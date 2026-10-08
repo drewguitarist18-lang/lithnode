@@ -1,0 +1,1043 @@
+<meta charset="utf-8">
+<title>Lithnode Spot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* One 16:9 film stage, then the cut sheet. Single deliberate look: onyx, like the app's dark theme. */
+  :root {
+    --onyx: #0a0a0a; --panel: #131313; --line: #262626; --ink: #ededed; --muted: #8d8d8d; --signal: #D97757;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Inter", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+    color-scheme: dark;
+  }
+  html, body { background: var(--onyx); color: var(--ink); }
+  [hidden] { display: none !important; }
+  body { font: 16px/1.55 var(--body); padding-inline: 16px; padding-block: 28px 48px; }
+  .wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+  .wrap > * { min-width: 0; }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  header.top h1 { font: 800 clamp(26px, 4vw, 40px)/1.05 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+  header.top p { margin: 0; color: var(--muted); font-size: 14px; }
+  .stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden;
+           background: var(--onyx); border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0, 0, 0, .55); }
+  .stage canvas { display: block; width: 100%; height: 100%; }
+  .stage:fullscreen { aspect-ratio: auto; border: 0; border-radius: 0; display: grid; place-items: center; }
+  .stage:fullscreen canvas { width: min(100vw, 177.78vh); height: auto; aspect-ratio: 16 / 9; }
+  .play { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10, 10, 10, .35); border: 0; cursor: pointer;
+          color: var(--ink); font: 600 15px var(--body); transition: background .2s; }
+  .play:hover { background: rgba(10, 10, 10, .2); }
+  .play:focus-visible { outline: 2px solid var(--signal); outline-offset: -6px; }
+  .play span { display: inline-flex; align-items: center; gap: 12px; padding: 14px 22px 14px 16px; border-radius: 999px;
+               background: var(--signal); color: #160b06; box-shadow: 0 12px 40px rgba(217, 119, 87, .35); }
+  .play svg { width: 26px; height: 26px; }
+  .bar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--signal); width: 0; }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .controls button { font: 600 14px var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+                     border-radius: 10px; padding: 8px 14px; cursor: pointer; }
+  .controls button:hover { border-color: var(--signal); }
+  .controls button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+  .controls .note { color: var(--muted); font-size: 13px; }
+  section.sheet h2 { font: 800 22px/1.2 var(--display); margin: 0 0 4px; letter-spacing: -0.01em; }
+  section.sheet > p { margin: 0 0 14px; color: var(--muted); max-width: 65ch; }
+  .table { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  th { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: var(--panel); }
+  tr:last-child td { border-bottom: 0; }
+  td.tc { font: 500 13px var(--mono); color: var(--signal); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .copybox { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .copybox div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .copybox b { display: block; font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+  .copybox p { margin: 0; }
+  footer { color: var(--muted); font-size: 12px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Lithnode · Split, check, ship</h1>
+    <p>1920 × 1080 · 0:31 · sound on</p>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="film" width="1920" height="1080" aria-label="Lithnode ad: three Claude Code agents split a 100,000-row job, a checker catches a missing chunk and gets it redone, and a publisher ships the result with the gh command line and a docs connector."></canvas>
+    <button class="play" id="play" aria-label="Play the ad with sound">
+      <span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Play with sound</span>
+    </button>
+    <div class="bar" id="bar"></div>
+  </div>
+
+  <div class="controls">
+    <button id="replay">Replay</button>
+    <button id="mute" aria-pressed="false">Sound on</button>
+    <button id="full">Full screen</button>
+    <span class="note">The MP4 render is in the site's media folder.</span>
+  </div>
+
+  <section class="sheet">
+    <h2>Cut sheet</h2>
+    <p>Every beat, with the words on screen and the sound under it. The score is a 120 BPM synth bed built into the page, cut to the picture.</p>
+    <div class="table">
+      <table>
+        <thead><tr><th>Time</th><th>Picture</th><th>On screen</th><th>Sound</th></tr></thead>
+        <tbody>
+          <tr><td class="tc">0:00–0:03</td><td>Three chores slam in, one per beat, then dim. The answer lands in orange.</td><td>“Clean 100,000 rows.” “Check every one.” “Ship it.” “Or let a team do it.”</td><td>Sub pulse, an impact on every line, riser.</td></tr>
+          <tr><td class="tc">0:03–0:07</td><td>The Lithnode window flies in. The flow snaps together: Start, Workers ×3, Checker, Publisher, Done. The cursor switches on Split the job, then presses Run.</td><td>“Draw the team.”</td><td>Impact, groove starts, a blip per node, UI clicks.</td></tr>
+          <tr><td class="tc">0:07–0:12</td><td>Camera dives onto the Workers. Three parts fill side by side, each streaming rows from messy to clean, with python running above the bots.</td><td>“Split the job.” A counter climbs to 100,000.</td><td>Full groove, ticks per batch, a chime per part.</td></tr>
+          <tr><td class="tc">0:12–0:16</td><td>The Checker scans each part. Two pass. Part 3 is missing 412 rows, gets cut, and is redone, then passes.</td><td>“Check every part.”</td><td>Chime for a pass, low thud for the cut, a riser for the redo.</td></tr>
+          <tr><td class="tc">0:16–0:21</td><td>The app slides left. A terminal types gh commands and a docs page fills with the report as the parts fly in.</td><td>“Ship with your tools.” Release v2.4, issue #112 closed.</td><td>Whoosh and a ding per part, key clicks.</td></tr>
+          <tr><td class="tc">0:21–0:27</td><td>Run history stacks up while the job is tweaked from 3 ways to 5. Minutes per run fall on a live chart.</td><td>“Run it.” “Tweak it.” “Run it again.” “On repeat.”</td><td>Double-time hats, a slam per word, riser.</td></tr>
+          <tr><td class="tc">0:27–0:31</td><td>The crew hops above the wordmark.</td><td>“Lithnode.” “Your CLIs. Your connectors. One team.”</td><td>Final hit, chord rings out.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sheet">
+    <h2>Copy kit</h2>
+    <div class="copybox">
+      <div><b>Tagline</b><p>Your CLIs. Your connectors. One team.</p></div>
+      <div><b>One-liner</b><p>Draw a team of Claude Code agents that splits a big job, checks every part and ships it with the tools you already use.</p></div>
+      <div><b>Post caption</b><p>Three agents split 100,000 rows. A checker catches the missing chunk. A publisher ships it with gh. Lithnode, for Claude Code.</p></div>
+    </div>
+  </section>
+
+  <footer>Data, release and issue numbers in this spot are demo data. Lithnode is an independent project for Claude Code, not made or endorsed by Anthropic.</footer>
+</div>
+
+<script>
+"use strict";
+// ============================================================================ setup
+const cv = document.getElementById("film"), g = cv.getContext("2d");
+const W = 1920, H = 1080, LENGTH = 31;
+const C = { bg: "#0a0a0a", panel: "#111111", pad: "#171717", line: "#262626", ink: "#ededed", muted: "#8d8d8d", grid: "#1c1c1c",
+            wire: "#4a4a4a", accent: "#D97757", done: "#9ece6a", failed: "#f7768e", hover: "#202020", cli: "#9ece6a" };
+const F = { display: '"Bricolage Grotesque", "Segoe UI", sans-serif', ui: '"Inter", "Segoe UI", system-ui, sans-serif', mono: '"JetBrains Mono", Consolas, monospace' };
+
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const span = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, p) => a + (b - a) * p;
+const outCubic = (p) => 1 - Math.pow(1 - p, 3);
+const outQuint = (p) => 1 - Math.pow(1 - p, 5);
+const outBack = (p) => { const s = 1.7; return Math.max(0, 1 + (s + 1) * Math.pow(p - 1, 3) + s * Math.pow(p - 1, 2)); };   // never below 0: arcs throw on negative radii
+const inOut = (p) => (p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+const inCubic = (p) => p * p * p;
+function rr(x, y, w, h, r, ctx = g) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function text(str, x, y, font, color, align = "left", alpha = 1, base = "alphabetic") {
+  if (alpha <= 0) return;
+  g.save(); g.globalAlpha *= alpha; g.font = font; g.fillStyle = color; g.textAlign = align; g.textBaseline = base; g.fillText(str, x, y); g.restore();
+}
+function tw(str, font) { g.font = font; return g.measureText(str).width; }
+function wrap(str, maxW, font) {
+  g.font = font; const out = []; let line = "";
+  for (const w of str.split(" ")) { const next = line ? line + " " + w : w; if (g.measureText(next).width > maxW && line) { out.push(line); line = w; } else line = next; }
+  if (line) out.push(line); return out;
+}
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const num = (v) => Math.round(v).toLocaleString("en-US");
+
+// ============================================================================ pixel bots (same art as the app)
+const SHAPES = {
+  crab:  ["..########..", "..#e####e#..", "############", "############", "..########..", "..########..", "..#.#..#.#..", "..#.#..#.#.."],
+  scout: ["...#....#...", "....#..#....", "..########..", ".#e######e#.", ".##########.", "..########..", "...#.##.#...", "..##....##.."],
+  byte:  [".....kk.....", "..########..", ".##e####e##.", ".##########.", "#.########.#", "#.########.#", "..##....##..", "..##....##.."],
+  muse:  ["...######...", "..########..", ".##e####e##.", ".##########.", ".##########.", ".##########.", ".##########.", ".##.##.##.##"],
+  golem: ["..########..", "..#e####e#..", "..########..", "############", "##.######.##", "kk.######.kk", "...##..##...", "..###..###.."],
+  bug:   ["..k......k..", "...k....k...", "..########..", ".#e##kk##e#.", "#####kk#####", ".####kk####.", "#.########.#", "#..#....#..#"],
+  guard: [".....kk.....", "...######...", "..########..", "..#kkkkkk#..", "..#e#kk#e#..", "..########..", "...######...", "..##....##.."],
+  owl:   [".##......##.", ".###....###.", ".##########.", "##ee####ee##", "#####kk#####", ".##########.", "..########..", "...kk..kk..."],
+  rocket:[".....##.....", "....####....", "...######...", "...#e##e#...", "...######...", "..########..", ".##.####.##.", "....k..k...."],
+  funnel:["############", ".##########.", "..########..", "...######...", "....####....", ".....kk.....", ".....kk.....", ".....kk....."],
+  hand:  ["...#.#.#....", "...#.#.#.#..", "...#.#.#.#..", ".#.#######..", ".#########..", "..########..", "...######...", "...kkkkkk..."],
+  trophy:[".##########.", "##.######.##", "#..######..#", ".#.######.#.", "...######...", ".....##.....", "....kkkk....", "...kkkkkk..."],
+};
+function shade(hex, k) { const n = parseInt(hex.slice(1), 16); return `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k)).join(",")})`; }
+function bot(shape, color, x, y, c, o = {}) {
+  const rows = SHAPES[shape], dark = shade(color, 0.6), bob = o.bob || 0, alpha = o.alpha ?? 1;
+  if (alpha <= 0) return;
+  g.save(); g.globalAlpha *= alpha;
+  rows.forEach((row, ry) => [...row].forEach((ch, cx) => {
+    if (ch === ".") return;
+    g.fillStyle = ch === "k" ? dark : ch === "e" ? "#000" : color;
+    g.fillRect(x + cx * c, y - bob + ry * c, c + 0.4, c + 0.4);
+  }));
+  if (o.typing != null) for (let i = 0; i < 3; i++) {
+    const on = Math.floor(o.typing * 5) % 3 === i;
+    g.fillStyle = on ? color : "rgba(255,255,255,.45)";
+    g.fillRect(x + (4.2 + i * 1.5) * c, y - bob - 1.5 * c - (on ? c * .3 : 0), c * .9, c * .9);
+  }
+  g.restore();
+}
+
+// ============================================================================ the job (demo data)
+const TOTAL = 100000;
+// one part per worker: rows, colour, when it fills, and what the checker says
+const PARTS = [
+  { i: 0, from: 1, to: 33334, color: "#5b8def", t0: 8.55, t1: 11.55, pass: true, why: "33,334 rows, no gaps" },
+  { i: 1, from: 33335, to: 66667, color: "#7aa2f7", t0: 8.65, t1: 11.85, pass: true, why: "33,333 rows, no gaps" },
+  { i: 2, from: 66668, to: 100000, color: "#2fb5a0", t0: 8.75, t1: 11.25, pass: false, why: "412 rows missing", fixed: "33,333 rows, redone" },
+];
+PARTS.forEach((p) => { p.n = p.to - p.from + 1; });
+const REDO = [14.75, 15.6], FIXED_AT = 15.8;   // part 3 is cut, redone by its worker, then passes
+// rows streaming through each part: messy in, clean out
+const ROWS = [
+  ["  taylor  SWIFT", "Taylor Swift"], ["DAFT punk ", "Daft Punk"], ["the weeknd", "The Weeknd"], ["arctic MONKEYS", "Arctic Monkeys"],
+  ["fleetwood  mac", "Fleetwood Mac"], ["sza", "SZA"], ["kendrick lamar ", "Kendrick Lamar"], ["THE MIDNIGHT", "The Midnight"],
+  ["  frank ocean", "Frank Ocean"], ["radiohead", "Radiohead"], ["billie EILISH", "Billie Eilish"], ["tame  impala", "Tame Impala"],
+];
+
+// ============================================================================ film grain + vignette (seeded, so every render matches)
+const GRAIN = [0, 1, 2, 3].map((s) => {
+  const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), d = x.createImageData(256, 256), r = mulberry(s * 99 + 1);
+  for (let i = 0; i < d.data.length; i += 4) { const v = r() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; }
+  x.putImageData(d, 0, 0); return g.createPattern(c, "repeat");
+});
+function postFX(t) {
+  const v = g.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * 1.05);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.32)");
+  g.fillStyle = v; g.fillRect(0, 0, W, H);
+  const f = Math.floor(t * 30);
+  g.save(); g.globalAlpha = .045; g.globalCompositeOperation = "overlay";
+  g.translate((f * 37) % 256, (f * 91) % 256); g.fillStyle = GRAIN[f % 4]; g.fillRect(-256, -256, W + 512, H + 512);
+  g.restore();
+}
+
+// ============================================================================ little marks: a CLI's prompt, a docs page
+function cliMark(x, y, s, on = true) {
+  rr(x, y, s, s, s * .24); g.fillStyle = "#1d1f24"; g.fill(); g.strokeStyle = "#3a3d45"; g.lineWidth = 1; g.stroke();
+  g.save(); g.strokeStyle = on ? C.cli : C.muted; g.lineWidth = Math.max(1.2, s * .11); g.lineCap = "round"; g.lineJoin = "round";
+  g.beginPath(); g.moveTo(x + s * .24, y + s * .32); g.lineTo(x + s * .44, y + s * .5); g.lineTo(x + s * .24, y + s * .68); g.stroke();
+  g.beginPath(); g.moveTo(x + s * .52, y + s * .7); g.lineTo(x + s * .76, y + s * .7); g.stroke(); g.restore();
+}
+function docMark(x, y, s, col = "#e8e8e8") {
+  g.save(); g.fillStyle = col; g.beginPath(); g.moveTo(x + s * .18, y); g.lineTo(x + s * .62, y); g.lineTo(x + s * .86, y + s * .24); g.lineTo(x + s * .86, y + s);
+  g.lineTo(x + s * .18, y + s); g.closePath(); g.fill();
+  g.fillStyle = "#555"; [.42, .58, .74].forEach((k) => g.fillRect(x + s * .3, y + s * k, s * .44, s * .07)); g.restore();
+}
+// a chip on a node: a command-line tool or a connector
+function chip(x, y, label, kind, on) {
+  const f = `700 10px ${F.ui}`, w = tw(label, f) + 26;
+  rr(x - w, y, w, 19, 9.5); g.fillStyle = on ? (kind === "cli" ? "rgba(158,206,106,.16)" : "rgba(200,200,200,.14)") : C.hover; g.fill();
+  if (kind === "cli") cliMark(x - w + 3, y + 2.5, 14, on); else docMark(x - w + 4, y + 3, 13, on ? "#e8e8e8" : C.muted);
+  text(label, x - 7, y + 13.5, f, on ? (kind === "cli" ? C.cli : C.ink) : C.muted, "right");
+  return w + 5;
+}
+
+// ============================================================================ the app, in world space (1:1 with the real layout)
+const APP = { x: 60, y: 40, w: 1800, h: 1000 };
+const LEFT = 330, RIGHT = 1530, BAR1 = 84, BAR2 = 134;
+const NW = 196, NH = 112, NY = 514;
+const SPLIT_ON = 6.78;
+const NODES = [
+  { id: "start", x: 356, kind: "start", name: "Start", type: "START", line: "Your task goes in here", shape: "crab", color: "#D97757", on: 7.75, off: 8.05 },
+  { id: "work", x: 586, kind: "team", name: "Workers", type: "TEAM", sub: "3 × Sonnet 5.5", job: "Clean every row of your part with a script.", shape: "byte", color: "#5b8def", n: 3, on: 8.05, off: 12.45, chips: [["python", "cli"]] },
+  { id: "check", x: 816, kind: "team", name: "Checker", type: "TEAM", sub: "1 × Haiku 4.5", job: "Counts every part. Flags gaps and bad rows.", shape: "bug", color: "#6cc070", on: 12.7, off: 16.25 },
+  { id: "ship", x: 1046, kind: "team", name: "Publisher", type: "TEAM", sub: "1 × Haiku 4.5", job: "Releases the file and writes the report.", shape: "rocket", color: "#bb9af7", on: 17.5, off: 20.85, chips: [["Docs", "conn"], ["gh", "cli"]] },
+  { id: "done", x: 1276, kind: "done", name: "Done", type: "DONE", line: "Final result lands here", shape: "trophy", color: "#e6b450", on: 20.85, off: 21.2 },
+];
+NODES.forEach((n, i) => { n.y = NY; n.pop = 4.35 + i * 0.36; n.cx = n.x + NW / 2; n.cy = n.y + NH / 2; });
+const NB = Object.fromEntries(NODES.map((n) => [n.id, n]));
+const RUN_AT = 7.6;
+function state(n, t) {
+  if (n.id === "work" && t >= REDO[0] && t < REDO[1]) return "work";   // worker 3 redoes its part
+  return t < RUN_AT ? "idle" : t < n.on ? "idle" : t < n.off ? "work" : "done";
+}
+
+// the tray where the workers' parts fill up
+const TRAY = { x: 426, y: 144, w: 608, h: 266 };
+const PART = (i) => ({ x: TRAY.x + 16, y: TRAY.y + 50 + i * 70, w: TRAY.w - 32, h: 62 });
+const CW = 150, CH = 58;
+const T_CHECK = (i) => 13.0 + i * 0.62, T_UP = (k) => 18.0 + k * 0.85;
+function partDone(p, t) {   // rows done in this part at time t
+  if (!p.pass && t >= REDO[0]) return t >= REDO[1] ? p.n : lerp(p.n - 412, p.n, outCubic(span(t, REDO[0], REDO[1])));
+  const f = span(t, p.t0, p.t1), e = f < 1 ? f * (0.94 + 0.06 * Math.sin(f * 9 + p.i)) : 1;
+  return (p.pass ? p.n : p.n - 412) * clamp(e);
+}
+
+function drawChrome(t) {
+  // shell bar
+  g.fillStyle = C.panel; g.fillRect(APP.x, APP.y, APP.w, BAR1 - APP.y);
+  g.fillStyle = C.line; g.fillRect(APP.x, BAR1 - 1, APP.w, 1);
+  bot("crab", "#D97757", 84, 52, 2.3);
+  text("Lithnode", 122, 68, `700 16px ${F.ui}`, C.ink); text("for Claude Code", 199, 68, `400 12px ${F.ui}`, C.muted);
+  rr(330, 50, 84, 28, 8); g.fillStyle = C.hover; g.fill(); text("Flows", 350, 69, `600 13px ${F.ui}`, C.ink);
+  const running = t >= RUN_AT && t < 20.9;
+  if (running) { g.fillStyle = C.accent; g.beginPath(); g.arc(400, 56, 7, 0, 7); g.fill(); text("1", 400, 60.5, `700 10px ${F.ui}`, "#fff", "center"); }
+  text("Office", 440, 69, `500 13px ${F.ui}`, C.muted);
+  g.fillStyle = C.done; g.beginPath(); g.arc(1572, 63, 4, 0, 7); g.fill();
+  text("Claude Code signed in", 1584, 68, `400 12.5px ${F.ui}`, C.muted);
+  rr(1730, 50, 56, 28, 8); g.strokeStyle = C.line; g.lineWidth = 1; g.stroke(); text("Dark", 1758, 68, `500 12px ${F.ui}`, C.muted, "center");
+  g.strokeStyle = C.line; g.beginPath(); g.arc(1818, 64, 14, 0, 7); g.stroke();
+  // flow toolbar
+  g.fillStyle = C.bg; g.fillRect(APP.x, BAR1, APP.w, BAR2 - BAR1);
+  g.fillStyle = C.line; g.fillRect(APP.x, BAR2 - 1, APP.w, 1);
+  const box = (x, w, label, opt = {}) => { rr(x, 93, w, 33, 8); g.fillStyle = opt.fill || C.pad; g.fill(); g.strokeStyle = opt.stroke || C.line; g.stroke(); text(label, x + (opt.center ? w / 2 : 12), 114, `${opt.weight || 500} 13px ${F.ui}`, opt.color || C.ink, opt.center ? "center" : "left"); };
+  box(74, 200, "Clean song library"); text("▾", 258, 114, `500 12px ${F.ui}`, C.muted);
+  box(282, 66, "+ New", { center: true }); box(356, 220, "Clean song library", { weight: 700 });
+  rr(600, 98, 74, 24, 12); g.strokeStyle = C.line; g.stroke(); text("5 agents", 637, 114, `500 12px ${F.ui}`, C.muted, "center");
+  if (running) {
+    const secs = Math.floor(span(t, RUN_AT, 20.9) * 252);
+    rr(1430, 97, 168, 26, 13); g.fillStyle = "rgba(217,119,87,.12)"; g.fill();
+    g.fillStyle = C.accent; g.globalAlpha = .6 + .4 * Math.sin(t * 8); g.beginPath(); g.arc(1446, 110, 4.5, 0, 7); g.fill(); g.globalAlpha = 1;
+    text(`Running · ${Math.floor(secs / 60)}m ${String(secs % 60).padStart(2, "0")}s`, 1458, 115, `600 12.5px ${F.ui}`, C.accent);
+  } else if (t >= 20.9) {
+    rr(1460, 97, 138, 26, 13); g.fillStyle = "rgba(158,206,106,.12)"; g.fill(); text("✓ Done · 4m 12s", 1529, 115, `600 12.5px ${F.ui}`, C.done, "center");
+  }
+  box(1606, 60, "Runs", { center: true }); box(1674, 38, "···", { center: true });
+  const press = t > 7.42 && t < 7.62;
+  g.save(); if (press) { g.translate(1758, 109); g.scale(.94, .94); g.translate(-1758, -109); }
+  box(1720, 76, "▶ Run", { fill: running ? "#8a4a34" : C.accent, stroke: running ? "#8a4a34" : C.accent, color: "#fff", center: true, weight: 700 });
+  g.restore();
+}
+
+function drawPalette() {
+  g.fillStyle = C.panel; g.fillRect(APP.x, BAR2, LEFT - APP.x, APP.y + APP.h - BAR2);
+  g.fillStyle = C.line; g.fillRect(LEFT - 1, BAR2, 1, APP.y + APP.h - BAR2);
+  text("BUILDING BLOCKS", 78, 166, `700 10.5px ${F.ui}`, C.muted);
+  const tiles = [["Custom team", "blank, no preset", "crab", "#e0823d"], ["Checkpoint", "waits, then merges", "funnel", "#7aa2f7"], ["Approval", "you say go", "hand", "#e0a23c"], ["Done", "the result", "trophy", "#e6b450"]];
+  tiles.forEach(([a, b, s, col], i) => {
+    const x = 76 + (i % 2) * 124, y = 180 + Math.floor(i / 2) * 102, dim = i === 3;
+    g.save(); g.globalAlpha = dim ? .4 : 1;
+    rr(x, y, 116, 94, 12); g.fillStyle = C.pad; g.fill(); g.strokeStyle = C.line; g.stroke();
+    bot(s, col, x + 40, y + 14, 3); text(a, x + 58, y + 64, `700 12.5px ${F.ui}`, C.ink, "center"); text(b, x + 58, y + 80, `400 10.5px ${F.ui}`, C.muted, "center");
+    g.restore();
+  });
+  text("BOTS", 78, 412, `700 10.5px ${F.ui}`, C.muted);
+  rr(270, 398, 46, 22, 11); g.strokeStyle = C.line; g.stroke(); text("+ New", 293, 413, `500 11px ${F.ui}`, C.ink, "center");
+  rr(76, 430, 240, 32, 8); g.fillStyle = C.bg; g.fill(); g.strokeStyle = C.line; g.stroke(); text("Find a bot", 92, 451, `400 12.5px ${F.ui}`, "#5c5c5c");
+  const list = [["Byte", "Senior engineer for code", "byte", "#5b8def"], ["Forge", "Builder that writes code", "golem", "#e0823d"], ["Beetle", "Bug hunter", "bug", "#6cc070", "READS"],
+                ["Sentinel", "Security reviewer", "guard", "#e5566e", "READS"], ["Launch", "Ship-ready check", "rocket", "#bb9af7", "READS"], ["Claude", "All-rounder", "crab", "#D97757", "READS"],
+                ["Scout", "Researcher that cites sources", "scout", "#2fb5a0", "READS + WEB"], ["Muse", "Writing partner", "muse", "#a77be6", "THINKS"], ["Atlas", "Planner that breaks work down", "owl", "#7aa2f7", "READS"]];
+  list.forEach(([n, d, s, col, tag], i) => {
+    const y = 478 + i * 60;
+    rr(76, y, 240, 52, 10); g.fillStyle = i === 0 ? C.hover : "transparent"; g.fill();
+    rr(84, y + 8, 36, 36, 9); g.fillStyle = shade(col, .18); g.fill(); bot(s, col, 88, y + 16, 2.35);
+    text(n, 130, y + 23, `700 13px ${F.ui}`, C.ink);
+    if (tag) { const w = tw(tag, `700 9px ${F.ui}`) + 12, x = 136 + tw(n, `700 13px ${F.ui}`); rr(x, y + 12, w, 16, 4); g.fillStyle = tag.includes("WEB") ? "rgba(122,162,247,.16)" : C.hover; g.fill(); text(tag, x + 6, y + 23.5, `700 9px ${F.ui}`, tag.includes("WEB") ? "#7aa2f7" : C.muted); }
+    text(d, 130, y + 40, `400 11.5px ${F.ui}`, C.muted);
+  });
+}
+
+function drawCanvasBg(t) {
+  g.fillStyle = C.bg; g.fillRect(LEFT, BAR2, RIGHT - LEFT, APP.y + APP.h - BAR2);
+  g.fillStyle = C.grid;
+  for (let x = LEFT + 12; x < RIGHT; x += 24) for (let y = BAR2 + 12; y < APP.y + APP.h; y += 24) g.fillRect(x, y, 2, 2);
+  // describe-a-team bar (hidden while a run is on, like the app)
+  g.save(); g.globalAlpha *= 1 - span(t, RUN_AT, RUN_AT + .4);
+  rr(646, 150, 568, 42, 12); g.fillStyle = C.pad; g.fill(); g.strokeStyle = C.line; g.stroke();
+  text("✦", 664, 177, `600 14px ${F.ui}`, C.accent);
+  text("Clean 100,000 songs 3 ways, check every part, ship it", 684, 176, `400 12.5px ${F.ui}`, "#9a9a9a");
+  rr(1122, 157, 84, 28, 8); g.fillStyle = C.accent; g.fill(); text("Build flow", 1164, 176, `700 12px ${F.ui}`, "#fff", "center");
+  g.restore();
+  // canvas controls
+  const bx = (x, w, l, col) => { rr(x, 990, w, 28, 7); g.fillStyle = C.pad; g.fill(); g.strokeStyle = col || C.line; g.stroke(); text(l, x + w / 2, 1009, `500 12px ${F.ui}`, col || C.ink, "center"); };
+  bx(1290, 92, "Auto-arrange", "#a5543b"); bx(1388, 28, "⇄"); bx(1420, 28, "−"); bx(1452, 36, "Fit"); bx(1492, 28, "+");
+}
+
+function wirePath(a, b) {
+  const ax = a.x + NW, ay = a.cy, bx = b.x, by = b.cy, dx = Math.max(30, (bx - ax) / 2);
+  g.beginPath(); g.moveTo(ax, ay); g.bezierCurveTo(ax + dx, ay, bx - dx, by, bx, by);
+}
+function drawWires(t) {
+  for (let i = 0; i < NODES.length - 1; i++) {
+    const a = NODES[i], b = NODES[i + 1];
+    const draw = outCubic(span(t, b.pop + .1, b.pop + .5));
+    if (draw <= 0) continue;
+    const sb = state(b, t), live = sb === "work", ok = sb === "done";
+    g.save();
+    g.lineWidth = live ? 3 : 2.2;
+    g.strokeStyle = live ? C.accent : ok ? C.done : C.wire;
+    if (draw < 1) { g.setLineDash([60 * draw, 999]); }
+    else if (live) { g.setLineDash([9, 7]); g.lineDashOffset = -t * 60; g.shadowColor = C.accent; g.shadowBlur = 12; }
+    wirePath(a, b); g.stroke();
+    g.restore();
+  }
+}
+
+function drawNode(n, t, selected) {
+  const p = outBack(span(t, n.pop, n.pop + .42));
+  if (p <= 0) return;
+  const st = state(n, t), work = st === "work", done = st === "done";
+  g.save();
+  g.translate(n.cx, n.cy); g.scale(p, p); g.translate(-n.cx, -n.cy); g.globalAlpha *= clamp(p);
+  if (work) { g.shadowColor = C.accent; g.shadowBlur = 34 + Math.sin(t * 6) * 8; }
+  rr(n.x, n.y, NW, NH, 12); g.fillStyle = C.pad; g.fill(); g.shadowBlur = 0;
+  g.lineWidth = work || done || selected ? 2 : 1;
+  g.strokeStyle = work ? C.accent : done ? C.done : selected ? "#5c5c5c" : C.line;
+  rr(n.x, n.y, NW, NH, 12); g.stroke();
+  if (selected) { g.strokeStyle = "rgba(217,119,87,.45)"; g.lineWidth = 1.5; rr(n.x - 5, n.y - 5, NW + 10, NH + 10, 15); g.stroke(); }
+  // ports
+  for (const [px, show] of [[n.x, n.kind !== "start"], [n.x + NW, n.kind !== "done"]]) if (show) { g.fillStyle = C.bg; g.strokeStyle = C.wire; g.lineWidth = 1.5; g.beginPath(); g.arc(px, n.cy, 5, 0, 7); g.fill(); g.stroke(); }
+  // avatar
+  if (n.n) { for (let i = 0; i < n.n; i++) bot(n.shape, PARTS[i].color, n.x + 12 + i * 22, n.y + 16, 1.7, { bob: work ? Math.abs(Math.sin(t * 9 + i * 1.3)) * 2 : 0 }); }
+  else bot(n.shape, n.color, n.x + 12, n.y + 14, 2.2, { bob: work ? Math.abs(Math.sin(t * 9)) * 2.5 : 0, typing: n.kind === "team" && work ? t : null });
+  const nx = n.n ? n.x + 82 : n.x + 46;
+  text(n.name, nx, n.y + 26, `700 14px ${F.ui}`, C.ink);
+  text(n.type, nx, n.y + 40, `600 9.5px ${F.ui}`, C.muted);
+  if (n.kind === "team") {
+    const split = n.id === "work" && t > SPLIT_ON;
+    text(n.sub + (split ? " · split 3 ways" : ""), n.x + 12, n.y + 64, `${split ? 600 : 400} 11px ${F.ui}`, split ? C.accent : C.muted);
+    wrap(n.job, NW - 24, `500 11.5px ${F.ui}`).slice(0, 2).forEach((l, i) => text(l, n.x + 12, n.y + 82 + i * 15, `500 11.5px ${F.ui}`, C.ink));
+    let cx = n.x + NW - 10;
+    for (const [label, kind] of n.chips || []) cx -= chip(cx, n.y + 30, label, kind, true);
+  } else text(n.line, n.x + 12, n.y + 74, `400 11.5px ${F.ui}`, C.muted);
+  if (done && t >= RUN_AT) {
+    g.fillStyle = C.done; g.beginPath(); g.arc(n.x + NW - 2, n.y + 2, 10, 0, 7); g.fill();
+    g.strokeStyle = C.bg; g.lineWidth = 2.6; g.beginPath(); g.moveTo(n.x + NW - 7, n.y + 2); g.lineTo(n.x + NW - 3, n.y + 6); g.lineTo(n.x + NW + 3, n.y - 2); g.stroke();
+  }
+  g.restore();
+}
+
+function bubble(n, label, t, a, color = C.accent, dx = 0) {
+  if (a <= 0) return;
+  g.save(); g.globalAlpha *= a;
+  g.font = `600 12px ${F.mono}`;
+  const cx = n.cx + dx, w = g.measureText(label).width + 26, x = cx - w / 2, y = n.y - 40 + (1 - a) * 6;
+  g.shadowColor = color; g.shadowBlur = 16;
+  rr(x, y, w, 26, 13); g.fillStyle = color; g.fill(); g.shadowBlur = 0;
+  g.beginPath(); g.moveTo(cx - 6, y + 26); g.lineTo(cx + 6, y + 26); g.lineTo(cx, y + 32); g.fill();
+  g.fillStyle = "#140a06"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(label, cx, y + 14);
+  g.restore();
+}
+function steps(t, list) { let cur = null; for (const [at, l] of list) if (t >= at) cur = [at, l]; return cur; }
+
+// ---- a part of the job, filling up in the tray (world units)
+function verdict(p, t) {   // "pass" | "cut" | null, with how far its stamp has popped in
+  const tc = T_CHECK(p.i); if (t < tc + .3) return null;
+  if (!p.pass && t >= FIXED_AT) return { v: "pass", sp: span(t, FIXED_AT, FIXED_AT + .25), why: p.fixed };
+  if (!p.pass && t >= REDO[0]) return null;
+  return { v: p.pass ? "pass" : "cut", sp: span(t, tc + .3, tc + .5), why: p.why };
+}
+function drawPart(p, t, o = {}) {
+  const r = PART(p.i), a = o.alpha ?? 1; if (a <= 0) return;
+  const appear = outQuint(span(t, 8.45 + p.i * .12, 8.9 + p.i * .12)); if (appear <= 0) return;
+  g.save(); g.globalAlpha *= a * appear; g.translate((1 - appear) * -30, 0);
+  const vd = verdict(p, t), cut = vd && vd.v === "cut";
+  rr(r.x, r.y, r.w, r.h, 10); g.fillStyle = "#181818"; g.fill();
+  g.lineWidth = 1.2; g.strokeStyle = vd ? (cut ? "rgba(247,118,142,.7)" : "rgba(158,206,106,.6)") : "#2c2c2c"; rr(r.x, r.y, r.w, r.h, 10); g.stroke();
+  const doneRows = partDone(p, t), f = doneRows / p.n, working = (t > p.t0 && t < p.t1) || (!p.pass && t >= REDO[0] && t < REDO[1]);
+  bot("byte", p.color, r.x + 12, r.y + 13, 2.2, { bob: working ? Math.abs(Math.sin(t * 10 + p.i)) * 2 : 0 });
+  text(`Part ${p.i + 1}`, r.x + 50, r.y + 25, `700 14px ${F.ui}`, C.ink);
+  text(`rows ${num(p.from)}–${num(p.to)}`, r.x + 50, r.y + 43, `500 11px ${F.mono}`, C.muted);
+  // progress
+  const bx = r.x + 200, bw = 200;
+  rr(bx, r.y + 15, bw, 10, 5); g.fillStyle = C.line; g.fill();
+  if (f > 0) { rr(bx, r.y + 15, Math.max(10, bw * f), 10, 5); g.fillStyle = cut ? C.failed : vd ? C.done : p.color; g.fill(); }
+  if (cut) { g.fillStyle = "rgba(10,10,10,.6)"; for (let k = 0; k < 4; k++) g.fillRect(bx + bw * (.31 + k * .17), r.y + 15, 7, 10); }   // the gaps
+  text(num(doneRows), bx, r.y + 43, `700 12px ${F.mono}`, C.ink);
+  text(`/ ${num(p.n)}`, bx + tw(num(doneRows), `700 12px ${F.mono}`) + 6, r.y + 43, `500 11px ${F.mono}`, C.muted);
+  // the row going through right now: messy in, clean out
+  if (working) {
+    const k = Math.floor(t * 7 + p.i * 5) % ROWS.length, [a0, b0] = ROWS[k];
+    text(a0.trim() === a0 ? a0 : "·" + a0.trim(), r.x + 420, r.y + 25, `500 10.5px ${F.mono}`, "#7a7a7a");
+    text("→ " + b0, r.x + 420, r.y + 43, `700 11px ${F.mono}`, p.color);
+  }
+  // the checker's scan line
+  const tc = T_CHECK(p.i), scan = span(t, tc, tc + .32);
+  if (scan > 0 && scan < 1) {
+    const xx = r.x + 4 + scan * (r.w - 8);
+    const sg = g.createLinearGradient(xx - 26, 0, xx + 2, 0); sg.addColorStop(0, "rgba(108,192,112,0)"); sg.addColorStop(1, "rgba(108,192,112,.35)");
+    g.fillStyle = sg; g.fillRect(xx - 26, r.y + 2, 28, r.h - 4); g.fillStyle = "#8ff09a"; g.fillRect(xx, r.y + 2, 1.6, r.h - 4);
+  }
+  if (vd) {
+    const sp = outBack(clamp(vd.sp)), pass = vd.v === "pass";
+    g.save(); g.translate(r.x + r.w - 18, r.y + 18); g.scale(sp, sp);
+    g.fillStyle = pass ? C.done : C.failed; g.beginPath(); g.arc(0, 0, 11, 0, 7); g.fill();
+    g.strokeStyle = "#0a0a0a"; g.lineWidth = 2.6; g.beginPath();
+    if (pass) { g.moveTo(-5, 0); g.lineTo(-1.5, 3.5); g.lineTo(5, -3.5); } else { g.moveTo(-4, -4); g.lineTo(4, 4); g.moveTo(4, -4); g.lineTo(-4, 4); }
+    g.stroke(); g.restore();
+    const f2 = `700 11px ${F.ui}`, w = tw(vd.why, f2) + 16;
+    g.save(); g.globalAlpha *= clamp(vd.sp * 2);
+    g.fillStyle = "#181818"; g.fillRect(r.x + 414, r.y + 30, r.w - 420, 22);
+    rr(r.x + r.w - w - 8, r.y + 35, w, 20, 10); g.fillStyle = pass ? "#2c3a22" : "#f7768e"; g.fill();
+    text(vd.why, r.x + r.w - 16, r.y + 49, f2, pass ? C.done : "#1a0a0e", "right"); g.restore();
+  }
+  g.restore();
+}
+
+function drawTray(t) {
+  const a = outCubic(span(t, 8.35, 8.75)); if (a <= 0) return;
+  const fade = 1 - span(t, 20.4, 20.9);
+  g.save(); g.globalAlpha *= a * fade;
+  rr(TRAY.x, TRAY.y + (1 - a) * 14, TRAY.w, TRAY.h, 14); g.fillStyle = "#111111"; g.fill(); g.strokeStyle = C.line; g.lineWidth = 1; g.stroke();
+  const rows = PARTS.reduce((s, p) => s + partDone(p, t), 0);
+  const checked = PARTS.map((p) => verdict(p, t)).filter(Boolean), passed = checked.filter((v) => v.v === "pass").length, cut = checked.length - passed;
+  const checking = t >= 12.9;
+  bot(checking ? "bug" : "byte", checking ? "#6cc070" : "#5b8def", TRAY.x + 16, TRAY.y + 16, 1.6);
+  text(checking ? "Checked by Checker" : "Workers · split 3 ways", TRAY.x + 42, TRAY.y + 29, `700 12.5px ${F.ui}`, C.ink);
+  const right = checking ? (checked.length ? `${passed} passed${cut ? ` · ${cut} cut` : ""}` : "checking…") : `${num(rows)} / ${num(TOTAL)} rows`;
+  text(right, TRAY.x + TRAY.w - 16, TRAY.y + 29, `600 12px ${F.mono}`, checking ? (cut ? C.failed : C.done) : C.ink, "right");
+  if (!checking) { rr(TRAY.x + 16, TRAY.y + 38, TRAY.w - 32, 3, 1.5); g.fillStyle = C.line; g.fill(); rr(TRAY.x + 16, TRAY.y + 38, (TRAY.w - 32) * rows / TOTAL, 3, 1.5); g.fillStyle = C.accent; g.fill(); }
+  g.restore();
+  for (const p of PARTS) { if (t >= T_UP(p.i)) continue; drawPart(p, t, { alpha: fade }); }
+}
+
+function drawInspector(t) {
+  const X = RIGHT, Y = BAR2, w = APP.x + APP.w - RIGHT;
+  g.fillStyle = C.panel; g.fillRect(X, Y, w, APP.y + APP.h - Y);
+  g.fillStyle = C.line; g.fillRect(X, Y, 1, APP.y + APP.h - Y);
+  const L = X + 20;
+  if (t < 6.15) {
+    text("Clean song library", L, Y + 40, `700 19px ${F.ui}`, C.ink);
+    ["5 agents", "5 steps", "3× Sonnet 5.5"].forEach((c, i, arr) => { const x = L + arr.slice(0, i).reduce((s, v) => s + tw(v, `500 11.5px ${F.ui}`) + 22, 0); rr(x, Y + 56, tw(c, `500 11.5px ${F.ui}`) + 16, 24, 12); g.strokeStyle = C.line; g.stroke(); text(c, x + 8, Y + 72, `500 11.5px ${F.ui}`, C.muted); });
+    text("GET STARTED", L, Y + 122, `700 10.5px ${F.ui}`, C.muted); text("2 of 3", X + w - 20, Y + 122, `500 11px ${F.ui}`, C.muted, "right");
+    rr(L, Y + 134, w - 40, 6, 3); g.fillStyle = C.line; g.fill(); rr(L, Y + 134, (w - 40) * .66, 6, 3); g.fillStyle = C.accent; g.fill();
+    [["Make a team", "Describe it in one line, or add bots.", true], ["Set them up", "Give each team a job and its tools.", true], ["Run it", "Say what you want done.", false]].forEach(([a, b, ok], i) => {
+      const y = Y + 158 + i * 78; rr(L, y, w - 40, 68, 12); g.fillStyle = C.pad; g.fill(); g.strokeStyle = !ok ? "#7a4a3a" : C.line; g.stroke();
+      bot(["owl", "golem", "rocket"][i], ["#7aa2f7", "#e0823d", "#bb9af7"][i], L + 14, y + 20, 2.4, { alpha: ok ? .55 : 1 });
+      if (ok) { g.fillStyle = C.done; g.beginPath(); g.arc(L + 44, y + 46, 7, 0, 7); g.fill(); }
+      text(a, L + 60, y + 30, `700 13px ${F.ui}`, C.ink); text(b, L + 60, y + 48, `400 11.5px ${F.ui}`, C.muted);
+    });
+    return;
+  }
+  // the Workers team is selected
+  const sel = outCubic(span(t, 6.15, 6.4));
+  g.save(); g.globalAlpha *= sel; g.translate((1 - sel) * 12, 0);
+  rr(L, Y + 20, 44, 44, 11); g.fillStyle = shade("#5b8def", .18); g.fill(); bot("byte", "#5b8def", L + 8, Y + 32, 2.3);
+  text("Workers", L + 58, Y + 40, `700 18px ${F.ui}`, C.ink); text("TEAM · 3 × Sonnet 5.5", L + 58, Y + 58, `600 10px ${F.ui}`, C.muted);
+  const sec = (label, y) => text(label, L, y, `700 10.5px ${F.ui}`, C.muted);
+  sec("TEAM", Y + 98);
+  rr(L, Y + 108, 112, 34, 9); g.fillStyle = C.bg; g.fill(); g.strokeStyle = C.line; g.stroke();
+  text("−", L + 18, Y + 131, `600 16px ${F.ui}`, C.muted, "center"); text("3", L + 56, Y + 131, `700 15px ${F.ui}`, C.ink, "center"); text("+", L + 94, Y + 131, `600 16px ${F.ui}`, C.muted, "center");
+  text("agents", L + 124, Y + 130, `400 12px ${F.ui}`, C.muted);
+  // Split the job
+  const sp = outCubic(span(t, SPLIT_ON, SPLIT_ON + .17)), y0 = Y + 152;
+  rr(L, y0, w - 40, 54, 10); g.fillStyle = sp > .5 ? "rgba(217,119,87,.08)" : C.pad; g.fill(); g.strokeStyle = sp > .5 ? "rgba(217,119,87,.5)" : C.line; g.stroke();
+  text("Split the job", L + 14, y0 + 23, `700 13px ${F.ui}`, C.ink);
+  text(sp > .5 ? "On: one job, 3 parts, side by side" : "Off: every agent does the whole job", L + 14, y0 + 41, `400 11px ${F.ui}`, C.muted);
+  const sx = L + w - 40 - 50, sy = y0 + 17;
+  rr(sx, sy, 38, 21, 10.5); g.fillStyle = sp > .5 ? C.accent : C.line; g.fill();
+  g.fillStyle = "#fff"; g.beginPath(); g.arc(sx + 10.5 + sp * 17, sy + 10.5, 7.5, 0, 7); g.fill();
+  sec("ACCESS", Y + 236);
+  [["Read files", false], ["Edit files", true], ["Edit + run code", false]].forEach(([c, on], i, arr) => { const x = L + arr.slice(0, i).reduce((s, v) => s + tw(v[0], `600 11.5px ${F.ui}`) + 28, 0); rr(x, Y + 248, tw(c, `600 11.5px ${F.ui}`) + 20, 26, 13); g.fillStyle = on ? "rgba(217,119,87,.14)" : "transparent"; g.fill(); g.strokeStyle = on ? "#7a4a3a" : C.line; g.stroke(); text(c, x + 10, Y + 265, `600 11.5px ${F.ui}`, on ? C.accent : C.muted); });
+  sec("COMMAND-LINE TOOLS", Y + 308); text("only these can run", X + w - 20, Y + 308, `400 10.5px ${F.ui}`, "#5c5c5c", "right");
+  [["Python", "python", true], ["Git", "git", false], ["GitHub", "gh", false], ["npm", "npm", false]].forEach(([name, id, on], i) => {
+    const y = Y + 322 + i * 48;
+    rr(L, y, w - 40, 40, 10); g.fillStyle = on ? "rgba(158,206,106,.08)" : C.pad; g.fill(); g.strokeStyle = on ? "rgba(158,206,106,.5)" : C.line; g.stroke();
+    cliMark(L + 11, y + 10, 20, on);
+    text(name, L + 40, y + 25, `600 12.5px ${F.ui}`, on ? C.ink : C.muted); text(id, L + 46 + tw(name, `600 12.5px ${F.ui}`), y + 25, `500 11px ${F.mono}`, "#5c5c5c");
+    const kx = L + w - 40 - 46, ky = y + 10; rr(kx, ky, 36, 20, 10); g.fillStyle = on ? C.cli : C.line; g.fill();
+    g.fillStyle = "#fff"; g.beginPath(); g.arc(kx + (on ? 26 : 10), ky + 10, 7, 0, 7); g.fill();
+  });
+  sec("CONNECTORS", Y + 528); text("loaded only when used", X + w - 20, Y + 528, `400 10.5px ${F.ui}`, "#5c5c5c", "right");
+  [["Docs", "#e8e8e8"], ["Vercel", "#cfcfcf"]].forEach(([name, col], i) => {
+    const y = Y + 542 + i * 48;
+    rr(L, y, w - 40, 40, 10); g.fillStyle = C.pad; g.fill(); g.strokeStyle = C.line; g.stroke();
+    if (i === 0) docMark(L + 13, y + 11, 18, C.muted); else { rr(L + 12, y + 12, 16, 16, 4); g.fillStyle = col; g.globalAlpha *= .6; g.fill(); g.globalAlpha /= .6; }
+    text(name, L + 40, y + 25, `600 12.5px ${F.ui}`, C.muted);
+    const kx = L + w - 40 - 46, ky = y + 10; rr(kx, ky, 36, 20, 10); g.fillStyle = C.line; g.fill(); g.fillStyle = "#fff"; g.beginPath(); g.arc(kx + 10, ky + 10, 7, 0, 7); g.fill();
+  });
+  g.restore();
+}
+
+function cursor(x, y, press, alpha) {
+  if (alpha <= 0) return;
+  g.save(); g.globalAlpha *= alpha; g.translate(x, y); const s = press ? .88 : 1; g.scale(s, s);
+  if (press) { g.strokeStyle = "rgba(255,255,255,.5)"; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, 18 * (2 - s), 0, 7); g.stroke(); }
+  g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 8; g.shadowOffsetY = 2;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 22); g.lineTo(6, 17); g.lineTo(10, 26); g.lineTo(14, 24); g.lineTo(10, 15); g.lineTo(17, 15); g.closePath();
+  g.fillStyle = "#fff"; g.fill(); g.shadowBlur = 0; g.strokeStyle = "#000"; g.lineWidth = 1.4; g.stroke();
+  g.restore();
+}
+const CUR = [[5.9, 1240, 760], [6.6, 1800, 297], [6.9, 1800, 297], [7.35, 1758, 112], [7.9, 1758, 112]];
+function cursorAt(t) {
+  if (t < CUR[0][0] || t > 8.1) return null;
+  for (let i = 0; i < CUR.length - 1; i++) {
+    const [a, x0, y0] = CUR[i], [b, x1, y1] = CUR[i + 1];
+    if (t <= b) { const p = inOut(span(t, a, b)); return [lerp(x0, x1, p), lerp(y0, y1, p) - Math.sin(p * Math.PI) * 40]; }
+  }
+  return [CUR.at(-1)[1], CUR.at(-1)[2]];
+}
+
+function drawAppWorld(t) {
+  g.save();
+  rr(APP.x, APP.y, APP.w, APP.h, 16); g.clip();
+  drawChrome(t); drawPalette(); drawCanvasBg(t); drawInspector(t);
+  g.save(); g.beginPath(); g.rect(LEFT, BAR2, RIGHT - LEFT, APP.y + APP.h - BAR2); g.clip();
+  drawWires(t);
+  NODES.forEach((n) => drawNode(n, t, n.id === "work" && t > 6.15 && t < RUN_AT + .2));
+  drawTray(t);
+  // checker beam to the part being checked
+  for (const p of PARTS) {
+    const tc = T_CHECK(p.i); if (t < tc - .02 || t > tc + .38) continue;
+    const r = PART(p.i), a = 1 - span(t, tc + .26, tc + .38), from = { x: NB.check.cx, y: NB.check.y };
+    g.save(); g.globalAlpha = a; g.strokeStyle = "#8ff09a"; g.lineWidth = 2; g.shadowColor = "#6cc070"; g.shadowBlur = 18;
+    g.setLineDash([6, 5]); g.lineDashOffset = -t * 120;
+    g.beginPath(); g.moveTo(from.x, from.y); g.quadraticCurveTo(from.x + 60, r.y + r.h + 40, r.x + r.w - 60, r.y + r.h); g.stroke(); g.restore();
+  }
+  // live steps above the nodes
+  if (t > 8.1 && t < 12.45) {   // three agents, three bubbles, stacked
+    PARTS.forEach((p, i) => { if (t > p.t1 + .15) return; const n = { ...NB.work, y: NB.work.y - i * 31 }; bubble(n, `Running: python clean.py --part ${i + 1}`, t, outCubic(span(t, 8.1 + i * .12, 8.3 + i * .12)), C.cli); });
+  }
+  if (t > 12.7 && t < 16.25) {
+    const cur = PARTS.filter((p) => t >= T_CHECK(p.i) - .05).at(-1);
+    let label = cur ? `Counting part ${cur.i + 1}: ${num(cur.n)} rows` : "Reading the parts";
+    if (t >= T_CHECK(2) + .3) label = t < REDO[0] ? "✕ Part 3: 412 rows missing" : t < FIXED_AT ? "Part 3 sent back" : "✓ All 3 parts check out";
+    bubble(NB.check, label, t, 1, t >= T_CHECK(2) + .3 && t < REDO[0] ? C.failed : "#6cc070");
+  }
+  if (t >= REDO[0] && t < REDO[1]) bubble(NB.work, "python clean.py --part 3", t, outCubic(span(t, REDO[0], REDO[0] + .2)), C.cli);
+  if (t > 17.5 && t < 20.85) {
+    const s = steps(t, [[17.5, "Running: gh release create v2.4"], [19.15, "Running: gh issue close 112"], [19.95, "Docs: create page"]]);
+    bubble(NB.ship, s[1], t, outCubic(span(t, s[0], s[0] + .18)), s[1].startsWith("Docs") ? "#e8e8e8" : C.cli);
+  }
+  g.restore();
+  const cu = cursorAt(t);
+  if (cu) cursor(cu[0], cu[1], (t > 6.7 && t < 6.86) || (t > 7.42 && t < 7.6), clamp(span(t, 5.9, 6.1) * (1 - span(t, 7.8, 8.1))));
+  g.restore();
+  g.lineWidth = 1; g.strokeStyle = "#2c2c2c"; rr(APP.x, APP.y, APP.w, APP.h, 16); g.stroke();
+}
+
+// ============================================================================ camera
+const CAMK = [[0, 960, 540, 1], [7.4, 960, 556, 1], [8.35, 742, 430, 1.6], [12.5, 752, 432, 1.6], [13.15, 812, 446, 1.55], [16.8, 822, 448, 1.55], [17.65, 1012, 442, 1.15], [21.6, 1030, 446, 1.1]];
+function cam(t) {
+  if (t <= CAMK[0][0]) return { cx: CAMK[0][1], cy: CAMK[0][2], z: CAMK[0][3] };
+  for (let i = 0; i < CAMK.length - 1; i++) {
+    const a = CAMK[i], b = CAMK[i + 1];
+    if (t <= b[0]) { const p = inOut(span(t, a[0], b[0])); return { cx: lerp(a[1], b[1], p), cy: lerp(a[2], b[2], p), z: lerp(a[3], b[3], p) }; }
+  }
+  const l = CAMK.at(-1); return { cx: l[1], cy: l[2], z: l[3] };
+}
+const shiftX = (t) => -380 * inOut(span(t, 16.95, 17.65));
+function toScreen(wx, wy, t) { const c = cam(t); return { x: (wx - c.cx) * c.z + 960 + shiftX(t), y: (wy - c.cy) * c.z + 540, z: c.z }; }
+
+// ============================================================================ shipping: a terminal and a docs page (screen space)
+const SX = (t) => 1000 + 960 * (1 - outQuint(span(t, 16.95, 17.75)));
+const TERM = [   // [start, end of typing (or same for output), text, kind]
+  [17.7, 18.35, '$ gh release create v2.4 songs-clean.csv -t "Clean library"', "cmd"],
+  [18.5, 18.5, "  ↑ songs-clean.csv   100,000 rows   4.1 MB", "out"],
+  [18.85, 18.85, "  ✓ Release v2.4 published", "ok"],
+  [19.2, 19.75, '$ gh issue close 112 -c "Cleaned all 100,000 songs"', "cmd"],
+  [19.95, 19.95, "  ✓ Closed issue #112", "ok"],
+];
+function drawShip(t) {
+  const x0 = SX(t); if (x0 >= W) return;
+  g.save();
+  g.shadowColor = "rgba(0,0,0,.65)"; g.shadowBlur = 80; g.shadowOffsetX = -20;
+  rr(x0 - 12, 50, 904, 980, 24); g.fillStyle = "#0a0a0a"; g.fill();   // one backdrop, so the app never shows between the two panels
+  g.shadowBlur = 0; g.shadowOffsetX = 0;
+  rr(x0, 62, 880, 420, 18); g.fillStyle = "#0d0f12"; g.fill();
+  rr(x0, 500, 880, 518, 18); g.fillStyle = "#f6f6f3"; g.fill(); g.shadowBlur = 0; g.shadowOffsetX = 0;
+  // terminal
+  g.save(); rr(x0, 62, 880, 420, 18); g.clip();
+  g.fillStyle = "#16191e"; g.fillRect(x0, 62, 880, 46);
+  ["#f7768e", "#e0af68", "#9ece6a"].forEach((c, i) => { g.fillStyle = c; g.beginPath(); g.arc(x0 + 26 + i * 22, 85, 6.5, 0, 7); g.fill(); });
+  cliMark(x0 + 400, 74, 22); text("Publisher · gh", x0 + 430, 90, `600 13px ${F.ui}`, "#b9bcc4");
+  let ly = 150;
+  for (const [a, b, s, kind] of TERM) {
+    if (t < a) break;
+    const shown = kind === "cmd" ? s.slice(0, Math.ceil(s.length * span(t, a, b))) : s;
+    const col = kind === "cmd" ? "#e6e6e6" : kind === "ok" ? C.done : "#8a8f99";
+    if (kind === "cmd") { text("$", x0 + 32, ly, `700 17px ${F.mono}`, C.cli); text(shown.slice(1), x0 + 32 + tw("$", `700 17px ${F.mono}`), ly, `500 17px ${F.mono}`, col); }
+    else text(shown, x0 + 32, ly, `${kind === "ok" ? 700 : 500} 17px ${F.mono}`, col, "left", outCubic(span(t, a, a + .15)));
+    if (kind === "cmd" && t < b + .1 && Math.floor(t * 6) % 2) { g.fillStyle = "#e6e6e6"; g.fillRect(x0 + 34 + tw(shown, `500 17px ${F.mono}`), ly - 16, 10, 20); }
+    ly += 46;
+  }
+  if (t > 20.1) { text("$", x0 + 32, ly, `700 17px ${F.mono}`, C.cli); if (Math.floor(t * 3) % 2) { g.fillStyle = "#e6e6e6"; g.fillRect(x0 + 52, ly - 16, 10, 20); } }
+  g.restore();
+  // docs page
+  g.save(); rr(x0, 500, 880, 518, 18); g.clip();
+  docMark(x0 + 34, 530, 30, "#2a2a2a");
+  text("Docs", x0 + 72, 552, `600 13px ${F.ui}`, "#8a8a8a"); text("›  Projects  ›  Music", x0 + 112, 552, `400 13px ${F.ui}`, "#9a9a9a");
+  const head = outCubic(span(t, 17.9, 18.3));
+  text("Song library cleanup", x0 + 34, 612, `800 34px ${F.display}`, "#1a1a1a", "left", head);
+  text("Written by Lithnode · Publisher  ·  Run 1", x0 + 36, 642, `500 13px ${F.ui}`, "#8a8a8a", "left", head);
+  const mx = x0 + 34, ty = 672;
+  rr(mx, ty, 812, 216, 10); g.fillStyle = "#fff"; g.fill(); g.strokeStyle = "#e3e3df"; g.lineWidth = 1; g.stroke();
+  g.fillStyle = "#f3f3f0"; g.fillRect(mx + 1, ty + 1, 810, 38);
+  [["Part", 20], ["Rows", 200], ["Checker", 380], ["Status", 640]].forEach(([h, dx]) => text(h, mx + dx, ty + 25, `600 12px ${F.ui}`, "#6b6b6b"));
+  PARTS.forEach((p, k) => {
+    const land = T_UP(k) + .7; if (t < land - .05) return;
+    const y = ty + 40 + k * 58, a = outCubic(span(t, land - .05, land + .15)), fresh = 1 - span(t, land, land + 1.2);
+    g.save(); g.globalAlpha *= a;
+    g.fillStyle = `rgba(158,206,106,${.2 * fresh})`; g.fillRect(mx + 1, y, 810, 58);
+    if (k < 2) { g.fillStyle = "#ececea"; g.fillRect(mx + 16, y + 57, 780, 1); }
+    bot("byte", p.color, mx + 20, y + 16, 2.2); text(`Part ${k + 1}`, mx + 56, y + 35, `600 14px ${F.ui}`, "#1a1a1a");
+    text(num(p.n), mx + 200, y + 35, `600 14px ${F.mono}`, "#1a1a1a");
+    text(p.pass ? "Passed" : "Passed after a redo", mx + 380, y + 35, `500 13.5px ${F.ui}`, p.pass ? "#3d8a1f" : "#a05a12");
+    const bp = outBack(span(t, land + .3, land + .55));
+    g.save(); g.translate(mx + 676, y + 30); g.scale(lerp(.6, 1, bp), lerp(.6, 1, bp));
+    rr(-36, -12, 72, 22, 11); g.fillStyle = "#cdeab0"; g.fill(); text("Released", 0, 3.5, `700 11px ${F.ui}`, "#245a12", "center"); g.restore();
+    g.restore();
+  });
+  const ta = outCubic(span(t, 20.9, 21.15)); if (ta > 0) {
+    g.save(); g.globalAlpha *= ta; const tx = x0 + 440, ty2 = 958 + (1 - ta) * 20;
+    rr(tx - 220, ty2 - 26, 440, 50, 12); g.fillStyle = "#1c1c1c"; g.fill();
+    g.fillStyle = C.done; g.beginPath(); g.arc(tx - 190, ty2 - 1, 10, 0, 7); g.fill();
+    text("100,000 rows released · report saved", tx - 170, ty2 + 4, `600 14px ${F.ui}`, "#fff"); g.restore();
+  }
+  g.restore();
+  g.restore();
+}
+function partCard(p, x, y, s, alpha) {   // a part, as a small card in flight
+  g.save(); g.globalAlpha *= alpha; g.translate(x, y); g.scale(s, s); g.translate(-CW / 2, -CH / 2);
+  g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 14; g.shadowOffsetY = 4;
+  rr(0, 0, CW, CH, 9); g.fillStyle = "#1b1b1b"; g.fill(); g.shadowBlur = 0; g.shadowOffsetY = 0;
+  g.strokeStyle = "rgba(158,206,106,.8)"; g.lineWidth = 1.2; rr(0, 0, CW, CH, 9); g.stroke();
+  bot("byte", p.color, 10, 14, 2.4); text(`Part ${p.i + 1}`, 48, 25, `700 13px ${F.ui}`, C.ink);
+  text(num(p.n) + " rows", 48, 43, `500 11px ${F.mono}`, C.done);
+  g.fillStyle = C.done; g.beginPath(); g.arc(CW - 12, 12, 8, 0, 7); g.fill();
+  g.strokeStyle = "#0a0a0a"; g.lineWidth = 2; g.beginPath(); g.moveTo(CW - 15.5, 12); g.lineTo(CW - 13, 14.5); g.lineTo(CW - 8.5, 9.5); g.stroke();
+  g.restore();
+}
+function drawFlyingParts(t) {   // screen space: tray → publisher → docs row
+  for (const p of PARTS) {
+    const t0 = T_UP(p.i), f = span(t, t0, t0 + .7); if (t < t0 || f >= 1) continue;
+    const r = PART(p.i), a = toScreen(r.x + r.w / 2, r.y + r.h / 2, t), u = toScreen(NB.ship.cx, NB.ship.y - 20, t);
+    const end = { x: SX(t) + 34 + 120, y: 672 + 40 + p.i * 58 + 29 };
+    for (let gh = 3; gh >= 0; gh--) {   // motion trail
+      const e = inOut(clamp(f - gh * .035));
+      const x = (1 - e) * (1 - e) * a.x + 2 * (1 - e) * e * u.x + e * e * end.x, y = (1 - e) * (1 - e) * a.y + 2 * (1 - e) * e * (u.y - 220) + e * e * end.y;
+      partCard(p, x, y, lerp(a.z * .9, .7, e), gh ? .14 : 1 - span(f, .9, 1));
+    }
+  }
+}
+
+// ============================================================================ scenes
+function sceneOpen(t) {
+  const out = span(t, 3.25, 3.65); if (out >= 1) return;
+  g.save();
+  const z = 1 + inCubic(out) * 1.8; g.translate(W / 2, H / 2); g.scale(z, z); g.translate(-W / 2, -H / 2); g.globalAlpha = 1 - out;
+  const lines = [["Clean 100,000 rows.", .15], ["Check every one.", .75], ["Ship it.", 1.35]];
+  const dim = span(t, 2.0, 2.3);
+  lines.forEach(([s, at], i) => {
+    const p = span(t, at, at + .28); if (p <= 0) return;
+    const sc = lerp(1.35, 1, outQuint(p)), y = 330 + i * 140 - dim * 70;
+    g.save(); g.translate(170, y); g.scale(sc, sc); g.globalAlpha *= clamp(p * 3) * lerp(1, .22, dim);
+    text(s, 0, 0, `800 128px ${F.display}`, C.ink); g.restore();
+    if (dim > 0) { g.fillStyle = `rgba(217,119,87,${.8 * dim})`; g.fillRect(170, y - 44, tw(s, `800 128px ${F.display}`) * outCubic(span(t, 2.0 + i * .06, 2.3 + i * .06)), 8); }
+  });
+  const q = span(t, 2.35, 2.62);
+  if (q > 0) {
+    g.save(); const sc = lerp(1.6, 1, outQuint(q)); g.translate(170, 760); g.scale(sc, sc); g.globalAlpha *= clamp(q * 2.5);
+    const a = "Or let a ", b = "team", c = " do it.", f = `800 132px ${F.display}`;
+    text(a, 0, 0, f, C.ink); text(b, tw(a, f), 0, f, C.accent); text(c, tw(a + b, f), 0, f, C.ink);
+    g.restore();
+  }
+  g.restore();
+}
+
+function caption(t, a, b, big, small) {
+  const p = outQuint(span(t, a, a + .45)) * (1 - span(t, b - .3, b));
+  if (p <= 0) return;
+  const y = 952;
+  g.save(); g.globalAlpha = p;
+  const grad = g.createLinearGradient(0, H - 330, 0, H); grad.addColorStop(0, "rgba(10,10,10,0)"); grad.addColorStop(.45, "rgba(10,10,10,.82)"); grad.addColorStop(1, "rgba(10,10,10,.97)");
+  g.fillStyle = grad; g.fillRect(0, H - 330, Math.min(W, SX(t)), 330);
+  g.fillStyle = C.accent; g.fillRect(96, y - 70 + (1 - p) * 20, 6, 98);
+  text(big, 126, y - 12 + (1 - p) * 24, `800 74px ${F.display}`, C.ink);
+  text(small, 129, y + 26 + (1 - p) * 24, `500 25px ${F.ui}`, "#bdbdbd");
+  g.restore();
+}
+
+function sceneApp(t) {
+  if (t < 3.3 || t > 22.2) return;
+  const intro = span(t, 3.3, 4.35), ie = outQuint(intro);
+  const c = cam(t);
+  g.save();
+  g.globalAlpha = clamp(intro * 3) * (1 - span(t, 21.7, 22.2));
+  g.translate(W / 2, H / 2 + (1 - ie) * 260);
+  g.transform(1, (1 - ie) * -.08, 0, 1, 0, 0);
+  g.scale(lerp(.62, 1, ie), lerp(.62, 1, ie));
+  g.rotate((1 - ie) * -.05);
+  g.translate(-W / 2, -H / 2);
+  if (intro < 1) { g.save(); g.globalAlpha *= (1 - intro); const gl = g.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, 1000); gl.addColorStop(0, "rgba(217,119,87,.35)"); gl.addColorStop(1, "rgba(217,119,87,0)"); g.fillStyle = gl; g.fillRect(-200, -200, W + 400, H + 400); g.restore(); }
+  g.transform(c.z, 0, 0, c.z, 960 + shiftX(t) - c.cx * c.z, 540 - c.cy * c.z);
+  g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = 90; rr(APP.x, APP.y, APP.w, APP.h, 16); g.fillStyle = C.bg; g.fill(); g.shadowBlur = 0;
+  drawAppWorld(t);
+  g.restore();
+  g.save(); g.globalAlpha = 1 - span(t, 21.7, 22.2);
+  drawShip(t); drawFlyingParts(t);
+  g.restore();
+  caption(t, 4.5, 7.5, "Draw the team.", "Workers split the job. A checker verifies it. A publisher ships it.");
+  caption(t, 8.3, 12.6, "Split the job.", "Three Claude Code agents, one part each, side by side.");
+  caption(t, 12.8, 16.8, "Check every part.", "A missing chunk gets caught, sent back, and redone.");
+  caption(t, 17.3, 21.6, "Ship with your tools.", "Your CLIs and connectors, switched on per team.");
+}
+
+// ---- run it again: the loop montage
+const RUNS = [
+  { n: 1, at: 21.9, len: 0,   ways: 3, mins: 4.2 },
+  { n: 2, at: 23.95, len: .55, ways: 5, mins: 3.1 },
+  { n: 3, at: 24.85, len: .45, ways: 5, mins: 2.7 },
+  { n: 4, at: 25.55, len: .38, ways: 5, mins: 2.4 },
+  { n: 5, at: 26.1, len: .32, ways: 5, mins: 2.2 },
+];
+const mmss = (m) => `${Math.floor(m)}m ${String(Math.round((m % 1) * 60)).padStart(2, "0")}s`;
+function sceneLoop(t) {
+  const a = span(t, 21.7, 22.15) * (1 - span(t, 27.0, 27.35)); if (a <= 0) return;
+  g.save(); g.globalAlpha = a;
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  g.fillStyle = "#151515"; for (let x = 12; x < W; x += 32) for (let y = 12; y < H; y += 32) g.fillRect(x, y, 2, 2);
+  const glow = g.createRadialGradient(1420, 540, 50, 1420, 540, 900); glow.addColorStop(0, "rgba(217,119,87,.10)"); glow.addColorStop(1, "rgba(217,119,87,0)");
+  g.fillStyle = glow; g.fillRect(0, 0, W, H);
+  const heads = [["Run it.", 21.95, C.ink], ["Tweak it.", 23.1, C.ink], ["Run it again.", 24.0, C.ink], ["On repeat.", 25.5, C.accent]];
+  heads.forEach(([s, at, col], i) => {
+    const p = span(t, at, at + .22); if (p <= 0) return;
+    const sc = lerp(1.9, 1, outQuint(p)), y = 250 + i * 128;
+    const shake = (1 - span(t, at + .2, at + .45)) * (p >= 1 ? 1 : 0) * 6;
+    g.save(); g.translate(110 + Math.sin(t * 90) * shake, y); g.scale(sc, sc); g.globalAlpha *= clamp(p * 3);
+    text(s, 0, 0, `800 118px ${F.display}`, col); g.restore();
+  });
+  // the job being tweaked
+  const jp = outQuint(span(t, 22.6, 23.0));
+  if (jp > 0) {
+    const x = 110, y = 760 + (1 - jp) * 40;
+    g.save(); g.globalAlpha *= jp;
+    rr(x, y, 780, 220, 18); g.fillStyle = C.pad; g.fill(); g.strokeStyle = C.line; g.lineWidth = 1.5; g.stroke();
+    bot("byte", "#5b8def", x + 24, y + 24, 2.6); text("Workers · team", x + 70, y + 45, `700 18px ${F.ui}`, C.ink);
+    const f = `500 22px ${F.ui}`, f2 = `700 22px ${F.ui}`;
+    let lx = x + 26; const ly1 = y + 98, ly2 = y + 134;
+    const put = (s, col, font = f, strike = false, ly = ly1) => { text(s, lx, ly, font, col); const w = tw(s, font); if (strike) { g.fillStyle = C.failed; g.fillRect(lx, ly - 8, w, 2.5); } lx += w; };
+    put("Clean all 100,000 songs. Title Case, real names.", C.ink);
+    lx = x + 26;
+    const ed1 = span(t, 23.2, 23.45), ed2 = span(t, 23.5, 23.85);
+    put("Agents: ", C.ink, f, false, ly2);
+    if (ed1 < 1) put("3", C.muted, f, ed1 > 0, ly2);
+    if (ed1 > 0) put(" " + "5".slice(0, Math.ceil(ed1)), C.accent, f2, false, ly2);
+    put("  ·  Split the job: ", C.ink, f, false, ly2);
+    put("on", C.done, f2, false, ly2);
+    put("  ·  Checker: ", C.ink, f, false, ly2);
+    if (ed2 < 1) put("Haiku", C.muted, f, ed2 > 0, ly2);
+    if (ed2 > 0) put(" " + "Sonnet".slice(0, Math.ceil(6 * ed2)), C.accent, f2, false, ly2);
+    if (Math.floor(t * 3) % 2 && t < 23.9) { g.fillStyle = C.accent; g.fillRect(lx + 4, ly2 - 22, 3, 28); }
+    const clicks = RUNS.slice(1).map((r) => r.at);
+    const pressed = clicks.some((c) => t > c - .08 && t < c + .06);
+    g.save(); const bxp = x + 26, byp = y + 160; if (pressed) { g.translate(bxp + 80, byp + 20); g.scale(.93, .93); g.translate(-bxp - 80, -byp - 20); }
+    rr(bxp, byp, 160, 40, 10); g.fillStyle = C.accent; g.fill(); text("▶ Run again", bxp + 80, byp + 26, `700 16px ${F.ui}`, "#fff", "center"); g.restore();
+    text("Ctrl ↵", x + 202, y + 186, `500 14px ${F.mono}`, C.muted);
+    g.restore();
+  }
+  // runs panel
+  const rp = outQuint(span(t, 21.85, 22.35));
+  const px = 1020 + (1 - rp) * 120, py = 110;
+  g.save(); g.globalAlpha *= rp;
+  rr(px, py, 790, 860, 22); g.fillStyle = "#111"; g.fill(); g.strokeStyle = C.line; g.lineWidth = 1.5; g.stroke();
+  text("Runs", px + 32, py + 56, `800 32px ${F.display}`, C.ink); text("Clean song library", px + 128, py + 54, `500 16px ${F.ui}`, C.muted);
+  const shown = RUNS.filter((r) => t >= r.at - .1);
+  shown.slice().reverse().forEach((r, idx) => {
+    const ra = outQuint(span(t, r.at - .1, r.at + .2)), y = py + 92 + idx * 92 + (1 - ra) * -30;
+    if (y > py + 92 + 4 * 92) return;
+    const prog = r.len ? span(t, r.at, r.at + r.len) : 1, done = prog >= 1;
+    g.save(); g.globalAlpha *= ra;
+    rr(px + 24, y, 742, 80, 14); g.fillStyle = idx === 0 ? "#191919" : "#151515"; g.fill(); g.strokeStyle = idx === 0 && done ? "rgba(158,206,106,.45)" : C.line; g.stroke();
+    text("Run " + r.n, px + 46, y + 34, `700 18px ${F.ui}`, C.ink);
+    if (!done) {
+      rr(px + 46, y + 50, 300, 8, 4); g.fillStyle = C.line; g.fill(); rr(px + 46, y + 50, 300 * prog, 8, 4); g.fillStyle = C.accent; g.fill();
+      text(["Workers", "Checker", "Publisher"][Math.min(2, Math.floor(prog * 3))] + " working…", px + 360, y + 58, `500 13px ${F.mono}`, C.accent);
+    } else {
+      text(`100,000 rows · split ${r.ways} ways`, px + 46, y + 60, `500 15px ${F.ui}`, C.muted);
+      for (let i = 0; i < r.ways; i++) { rr(px + 300 + i * 26, y + 46, 20, 20, 5); g.fillStyle = "rgba(158,206,106,.18)"; g.fill(); text("✓", px + 310 + i * 26, y + 61, `700 12px ${F.ui}`, C.done, "center"); }
+      text(mmss(r.mins), px + 744, y + 46, `800 28px ${F.display}`, idx === 0 ? C.done : C.ink, "right");
+      text("per run", px + 744, y + 66, `500 12px ${F.ui}`, C.muted, "right");
+    }
+    g.restore();
+  });
+  // minutes per run
+  const cx0 = px + 46, cy0 = py + 580, cw = 700, chh = 240;
+  text("MINUTES PER RUN", cx0, cy0 - 14, `700 12px ${F.ui}`, C.muted);
+  g.strokeStyle = C.line; g.lineWidth = 1;
+  const yOf = (m) => cy0 + chh - (m - 1.6) / 3 * chh;
+  [2, 3, 4].forEach((v) => { const yy = yOf(v); g.beginPath(); g.moveTo(cx0, yy); g.lineTo(cx0 + cw, yy); g.stroke(); text(v + "m", cx0 + cw, yy - 6, `500 12px ${F.mono}`, "#5c5c5c", "right"); });
+  const pts = RUNS.map((r, i) => ({ x: cx0 + 30 + i * (cw - 80) / 4, y: yOf(r.mins), at: r.at + r.len }));
+  const vis = pts.filter((p) => t >= p.at);
+  if (vis.length) {
+    g.save(); g.strokeStyle = C.accent; g.lineWidth = 4; g.lineJoin = "round"; g.shadowColor = C.accent; g.shadowBlur = 16;
+    g.beginPath(); vis.forEach((p, i) => { const prev = vis[i - 1]; if (!prev) { g.moveTo(p.x, p.y); return; } const e = outCubic(span(t, p.at, p.at + .25)); g.lineTo(lerp(prev.x, p.x, e), lerp(prev.y, p.y, e)); }); g.stroke(); g.restore();
+    vis.forEach((p, i) => { const e = outBack(span(t, p.at, p.at + .3)); g.fillStyle = i === vis.length - 1 ? C.done : C.accent; g.beginPath(); g.arc(p.x, p.y, 7 * e, 0, 7); g.fill(); text("Run " + (i + 1), p.x, cy0 + chh + 26, `500 12px ${F.ui}`, C.muted, "center"); });
+  }
+  g.restore();
+  g.restore();
+}
+
+function sceneEnd(t) {
+  const a = span(t, 27.0, 27.3); if (a <= 0) return;
+  g.save(); g.globalAlpha = a;
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  const glow = g.createRadialGradient(W / 2, 560, 40, W / 2, 560, 800); glow.addColorStop(0, "rgba(217,119,87,.17)"); glow.addColorStop(1, "rgba(217,119,87,0)");
+  g.fillStyle = glow; g.fillRect(0, 0, W, H);
+  const crew = [["byte", "#5b8def"], ["byte", "#7aa2f7"], ["byte", "#2fb5a0"], ["bug", "#6cc070"], ["rocket", "#bb9af7"], ["crab", "#D97757"]];
+  crew.forEach(([s, col], i) => {
+    const ap = outBack(span(t, 27.2 + i * .08, 27.65 + i * .08));
+    const hop = Math.max(0, Math.sin((t - 27.7) * 6.2 - i * .7)) * 22 * (t > 27.7 ? 1 : 0) * (1 - span(t, 30.0, 30.6));
+    bot(s, col, W / 2 - 380 + i * 140, 240 + (1 - ap) * 40, 8, { bob: hop, alpha: clamp(ap) });
+  });
+  const wm = outQuint(span(t, 27.35, 27.95));
+  g.save(); g.globalAlpha *= wm; g.font = `800 236px ${F.display}`; g.textAlign = "center"; g.fillStyle = C.ink;
+  g.fillText("Lithnode", W / 2, 612 + (1 - wm) * 30); g.restore();
+  g.font = `800 236px ${F.display}`; const ww = g.measureText("Lithnode").width;
+  const dot = outBack(span(t, 27.8, 28.15)); g.fillStyle = C.accent; g.beginPath(); g.arc(W / 2 + ww / 2 + 44, 594, 22 * dot, 0, 7); g.fill();
+  text("Your CLIs. Your connectors. One team.", W / 2, 724, `600 50px ${F.ui}`, C.ink, "center", outCubic(span(t, 28.0, 28.5)));
+  text("for Claude Code  ·  free and open source  ·  lithnode.com", W / 2, 792, `500 25px ${F.mono}`, C.muted, "center", outCubic(span(t, 28.3, 28.8)));
+  text("Demo data. Independent project, not made or endorsed by Anthropic.", W / 2, 1022, `500 17px ${F.ui}`, "#5a5752", "center", outCubic(span(t, 28.6, 29.1)));
+  g.restore();
+}
+
+function flash(t, at, len = .18, strength = .5) { const p = span(t, at, at + len); if (p <= 0 || p >= 1) return; g.fillStyle = `rgba(255,236,226,${strength * (1 - p)})`; g.fillRect(0, 0, W, H); }
+
+function frame(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  sceneOpen(t);
+  sceneApp(t);
+  sceneLoop(t);
+  sceneEnd(t);
+  flash(t, 3.32, .25, .35); flash(t, 21.75, .2, .3); flash(t, 27.0, .25, .4);
+  postFX(t);
+  const out = span(t, LENGTH - .5, LENGTH); if (out > 0) { g.fillStyle = `rgba(10,10,10,${out})`; g.fillRect(0, 0, W, H); }
+}
+
+// ============================================================================ sound: 120 BPM, scheduled once against the picture
+let ac = null, master = null, muted = false, noiseBuf = null;
+function audio() {
+  if (!ac) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; ac = new AC(); wireMaster(); }
+  return ac;
+}
+function wireMaster() {
+  master = ac.createGain(); master.gain.value = .8;
+  const comp = ac.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .2;
+  master.connect(comp); comp.connect(ac.destination);
+}
+function noise() {
+  if (noiseBuf) return noiseBuf;
+  noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noiseBuf.getChannelData(0), r = mulberry(5);
+  for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1; return noiseBuf;
+}
+function env(node, at, a, peak, dec, sus = .0001) { node.gain.setValueAtTime(.0001, at); node.gain.exponentialRampToValueAtTime(peak, at + a); node.gain.exponentialRampToValueAtTime(Math.max(sus, .0001), at + a + dec); }
+const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+function tone(at, midi, dur, type = "sine", vol = .2, o = {}) {
+  const osc = ac.createOscillator(), gn = ac.createGain(); osc.type = type; osc.frequency.setValueAtTime(hz(midi), at); if (o.detune) osc.detune.value = o.detune;
+  if (o.glide) osc.frequency.exponentialRampToValueAtTime(hz(midi + o.glide), at + dur);
+  let out = osc;
+  if (o.lp) { const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.setValueAtTime(o.lp, at); if (o.lpTo) f.frequency.exponentialRampToValueAtTime(o.lpTo, at + dur); f.Q.value = o.q || 1; osc.connect(f); out = f; }
+  out.connect(gn); gn.connect(master); env(gn, at, o.a || .005, vol, dur, o.sus); osc.start(at); osc.stop(at + dur + .15);
+}
+function kick(at, vol = .9) { const o = ac.createOscillator(), gn = ac.createGain(); o.frequency.setValueAtTime(160, at); o.frequency.exponentialRampToValueAtTime(40, at + .15); o.connect(gn); gn.connect(master); env(gn, at, .002, vol, .34); o.start(at); o.stop(at + .45); }
+function nz(at, vol, len, type = "highpass", freq = 7500, q = 1) { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gn = ac.createGain(); s.buffer = noise(); f.type = type; f.frequency.value = freq; f.Q.value = q; s.connect(f); f.connect(gn); gn.connect(master); env(gn, at, .001, vol, len); s.start(at, (at * 7.3) % 1.5); s.stop(at + len + .05); }
+const hat = (at, v = .1, l = .045) => nz(at, v, l);
+const snare = (at, v = .35) => { nz(at, v, .18, "bandpass", 1900, .7); tone(at, 50, .12, "triangle", v * .5, { glide: -12 }); };
+const click = (at, v = .09) => { nz(at, v, .012, "highpass", 4000); tone(at, 96, .03, "square", v * .3); };
+function impact(at, v = 1) { kick(at, v); nz(at, .45 * v, .9, "lowpass", 900); tone(at, 28, 1.2, "sine", .5 * v, { glide: -5 }); nz(at, .15 * v, 1.4, "highpass", 6000); }
+function riser(at, dur, v = .2) { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gn = ac.createGain(); s.buffer = noise(); s.loop = true; f.type = "bandpass"; f.Q.value = 4; f.frequency.setValueAtTime(300, at); f.frequency.exponentialRampToValueAtTime(9000, at + dur); s.connect(f); f.connect(gn); gn.connect(master); gn.gain.setValueAtTime(.0001, at); gn.gain.exponentialRampToValueAtTime(v, at + dur); gn.gain.exponentialRampToValueAtTime(.0001, at + dur + .04); s.start(at); s.stop(at + dur + .1); }
+function whoosh(at, dur = .45, v = .14) { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gn = ac.createGain(); s.buffer = noise(); f.type = "bandpass"; f.Q.value = 2; f.frequency.setValueAtTime(600, at); f.frequency.exponentialRampToValueAtTime(4000, at + dur * .6); f.frequency.exponentialRampToValueAtTime(900, at + dur); s.connect(f); f.connect(gn); gn.connect(master); gn.gain.setValueAtTime(.0001, at); gn.gain.exponentialRampToValueAtTime(v, at + dur * .55); gn.gain.exponentialRampToValueAtTime(.0001, at + dur); s.start(at); s.stop(at + dur + .05); }
+function chord(at, notes, dur, vol, type = "sawtooth", lp = 2200) { notes.forEach((m, i) => tone(at, m, dur, type, vol, { a: .02, lp, detune: (i % 2 ? 7 : -7), sus: vol * .35 })); }
+
+function score(t0) {
+  const B = .5;
+  // 0:00 cold open: sub pulse, an impact per line
+  tone(t0, 33, 3.3, "sine", .22, { a: .3, sus: .2 });
+  [.15, .75, 1.35].forEach((s, i) => { kick(t0 + s, .8); nz(t0 + s, .2, .3, "lowpass", 2000); tone(t0 + s, [57, 60, 64][i], .3, "square", .05, { lp: 1800 }); });
+  [2.0, 2.06, 2.12].forEach((s) => nz(t0 + s, .08, .2, "bandpass", 3000, 3));
+  snare(t0 + 2.35, .4); chord(t0 + 2.35, [57, 64, 69], .9, .05, "sawtooth", 1600);
+  riser(t0 + 2.4, .95, .22);
+  // 0:03.3 the window lands
+  impact(t0 + 3.32, 1.1); chord(t0 + 3.32, [45, 57, 64, 69, 72], 2.2, .06, "sawtooth", 2400);
+  // groove 0:03.8 → 0:21.5
+  const bass = [45, 45, 57, 45, 48, 48, 60, 48, 41, 41, 53, 41, 43, 43, 55, 47];
+  for (let i = 0; i < 36; i++) {
+    const at = t0 + 3.8 + i * B;
+    kick(at, i % 8 === 0 ? 1 : .78);
+    tone(at, bass[i % 16] - 12, B * .85, "sawtooth", .13, { lp: 260 + Math.min(i, 24) * 34, q: 7 });
+    tone(at + B / 2, bass[i % 16], B * .4, "sawtooth", .06, { lp: 500 + Math.min(i, 24) * 40, q: 6 });
+    if (i >= 8) { hat(at + B / 2, .12); hat(at + B / 4, .04); hat(at + 3 * B / 4, .05); }
+    if (i >= 8 && i % 2 === 1) snare(at, .22);
+  }
+  // node pops + UI clicks
+  const pent = [69, 72, 74, 76, 79, 81, 84, 86, 88, 91, 93, 96];
+  NODES.forEach((n, i) => tone(t0 + n.pop, pent[i], .2, "square", .05, { lp: 3200 }));
+  click(t0 + 6.75, .14); tone(t0 + 6.8, 84, .15, "sine", .1); tone(t0 + 6.88, 91, .25, "sine", .08);
+  click(t0 + 7.45, .16); whoosh(t0 + 7.6, .7, .16);
+  chord(t0 + 7.75, [57, 64, 67, 72], 3.0, .035, "sawtooth", 1500);
+  // the parts fill: soft ticks per batch, a chime as each part completes
+  for (let s = 8.7; s < 11.8; s += .25) click(t0 + s, .035);
+  PARTS.forEach((p, i) => { tone(t0 + p.t1, pent[6 + i * 2], .25, "triangle", .09); tone(t0 + p.t1 + .06, pent[7 + i * 2], .3, "sine", .06); });
+  riser(t0 + 11.7, 1.0, .12); whoosh(t0 + 12.4, .6, .14);
+  // checks: chime for a pass, thud for the cut, riser for the redo
+  PARTS.forEach((p) => {
+    const at = t0 + T_CHECK(p.i) + .3;
+    nz(at - .3, .03, .3, "bandpass", 2500 + p.i * 300, 6);
+    if (p.pass) { tone(at, 84, .18, "sine", .1); tone(at + .05, 91, .26, "sine", .07); }
+    else { tone(at, 40, .3, "triangle", .3, { glide: -7 }); nz(at, .12, .15, "lowpass", 500); }
+  });
+  riser(t0 + REDO[0], REDO[1] - REDO[0] + .1, .14);
+  tone(t0 + FIXED_AT, 84, .2, "sine", .11); tone(t0 + FIXED_AT + .06, 88, .2, "sine", .09); tone(t0 + FIXED_AT + .12, 91, .35, "sine", .08);
+  whoosh(t0 + 16.9, .8, .2); kick(t0 + 17.65, .9);
+  // shipping: key clicks while commands type, whoosh + ding as each part lands
+  for (const [a, b, , kind] of TERM) {
+    if (kind === "cmd") for (let s = a; s < b; s += .055) click(t0 + s, .04);
+    else tone(t0 + a, kind === "ok" ? 91 : 79, .18, "sine", .07);
+  }
+  PARTS.forEach((p) => { const at = t0 + T_UP(p.i); whoosh(at, .65, .09); tone(at + .7, 88, .2, "sine", .09); tone(at + 1.0, 93, .3, "triangle", .06); });
+  riser(t0 + 20.4, 1.3, .2);
+  // 0:21.7 loop montage: bigger, double-time
+  impact(t0 + 21.72, .9); chord(t0 + 21.72, [45, 57, 64, 69, 76], 1.2, .06, "sawtooth", 3000);
+  for (let i = 0; i < 10; i++) {
+    const at = t0 + 22.0 + i * B;
+    kick(at, .85); tone(at, bass[(i * 2) % 16] - 12, B * .8, "sawtooth", .14, { lp: 900, q: 6 });
+    for (let s = 0; s < 4; s++) hat(at + s * B / 4, s % 2 ? .05 : .1);
+    if (i % 2 === 1) snare(at, .3);
+  }
+  [21.95, 23.1, 24.0, 25.5].forEach((s) => { snare(t0 + s, .45); kick(t0 + s, 1); });
+  [23.2, 23.3, 23.5, 23.6, 23.7, 23.8].forEach((s) => click(t0 + s, .07));
+  RUNS.slice(1).forEach((r, i) => { click(t0 + r.at, .14); tone(t0 + r.at + r.len, [86, 88, 91, 93][i], .3, "sine", .09); });
+  riser(t0 + 26.0, 1.0, .24);
+  // 0:27 end card
+  impact(t0 + 27.0, 1.15); chord(t0 + 27.0, [45, 57, 64, 69, 73, 76], 3.6, .07, "triangle", 2600);
+  [27.4, 27.65, 27.9, 28.15].forEach((s, i) => tone(t0 + s, [81, 84, 88, 93][i], .6, "sine", .07));
+}
+
+// offline render hooks (used to make the MP4)
+window.renderFrame = (t) => frame(t);
+window.renderAudio = async () => {
+  const rate = 48000, off = new OfflineAudioContext(2, Math.ceil(rate * LENGTH), rate);
+  const keep = [ac, master, noiseBuf]; ac = off; noiseBuf = null; wireMaster(); score(0);
+  const buf = await off.startRendering(); [ac, master, noiseBuf] = keep;
+  const n = buf.length, data = new DataView(new ArrayBuffer(44 + n * 4)), L = buf.getChannelData(0), R = buf.getChannelData(1);
+  const w = (o, s) => [...s].forEach((ch, i) => data.setUint8(o + i, ch.charCodeAt(0)));
+  w(0, "RIFF"); data.setUint32(4, 36 + n * 4, true); w(8, "WAVE"); w(12, "fmt "); data.setUint32(16, 16, true); data.setUint16(20, 1, true); data.setUint16(22, 2, true);
+  data.setUint32(24, rate, true); data.setUint32(28, rate * 4, true); data.setUint16(32, 4, true); data.setUint16(34, 16, true); w(36, "data"); data.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) { data.setInt16(44 + i * 4, clamp(L[i], -1, 1) * 32767, true); data.setInt16(46 + i * 4, clamp(R[i], -1, 1) * 32767, true); }
+  return data.buffer;
+};
+// served by the render server with #render: draw every frame and send it back, then the sound
+if (location.hash === "#render") window.addEventListener("load", async () => {
+  await fontsReady();
+  for (let i = 0; i < LENGTH * 30; i++) {
+    frame(i / 30);
+    const b = await new Promise((r) => cv.toBlob(r, "image/jpeg", .92));
+    await fetch("/frame?i=" + i, { method: "POST", body: b });
+  }
+  await fetch("/audio", { method: "POST", body: await window.renderAudio() });
+  document.title = "rendered";
+});
+
+// ============================================================================ player
+const playBtn = document.getElementById("play"), bar = document.getElementById("bar");
+let startAt = 0, raf = 0;
+const POSTER = 10.6;   // still before play: three agents splitting the job
+async function fontsReady() {
+  try { await Promise.all([`800 100px ${F.display}`, `500 20px ${F.ui}`, `600 20px ${F.ui}`, `700 20px ${F.ui}`, `400 20px ${F.ui}`, `500 20px ${F.mono}`, `600 20px ${F.mono}`, `700 20px ${F.mono}`].map((f) => document.fonts.load(f))); } catch (e) {}
+}
+window.fontsReady = fontsReady;
+function tick() {
+  const t = (performance.now() - startAt) / 1000;
+  if (t >= LENGTH) { frame(LENGTH - .001); bar.style.width = "100%"; playBtn.hidden = false; playBtn.querySelector("span").lastChild.textContent = "Play again"; return; }
+  frame(Math.max(0, t)); bar.style.width = (t / LENGTH * 100) + "%";
+  raf = requestAnimationFrame(tick);
+}
+function play() {
+  cancelAnimationFrame(raf); playBtn.hidden = true;
+  const a = audio();
+  if (a) { a.resume(); master.gain.value = muted ? 0 : .8; score(a.currentTime + .06); }
+  startAt = performance.now() + 60; raf = requestAnimationFrame(tick);
+}
+function stopSound() { if (ac) { ac.close(); ac = null; master = null; noiseBuf = null; } }
+playBtn.onclick = play;
+document.getElementById("replay").onclick = () => { stopSound(); play(); };
+document.getElementById("mute").onclick = (e) => {
+  muted = !muted; e.currentTarget.textContent = muted ? "Sound off" : "Sound on"; e.currentTarget.setAttribute("aria-pressed", String(muted));
+  if (master) master.gain.value = muted ? 0 : .8;
+};
+document.getElementById("full").onclick = () => { const s = document.getElementById("stage"); (s.requestFullscreen ? s.requestFullscreen() : Promise.reject()).catch(() => {}); };
+frame(POSTER); fontsReady().then(() => frame(POSTER));
+</script>

@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lithnode · Build an AI team. Watch it ship.</title>
-<meta name="description" content="Lithnode turns Claude Code into a team you can draw. Wire up agents, press run, and watch them plan, build, check and ship. Runs on your Claude plan.">
+<meta name="description" content="Lithnode turns Claude Code into a team you can draw. Give each team your CLIs and connectors, split big jobs across agents, check every part and ship it. Free, open source, on your Claude plan.">
 <meta property="og:title" content="Lithnode">
-<meta property="og:description" content="Build an AI team. Watch it ship. For Claude Code.">
+<meta property="og:description" content="Build an AI team. Watch it ship. Your CLIs, your connectors, one team. For Claude Code.">
 <meta property="og:image" content="media/film-poster.jpg">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
@@ -30,6 +30,7 @@
   html { scroll-behavior: smooth; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   a { color: inherit; }
+  .card p a, footer a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
   img, video, canvas { max-width: 100%; display: block; }
   .wrap { width: min(1200px, 100% - 40px); margin-inline: auto; }
   h1, h2, h3 { font-family: var(--display); letter-spacing: -0.03em; text-wrap: balance; margin: 0; }
@@ -135,6 +136,8 @@
   .apps span i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #fff; transition: transform .3s; }
   .apps span.on i { background: var(--done); }
   .apps span.on i::after { transform: translateX(11px); }
+  .apps span.cli { font-family: var(--mono); font-weight: 600; font-size: 13.5px; }
+  .apps span.cli b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #1d1f24; color: var(--done); font: 700 10px var(--mono); box-shadow: inset 0 0 0 1px #3a3d45; }
 
   /* ---- features */
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
@@ -235,7 +238,7 @@
 <nav class="top" id="nav">
   <div class="wrap">
     <a class="brand" href="#top"><canvas data-sprite="crab" data-color="#D97757" width="12" height="8"></canvas>Lithnode</a>
-    <div class="links"><a href="#film">Film</a><a href="#how">How it works</a><a href="#connectors">Connectors</a><a href="#features">Features</a></div>
+    <div class="links"><a href="#film">Film</a><a href="#how">How it works</a><a href="#connectors">CLIs and connectors</a><a href="#features">Features</a><a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a></div>
     <a class="btn primary" href="#download">Download</a>
   </div>
 </nav>
@@ -245,12 +248,13 @@
   <div class="wrap">
     <div class="eyebrow">For Claude Code</div>
     <h1 style="margin-top:18px"><span class="line"><span>Build an AI team.</span></span><span class="line"><span><em>Watch it ship.</em></span></span></h1>
-    <p class="lede">Draw a team of Claude Code agents, wire them together and press run. They plan, build, check each other's work and hand you the result, on your own computer and your own Claude plan.</p>
+    <p class="lede">Draw a team of Claude Code agents, give each one your CLIs and connectors, and press run. They split big jobs, check each other's work and ship the result, on your own computer and your own Claude plan.</p>
     <div class="ctas">
       <a class="btn primary" href="download/LithnodeSetup.exe" download data-dl><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Download for Windows</a>
       <a class="btn" href="#film"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Watch the film</a>
+      <a class="btn" href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a>
     </div>
-    <div class="meta">Free · Windows 10 and 11 · no API keys · 99 MB</div>
+    <div class="meta">Free and open source · Windows 10 and 11 · no API keys · 99 MB</div>
   </div>
   <div class="scrollcue" aria-hidden="true"></div>
 </header>
@@ -261,8 +265,8 @@
 
 <section id="film">
   <div class="wrap">
-    <div class="head rv"><div class="eyebrow">31 seconds</div><h2>Find products. Check them. List the winners.</h2>
-      <p>A dropshipping flow, start to finish: a scout finds products, a checker cuts the duds, an uploader lists the rest. Then you tweak one line and run it again.</p></div>
+    <div class="head rv"><div class="eyebrow">31 seconds</div><h2>Split it. Check it. Ship it.</h2>
+      <p>100,000 rows, start to finish: three workers split the job, a checker catches a missing chunk and sends it back, and a publisher ships it with gh and a docs connector. Then you tweak it and run it again.</p></div>
     <div class="film" id="filmBox">
       <video id="filmVideo" src="media/lithnode-film.mp4" poster="media/film-poster.jpg" playsinline preload="metadata"></video>
       <button id="filmPlay" aria-label="Play the film with sound"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Play with sound</span></button>
@@ -274,9 +278,9 @@
   <div class="wrap">
     <div class="head rv"><div class="eyebrow">How it works</div><h2>Three moves. That's the whole thing.</h2></div>
     <div class="steps">
-      <div class="step rv"><div class="n">01</div><h3>Draw the team</h3><p>Drop in bots, give each team a job and wire them up. Or describe the team in one line and Lithnode draws it.</p><canvas data-demo="draw"></canvas></div>
+      <div class="step rv"><div class="n">01</div><h3>Draw the team</h3><p>Drop in bots, give each team a job, its CLIs and its connectors, and wire them up. Or describe the team in one line and Lithnode draws it.</p><canvas data-demo="draw"></canvas></div>
       <div class="step rv" style="--d:.12s"><div class="n">02</div><h3>Press run</h3><p>Every agent is a real Claude Code session. Watch each one work live, with an approval step wherever you want a say.</p><canvas data-demo="run"></canvas></div>
-      <div class="step rv" style="--d:.24s"><div class="n">03</div><h3>Run it again</h3><p>Don't love the result? Change one line and run it again. Every run is saved, so you can see it getting better.</p><canvas data-demo="again"></canvas></div>
+      <div class="step rv" style="--d:.24s"><div class="n">03</div><h3>Run it again</h3><p>Change one thing, like five workers instead of three, and run it again. Every run is saved, so you can see it getting faster.</p><canvas data-demo="again"></canvas></div>
     </div>
   </div>
 </section>
@@ -284,10 +288,10 @@
 <section id="connectors">
   <div class="wrap split">
     <div class="rv">
-      <div class="eyebrow">Connectors</div>
-      <h2 style="font-size:clamp(38px,5vw,64px);line-height:1;margin-top:14px">Your apps, without the bloat.</h2>
-      <p style="color:var(--muted);font-size:19px;margin:20px 0 0;max-width:52ch">Switch on the connectors a team needs, like Vercel, Notion or your store, and leave the rest off. Their tools load only when an agent searches for one, so every agent starts lean.</p>
-      <div class="apps" id="apps"><span data-app class="on"><i></i>Vercel</span><span data-app><i></i>Notion</span><span data-app class="on"><i></i>Your store</span><span data-app><i></i>Claude Docs</span></div>
+      <div class="eyebrow">CLIs and connectors</div>
+      <h2 style="font-size:clamp(38px,5vw,64px);line-height:1;margin-top:14px">Your tools, without the bloat.</h2>
+      <p style="color:var(--muted);font-size:19px;margin:20px 0 0;max-width:52ch">Switch on the command-line tools a team may run, like git, gh, vercel or python, and the connectors it needs, like Notion or Vercel. Everything else stays blocked, and connector tools load only when an agent searches for one, so every agent starts lean.</p>
+      <div class="apps" id="apps"><span data-app class="on cli"><i></i><b>&gt;_</b>gh</span><span data-app class="cli"><i></i><b>&gt;_</b>git</span><span data-app class="on cli"><i></i><b>&gt;_</b>python</span><span data-app class="cli"><i></i><b>&gt;_</b>vercel</span><span data-app class="on"><i></i>Notion</span><span data-app><i></i>Vercel</span><span data-app><i></i>Claude Docs</span></div>
     </div>
     <div class="bars rv" style="--d:.15s" id="bars">
       <div class="bar bad"><b>Every connector loaded up front <span data-count="215">0k</span></b><div class="t"><div class="f" data-w="100"></div></div></div>
@@ -301,12 +305,12 @@
   <div class="wrap">
     <div class="head rv"><div class="eyebrow">Built in</div><h2>Everything a team needs.</h2></div>
     <div class="grid">
-      <div class="card rv"><canvas data-sprite="scout" data-color="#2fb5a0" width="12" height="8"></canvas><h3>Real Claude Code agents</h3><p>Not a chat imitation. Every agent is a Claude Code session with the tools you give it: read, web, edit or run code.</p></div>
-      <div class="card rv" style="--d:.08s"><canvas data-sprite="bug" data-color="#6cc070" width="12" height="8"></canvas><h3>Teams that check each other</h3><p>Put three bug hunters side by side, merge their reports, and only the short summary moves on.</p></div>
+      <div class="card rv"><canvas data-sprite="scout" data-color="#2fb5a0" width="12" height="8"></canvas><h3>Real Claude Code agents</h3><p>Not a chat imitation. Every agent is a Claude Code session with the access you give it: read, web, edit, or only the CLIs you switch on.</p></div>
+      <div class="card rv" style="--d:.08s"><canvas data-sprite="bug" data-color="#6cc070" width="12" height="8"></canvas><h3>Split it, then check it</h3><p>Cut one big job into parts that agents do side by side, then put a checker team after them to verify every part.</p></div>
       <div class="card rv" style="--d:.16s"><canvas data-sprite="hand" data-color="#e0a23c" width="12" height="8"></canvas><h3>You stay in charge</h3><p>Drop an approval step anywhere. The run waits for your go, and can ping your phone when it does.</p></div>
       <div class="card rv"><canvas data-sprite="crab" data-color="#D97757" width="12" height="8"></canvas><h3>Your Claude plan</h3><p>No API keys, no extra bill. Lithnode uses your Claude Code sign-in like any other session.</p></div>
       <div class="card rv" style="--d:.08s"><canvas data-sprite="owl" data-color="#7aa2f7" width="12" height="8"></canvas><h3>Describe it, get a flow</h3><p>Type "plan it, build it, then three reviewers check it" and the team is drawn for you, ready to run.</p></div>
-      <div class="card rv" style="--d:.16s"><canvas data-sprite="rocket" data-color="#bb9af7" width="12" height="8"></canvas><h3>Runs on your computer</h3><p>Your code and your sign-in never leave your machine. Lithnode is a local app, not a website.</p></div>
+      <div class="card rv" style="--d:.16s"><canvas data-sprite="rocket" data-color="#bb9af7" width="12" height="8"></canvas><h3>Local and open source</h3><p>Your code and your sign-in never leave your machine. Lithnode is a local app, and its code is <a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">on GitHub</a>.</p></div>
     </div>
   </div>
 </section>
@@ -354,7 +358,7 @@
 <footer>
   <div class="wrap">
     <span>© 2026 Lithnode · An independent project for Claude Code. Not made or endorsed by Anthropic.</span>
-    <span>The film uses a demo store and demo data.</span>
+    <span>The film uses demo data. <a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">Source on GitHub</a> · MIT license.</span>
   </div>
 </footer>
 
@@ -371,6 +375,7 @@ const SHAPES = {
   trophy:[".##########.", "##.######.##", "#..######..#", ".#.######.#.", "...######...", ".....##.....", "....kkkk....", "...kkkkkk..."],
   golem: ["..########..", "..#e####e#..", "..########..", "############", "##.######.##", "kk.######.kk", "...##..##...", "..###..###.."],
   guard: [".....kk.....", "...######...", "..########..", "..#kkkkkk#..", "..#e#kk#e#..", "..########..", "...######...", "..##....##.."],
+  byte:  [".....kk.....", "..########..", ".##e####e##.", ".##########.", "#.########.#", "#.########.#", "..##....##..", "..##....##.."],
 };
 const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16); return `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k)).join(",")})`; };
 function sprite(g, shape, color, x, y, c, bob = 0) {
@@ -391,8 +396,8 @@ const nav = document.getElementById("nav");
 addEventListener("scroll", () => nav.classList.toggle("solid", scrollY > 40), { passive: true });
 
 // ---- marquee
-const FLOWS = [["Dropship finder", "#2fb5a0"], ["Bug sweep", "#6cc070"], ["Ship it", "#bb9af7"], ["Security review", "#e5566e"], ["Market research", "#7aa2f7"],
-  ["Landing page build", "#e0823d"], ["Fix the failing tests", "#e0af68"], ["App idea finder", "#a77be6"], ["Docs writer", "#D97757"], ["Code review ×3", "#6cc070"]];
+const FLOWS = [["Clean 100k rows", "#5b8def"], ["Bug sweep", "#6cc070"], ["Build and deploy", "#bb9af7"], ["Triage GitHub issues", "#e5566e"], ["Research to Notion", "#7aa2f7"],
+  ["Landing page build", "#e0823d"], ["Fix the failing tests", "#e0af68"], ["Convert 500 videos", "#a77be6"], ["Docs writer", "#D97757"], ["Code review ×3", "#6cc070"]];
 document.getElementById("marquee").innerHTML = [...FLOWS, ...FLOWS].map(([n, c]) => `<span style="--c:${c}"><i></i>${n}</span>`).join("");
 
 // ---- hero: a live flow that runs over and over, with parallax
@@ -408,10 +413,10 @@ addEventListener("pointermove", (e) => { tmx = e.clientX / innerWidth - .5; tmy 
 const HW = 150, HH = 72, HGX = 30, HGY = 56;   // node size and gaps, in the app's own units
 const HN = [
   { kind: "start", name: "Start", kindLabel: "START", sub: "Your task goes in here", shape: "crab", color: "#D97757", w: HW, h: HH, col: 0, row: 0 },
-  { kind: "team", name: "Product scout", kindLabel: "TEAM", sub: "1 × Sonnet 5.5 · web", job: "Finds trending products", shape: "scout", color: "#2fb5a0", w: HW, h: HH, col: 1, row: 0, step: "Reading supplier pages" },
-  { kind: "team", name: "Checker", kindLabel: "TEAM", sub: "2 × Haiku 4.5", job: "Cuts the duds", shape: "bug", color: "#6cc070", count: 2, w: HW, h: HH, col: 2, row: 0, step: "Margin 79% ✓" },
+  { kind: "team", name: "Workers", kindLabel: "TEAM", sub: "3 × Sonnet 5.5 · split 3 ways", job: "Clean 100,000 rows", shape: "byte", color: "#5b8def", count: 3, w: HW, h: HH, col: 1, row: 0, step: "python clean.py" },
+  { kind: "team", name: "Checker", kindLabel: "TEAM", sub: "1 × Haiku 4.5", job: "Checks every part", shape: "bug", color: "#6cc070", w: HW, h: HH, col: 2, row: 0, step: "Part 3 ✓" },
   { kind: "approval", name: "You", kindLabel: "APPROVAL", sub: "Pauses until you approve", shape: "hand", color: "#e0a23c", w: HW, h: HH, col: 0, row: 1 },
-  { kind: "team", name: "Uploader", kindLabel: "TEAM", sub: "1 × Sonnet 5.5 · Store", job: "Lists the winners", shape: "rocket", color: "#bb9af7", w: HW, h: HH, col: 1, row: 1, step: "Listing 8 products" },
+  { kind: "team", name: "Publisher", kindLabel: "TEAM", sub: "1 × Haiku 4.5 · gh · Docs", job: "Ships it", shape: "rocket", color: "#bb9af7", w: HW, h: HH, col: 1, row: 1, step: "gh release create" },
   { kind: "done", name: "Done", kindLabel: "DONE", sub: "Final result lands here", shape: "trophy", color: "#e6b450", w: HW, h: HH, col: 2, row: 1 },
 ];
 const HPHASE = [0, .7, 2.6, 4.4, 5.8, 7.6, 8.0];   // when each node starts; the last is when Done finishes
@@ -505,9 +510,9 @@ function demoFrame(d, now) {
     const L = t % 6.5;
     const N = [
       { kind: "start", name: "Start", kindLabel: "START", sub: "Your task goes in here", shape: "crab", color: "#D97757", w: nw, h: nh },
-      { kind: "team", name: "Product scout", kindLabel: "TEAM", sub: "1 × Sonnet 5.5", job: "Finds trending products", shape: "scout", color: "#2fb5a0", w: nw, h: nh },
-      { kind: "team", name: "Checker", kindLabel: "TEAM", sub: "2 × Haiku 4.5", job: "Cuts the duds", shape: "bug", color: "#6cc070", count: 2, w: nw, h: nh },
-      { kind: "team", name: "Uploader", kindLabel: "TEAM", sub: "1 × Sonnet 5.5 · Store", job: "Lists the winners", shape: "rocket", color: "#bb9af7", w: nw, h: nh },
+      { kind: "team", name: "Workers", kindLabel: "TEAM", sub: "3 × Sonnet 5.5 · split", job: "Clean every row", shape: "byte", color: "#5b8def", count: 3, w: nw, h: nh },
+      { kind: "team", name: "Checker", kindLabel: "TEAM", sub: "1 × Haiku 4.5", job: "Checks every part", shape: "bug", color: "#6cc070", w: nw, h: nh },
+      { kind: "team", name: "Publisher", kindLabel: "TEAM", sub: "1 × Haiku 4.5", job: "Ships it", shape: "rocket", color: "#bb9af7", w: nw, h: nh },
     ];
     const P = [[xL, y1], [xR, y1], [xL, y2], [xR, y2]];
     // the last bot is dragged in from the side by the cursor
@@ -521,9 +526,11 @@ function demoFrame(d, now) {
       const cx = dropX + nw * .55, cy = dropY + nh * .6;
       g.fillStyle = "#fff"; g.strokeStyle = "#000"; g.lineWidth = 1; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx, cy + 15); g.lineTo(cx + 4, cy + 11); g.lineTo(cx + 7, cy + 17); g.lineTo(cx + 10, cy + 16); g.lineTo(cx + 7, cy + 10); g.lineTo(cx + 12, cy + 10); g.closePath(); g.fill(); g.stroke();
     }
-    // the inspector's Connectors switch flips on for the Uploader
-    if (L > 3.2) { const a = ease(clamp((L - 3.2) / .3)); g.save(); g.globalAlpha = a; g.font = "700 7.5px Inter, sans-serif";
-      rr(g, xR + nw - 50, y2 + nh + 6, 50, 15, 7.5); g.fillStyle = "rgba(149,191,71,.18)"; g.fill(); g.fillStyle = "#95bf47"; g.fillText("✓ Store", xR + nw - 42, y2 + nh + 16); g.restore(); }
+    // the Publisher gets its tools: the gh CLI and a docs connector
+    [["›_ gh", 3.2, "rgba(158,206,106,.18)", "#9ece6a"], ["✓ Docs", 3.6, "rgba(220,220,220,.14)", "#dcdcdc"]].forEach(([label, at, bg, fg], i) => {
+      if (L <= at) return; const a = ease(clamp((L - at) / .3)); g.save(); g.globalAlpha = a; g.font = "700 7.5px Inter, sans-serif";
+      const bw = g.measureText(label).width + 16, bx = xR + nw - bw - i * 0 - (i ? 0 : 52);
+      rr(g, bx, y2 + nh + 6, bw, 15, 7.5); g.fillStyle = bg; g.fill(); g.fillStyle = fg; g.fillText(label, bx + 8, y2 + nh + 16); g.restore(); });
   } else if (d.kind === "run") {
     const L = t % 7.5, phases = [0, .6, 2.6, 4.8, 5.4];   // when Start, Builder, Reviewers, Done begin
     const N = [
@@ -547,14 +554,14 @@ function demoFrame(d, now) {
     g.fillStyle = finished ? "#9ece6a" : "#D97757"; g.beginPath(); g.arc(px + 10, 17, 3, 0, 7); g.fill();
     g.fillStyle = "#ededed"; g.fillText(label, px + 18, 20);
   } else {
-    const L = t % 6, vals = [68, 74, 79, 83, 86], bw = (w * .8) / vals.length;
+    const L = t % 6, vals = [4.2, 3.6, 3.1, 2.6, 2.2], bw = (w * .8) / vals.length;
     g.strokeStyle = "#232323"; g.lineWidth = 1; [.3, .55, .8].forEach((f) => { g.beginPath(); g.moveTo(w * .08, h * f); g.lineTo(w * .92, h * f); g.stroke(); });
-    const pts = vals.map((v, i) => [w * .1 + i * bw + bw / 2 - w * .02, h * .86 - (v - 60) / 30 * h * .7]);
+    const pts = vals.map((v, i) => [w * .1 + i * bw + bw / 2 - w * .02, h * .86 - (v - 1.6) / 3 * h * .7]);
     const shown = Math.min(vals.length, Math.floor(L / .9) + 1);
     g.save(); g.strokeStyle = "#D97757"; g.lineWidth = 3; g.shadowColor = "#D97757"; g.shadowBlur = 12; g.beginPath();
     pts.slice(0, shown).forEach(([x, y], i) => { if (!i) g.moveTo(x, y); else { const e = i === shown - 1 ? ease(clamp((L - i * .9) / .5)) : 1; g.lineTo(pts[i - 1][0] + (x - pts[i - 1][0]) * e, pts[i - 1][1] + (y - pts[i - 1][1]) * e); } }); g.stroke(); g.restore();
     pts.slice(0, shown).forEach(([x, y], i) => { const p = back(clamp((L - i * .9) / .35)); g.fillStyle = i === shown - 1 ? "#9ece6a" : "#D97757"; g.beginPath(); g.arc(x, y, 5 * p, 0, 7); g.fill();
-      g.fillStyle = "#8d8d8d"; g.font = '500 10px "JetBrains Mono", monospace'; g.textAlign = "center"; g.fillText("Run " + (i + 1), x, h - 8); g.fillStyle = "#ededed"; g.font = "700 11px Inter, sans-serif"; if (p > 0) g.fillText(vals[i] + "%", x, y - 12); g.textAlign = "left"; });
+      g.fillStyle = "#8d8d8d"; g.font = '500 10px "JetBrains Mono", monospace'; g.textAlign = "center"; g.fillText("Run " + (i + 1), x, h - 8); g.fillStyle = "#ededed"; g.font = "700 11px Inter, sans-serif"; if (p > 0) g.fillText(vals[i].toFixed(1) + "m", x, y - 12); g.textAlign = "left"; });
   }
 }
 const io = new IntersectionObserver((es) => es.forEach((e) => { const d = demos.find((x) => x.cv === e.target); if (d) { d.on = e.isIntersecting; if (e.isIntersecting && !d.seen) d.seen = performance.now(); } }), { threshold: .2 });
