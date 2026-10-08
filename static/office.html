@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>/* theme from the top-bar switch: dark (default), light or system */try { const t = localStorage.getItem("hq-theme") || "dark"; if (t !== "system") document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Office</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #eceef2; --panel: #f8f9fb; --pad: #ffffff; --line: #dfe2e9;
+    --ink: #1f2330; --muted: #6b7185; --accent: #D97757;
+    --floor: #e9ecf1; --grid: #dde1e9; --desk-top: #cfd4de; --desk-front: #b9c0cd;
+    --shadow: rgba(40, 48, 72, .14);
+    --working: #D97757; --waiting: #e5566e; --idle: #8d93a8; --done: #4fae6a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0a0a0a; --panel: #111111; --pad: #171717; --line: #262626;
+      --ink: #ededed; --muted: #8d8d8d;
+      --floor: #0d0d0d; --grid: #171717; --desk-top: #333333; --desk-front: #262626;
+      --shadow: rgba(0, 0, 0, .45);
+      --waiting: #f7768e; --done: #9ece6a; }
+  }
+  /* the theme switch in the top bar forces one or the other */
+  :root[data-theme="dark"] { color-scheme: dark; --bg: #0a0a0a; --panel: #111111; --pad: #171717; --line: #262626;
+      --ink: #ededed; --muted: #8d8d8d;
+      --floor: #0d0d0d; --grid: #171717; --desk-top: #333333; --desk-front: #262626;
+      --shadow: rgba(0, 0, 0, .45);
+      --waiting: #f7768e; --done: #9ece6a; }
+  :root[data-theme="light"] { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 14px/1.4 system-ui, "Segoe UI", sans-serif;
+    display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+    border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  .logo { width: 36px; height: 28px; }
+  .chips { display: flex; gap: 8px; margin-left: 8px; flex-wrap: wrap; }
+  .chip {
+    display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+    background: var(--pad); border: 1px solid var(--line); font-size: 12.5px;
+  }
+  .chip i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .live { margin-left: auto; color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--done); }
+  .live.off i { background: var(--waiting); }
+  main { display: grid; grid-template-columns: 280px 1fr 300px; min-height: 0; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; }
+  aside h2, #detail h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 4px 4px 10px; }
+  .row {
+    display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center;
+    padding: 8px; border-radius: 12px; cursor: pointer; border: 1px solid transparent;
+  }
+  .row:hover { background: var(--pad); }
+  .row.child { margin-left: 18px; padding-top: 4px; padding-bottom: 4px; border-left: 2px dashed var(--line); border-radius: 0 12px 12px 0; }
+  .row.sel { background: var(--pad); border-color: var(--accent); }
+  .row canvas { width: 40px; height: 30px; }
+  .row .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .sub { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 5px; overflow: hidden; }
+  .bar b { display: block; height: 100%; border-radius: 2px; }
+  #stagewrap { overflow: auto; background: var(--floor); position: relative; min-width: 0; }
+  #stage { display: block; }
+  #empty {
+    position: absolute; inset: 0; display: none; place-items: center; text-align: center;
+    color: var(--muted); pointer-events: none;
+  }
+  #empty.show { display: grid; }
+  #empty canvas { width: 180px; height: 120px; display: block; margin: 0 auto 10px; }
+  #detail { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 16px; }
+  #detail dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: 13px; }
+  #detail dt { color: var(--muted); }
+  #detail dd { margin: 0; word-break: break-word; }
+  #detail .big { font-size: 18px; font-weight: 650; margin: 2px 0 2px; }
+  #detail .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  #detail ul { margin: 8px 0 0; padding-left: 18px; }
+  .hint { color: var(--muted); font-size: 13px; }
+  @media (max-width: 980px) {
+    main { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 28vh; }
+    #detail { border-left: 0; border-top: 1px solid var(--line); max-height: 30vh; }
+    body { overflow: auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <canvas class="logo" id="logo" width="108" height="84"></canvas>
+  <h1>Office</h1>
+  <div class="chips" id="chips"></div>
+  <div class="live" id="live"><i></i><span>live</span></div>
+</header>
+<main>
+  <aside><h2>Sessions</h2><div id="list"></div></aside>
+  <div id="stagewrap">
+    <canvas id="stage"></canvas>
+    <div id="empty"><div>
+      <canvas id="emptyClawd" width="360" height="240"></canvas>
+      <div><b>The office is empty</b></div>
+      <div>Start a Claude Code session or run a flow, and a bot will clock in.</div>
+    </div></div>
+  </div>
+  <div id="detail"><p class="hint">Click a bot to see details.</p></div>
+</main>
+
+<script src="/static/sprites.js"></script>
+<script>
+"use strict";
+const SUB_COLORS = ["#7aa2f7", "#9ece6a", "#bb9af7", "#e0af68", "#7dcfff", "#f7768e"];
+const SW = 304, SH = 206;            // station size
+let data = { now: 0, sessions: [] }, stations = [], drift = 0, selected = null, online = false;
+const subColor = (a) => SUB_COLORS[hash(a.id) % SUB_COLORS.length];
+const subKey = (s, a) => s.id + ":" + a.id;
+const stationId = (st) => (st.kind === "sub" ? subKey(st.s, st.a) : st.s.id);
+// One station per session, each followed by one per running subagent.
+function buildStations() {
+  const out = [];
+  for (const s of data.sessions) {
+    out.push({ kind: "main", s });
+    for (const a of s.subagents) out.push({ kind: "sub", s, a });
+  }
+  return out;
+}
+let theme = {};
+
+// ------------------------------------------------------------------ helpers
+const $ = (id) => document.getElementById(id);
+const nowS = () => Date.now() / 1000 + drift;
+const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function readTheme() {
+  for (const n of ["bg", "pad", "line", "ink", "muted", "floor", "grid", "desk-top", "desk-front",
+                   "shadow", "working", "waiting", "idle", "done"]) theme[n] = cssVar("--" + n);
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTheme);
+
+function effState(s) {
+  let st = s.status || "idle";
+  const age = nowS() - s.status_ts;
+  if (st === "celebrate" && age > 4) st = "idle";
+  if (st === "idle" && age > 300) st = "sleeping";
+  return st;
+}
+const fill = (s) => (s.window ? Math.min(1, s.tokens / s.window) : 0);
+const tiredLevel = (f) => (f >= 0.9 ? 3 : f >= 0.75 ? 2 : f >= 0.5 ? 1 : 0);
+const stColor = (st) => ({ working: theme.working, waiting: theme.waiting, celebrate: theme.done }[st] || theme.idle);
+const energyColor = (e) => (e > 0.5 ? "#6cc070" : e > 0.25 ? "#e0af68" : "#f7768e");
+function dur(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  if (sec < 60) return sec + "s";
+  if (sec < 3600) return Math.floor(sec / 60) + "m";
+  return Math.floor(sec / 3600) + "h " + Math.floor((sec % 3600) / 60) + "m";
+}
+function statusText(s, st) {
+  if (st === "working") return s.detail || "Working…";
+  if (st === "waiting") return "Needs you";
+  if (st === "celebrate") return "All done!";
+  if (st === "sleeping") return "Asleep · " + dur(nowS() - s.status_ts);
+  return "Idle · " + dur(nowS() - s.status_ts);
+}
+const hash = (str) => [...str].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function clip(ctx, text, maxW) {
+  if (ctx.measureText(text).width <= maxW) return text;
+  while (text.length > 1 && ctx.measureText(text + "…").width > maxW) text = text.slice(0, -1);
+  return text + "…";
+}
+
+// ------------------------------------------------------------------ station
+function drawStation(ctx, station, ox, oy, t, isSel) {
+  const isSub = station.kind === "sub";
+  // A subagent is drawn as a station of its own: always working, in its own color.
+  const s = isSub
+    ? { id: subKey(station.s, station.a), project: station.a.type, status: "working", status_ts: station.a.started,
+        detail: station.a.detail || "Thinking…", tokens: 0, window: 0, subagents: [] }
+    : station.s;
+  const body = isSub ? subColor(station.a) : BODY;
+  const st = effState(s), f = fill(s), tired = tiredLevel(f), seed = hash(s.id) % 50;
+  const accent = isSub ? body : stColor(st);
+
+  // pad
+  ctx.save();
+  ctx.shadowColor = theme.shadow; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+  ctx.fillStyle = theme.pad; roundRect(ctx, ox + 8, oy + 8, SW - 16, SH - 16, 18); ctx.fill();
+  ctx.restore();
+  if (isSub) {
+    ctx.save(); ctx.setLineDash([7, 5]); ctx.strokeStyle = body; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.7;
+    roundRect(ctx, ox + 8, oy + 8, SW - 16, SH - 16, 18); ctx.stroke(); ctx.restore();
+  }
+  if (isSel) { ctx.strokeStyle = BODY; ctx.lineWidth = 2; roundRect(ctx, ox + 8, oy + 8, SW - 16, SH - 16, 18); ctx.stroke(); }
+
+  // confetti
+  if (st === "celebrate") {
+    const cols = ["#f7768e", "#e0af68", "#9ece6a", "#7dcfff", "#bb9af7"];
+    for (let i = 0; i < 18; i++) {
+      const p = (t * 1.1 + i * 0.37) % 1;
+      ctx.fillStyle = cols[i % 5];
+      ctx.fillRect(ox + 20 + ((i * 53) % (SW - 40)) + Math.sin(t * 3 + i) * 6, oy + 18 + p * (SH - 40), 5, 5);
+    }
+  }
+
+  // name tag
+  ctx.font = "600 12px system-ui, sans-serif";
+  const label = clip(ctx, s.project, 150), lw = ctx.measureText(label).width + 30;
+  const tagX = ox + 70 - lw / 2, tagY = oy + 22;
+  ctx.fillStyle = "#1f1f1f"; roundRect(ctx, tagX, tagY, lw, 22, 11); ctx.fill();
+  ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(tagX + 12, tagY + 11, 4, 0, 7); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(label, tagX + 22, tagY + 11.5);
+
+  // sprite behind desk
+  if (!isSub && s.bot) drawBot(ctx, s.bot, ox + 28, oy + 74, 7, { state: st, t });
+  else drawClawd(ctx, ox + 28, oy + 74, 7, { state: st, t, tired, seed, body, look: st === "working" ? 1 : 0 });
+  // desk
+  ctx.fillStyle = theme["desk-top"]; roundRect(ctx, ox + 14, oy + 128, 112, 10, 4); ctx.fill();
+  ctx.fillStyle = theme["desk-front"]; ctx.fillRect(ox + 20, oy + 138, 100, 24);
+  ctx.fillStyle = "#2a2a2a"; ctx.fillRect(ox + 40, oy + 123, 52, 5);
+  if (st === "working") {   // key flashes
+    ctx.fillStyle = "#7dcfff"; ctx.fillRect(ox + 42 + (Math.floor(t * 10 + seed) % 8) * 6, oy + 123, 4, 3);
+  }
+
+  // floating screen
+  const sx = ox + 142, sy = oy + 50, sw = 146, sh = 100;
+  ctx.save();
+  ctx.shadowColor = accent; ctx.shadowBlur = st === "idle" || st === "sleeping" ? 4 : 20;
+  ctx.fillStyle = "#141414"; roundRect(ctx, sx, sy, sw, sh, 9); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = accent; ctx.globalAlpha = 0.8; ctx.lineWidth = 1.5; roundRect(ctx, sx, sy, sw, sh, 9); ctx.stroke(); ctx.globalAlpha = 1;
+  ["#f7768e", "#e0af68", "#9ece6a"].forEach((col, i) => { ctx.fillStyle = col; ctx.fillRect(sx + 9 + i * 9, sy + 8, 6, 6); });
+  ctx.font = "10px ui-monospace, Consolas, monospace"; ctx.fillStyle = "#8d8d8d";
+  ctx.fillText(clip(ctx, s.project, 80), sx + 44, sy + 12);
+  ctx.fillStyle = "#2a2a2a"; ctx.fillRect(sx + 8, sy + 20, sw - 16, 1);
+
+  ctx.textBaseline = "alphabetic";
+  if (st === "working") {
+    ctx.font = "bold 11px ui-monospace, Consolas, monospace"; ctx.fillStyle = "#ededed";
+    ctx.fillText(clip(ctx, s.detail || "Working…", sw - 24) + (Math.floor(t * 2) % 2 ? "▌" : ""), sx + 10, sy + 38);
+    const shades = ["#9ece6a", "#7dcfff", "#e0af68"];
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = shades[(Math.floor(t * 3) + i) % 3];
+      ctx.fillRect(sx + 10, sy + 48 + i * 10, 30 + ((Math.floor(t * 3) + i * 3) % 6) * 14, 4);
+    }
+  } else if (st === "waiting") {
+    ctx.fillStyle = theme.waiting; ctx.font = "bold 34px system-ui"; ctx.textAlign = "center";
+    ctx.fillText("!", sx + sw / 2, sy + 62);
+    ctx.font = "bold 12px system-ui"; ctx.fillStyle = "#ededed"; ctx.fillText("Needs you", sx + sw / 2, sy + 82);
+    ctx.textAlign = "left";
+  } else if (st === "celebrate") {
+    ctx.fillStyle = "#9ece6a"; ctx.font = "bold 13px system-ui"; ctx.textAlign = "center";
+    ctx.fillText("✓ All done!", sx + sw / 2, sy + 60); ctx.textAlign = "left";
+  } else {
+    ctx.fillStyle = "#6f6f6f"; ctx.font = "12px system-ui"; ctx.textAlign = "center";
+    ctx.fillText(st === "sleeping" ? "zzz…" : "idle", sx + sw / 2, sy + 54);
+    ctx.font = "11px system-ui"; ctx.fillText(dur(nowS() - s.status_ts), sx + sw / 2, sy + 72); ctx.textAlign = "left";
+  }
+
+  // screen stand + energy bar
+  ctx.fillStyle = theme["desk-front"]; ctx.fillRect(ox + 206, oy + 150, 16, 10); ctx.fillRect(ox + 190, oy + 158, 48, 5);
+  ctx.font = "10.5px system-ui"; ctx.fillStyle = theme.muted;
+  if (isSub) {
+    ctx.fillText(clip(ctx, "helping " + station.s.project, sw), sx, oy + 176);
+    ctx.fillText(`running ${dur(nowS() - station.a.started)} · ${station.a.tools} tools`, sx, oy + 192);
+  } else {
+    ctx.fillStyle = theme.line; roundRect(ctx, sx, oy + 174, sw, 7, 3.5); ctx.fill();
+    ctx.fillStyle = energyColor(1 - f); roundRect(ctx, sx, oy + 174, Math.max(7, sw * (1 - f)), 7, 3.5); ctx.fill();
+    ctx.fillStyle = theme.muted; ctx.textAlign = "right";
+    ctx.fillText(`energy ${Math.round((1 - f) * 100)}%`, sx + sw, oy + 170); ctx.textAlign = "left";
+  }
+}
+
+// -------------------------------------------------------------------- stage
+const stage = $("stage"), sctx = stage.getContext("2d");
+// The stage size is cached (updated by a ResizeObserver) so we never force a reflow per frame.
+const stageBox = { w: 800, h: 600 };
+new ResizeObserver(([e]) => { stageBox.w = e.contentRect.width; stageBox.h = e.contentRect.height; })
+  .observe($("stagewrap"));
+function layout() {
+  const W = stageBox.w;
+  const cols = Math.max(1, Math.floor(W / SW)), n = Math.max(1, stations.length);
+  const rows = Math.ceil(n / cols), usedCols = Math.min(cols, n);
+  const left = Math.max(0, (W - usedCols * SW) / 2);
+  return { W, H: Math.max(stageBox.h, rows * SH + 40), cols, left, top: 20 };
+}
+function stationAt(mx, my) {
+  const L = layout(), c = Math.floor((mx - L.left) / SW), r = Math.floor((my - L.top) / SH);
+  if (c < 0 || c >= L.cols || r < 0) return -1;
+  const i = r * L.cols + c;
+  return i < stations.length ? i : -1;
+}
+stage.addEventListener("click", (e) => {
+  const r = stage.getBoundingClientRect(), i = stationAt(e.clientX - r.left, e.clientY - r.top);
+  if (i >= 0) select(stationId(stations[i]));
+});
+stage.addEventListener("mousemove", (e) => {
+  const r = stage.getBoundingClientRect();
+  stage.style.cursor = stationAt(e.clientX - r.left, e.clientY - r.top) >= 0 ? "pointer" : "default";
+});
+
+function drawFloor(ctx, W, H) {
+  ctx.fillStyle = theme.floor; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = theme.grid; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 0; x < W; x += 40) { ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); }
+  for (let y = 0; y < H; y += 40) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+  ctx.stroke();
+}
+
+// ------------------------------------------------------------------ sidebar
+function esc(str) { const d = document.createElement("div"); d.textContent = str; return d.innerHTML; }
+let lastSideHtml = "";
+function renderSide() {
+  const list = $("list");
+  const html = !stations.length ? '<p class="hint">No sessions open.</p>' : stations.map((x) => {
+    const id = stationId(x), cls = "row" + (id === selected ? " sel" : "") + (x.kind === "sub" ? " child" : "");
+    if (x.kind === "sub") {
+      return `<div class="${cls}" data-id="${esc(id)}"><canvas class="av" width="120" height="90"></canvas>
+        <div><div class="name">${esc(x.a.type)}</div>
+        <div class="sub" style="color:${subColor(x.a)}">${esc(x.a.detail || "Thinking…")}</div></div></div>`;
+    }
+    const s = x.s, st = effState(s), f = fill(s);
+    return `<div class="${cls}" data-id="${esc(id)}">
+      <canvas class="av" width="120" height="90"></canvas>
+      <div><div class="name">${esc(s.project)}</div>
+      <div class="sub" style="color:${stColor(st)}">${esc(statusText(s, st))}</div>
+      <div class="bar"><b style="width:${Math.round((1 - f) * 100)}%;background:${energyColor(1 - f)}"></b></div></div></div>`;
+  }).join("");
+  if (html !== lastSideHtml) { list.innerHTML = html; lastSideHtml = html; }  // skip no-op rebuilds
+}
+$("list").addEventListener("click", (e) => {
+  const row = e.target.closest(".row"); if (row) select(row.dataset.id);
+});
+function select(id) { selected = selected === id ? null : id; renderSide(); renderDetail(); }
+
+function renderDetail() {
+  const box = $("detail"), x = stations.find((z) => stationId(z) === selected);
+  if (!x) { box.innerHTML = '<p class="hint">Click a bot to see details.</p>'; return; }
+  if (x.kind === "sub") {
+    const a = x.a;
+    box.innerHTML = `<h2>Subagent</h2><div class="big">${esc(a.type)}</div>
+      <p class="hint" style="margin:0 0 14px;color:${subColor(a)}">${esc(a.detail || "Thinking…")}</p>
+      <dl>
+        <dt>Helping</dt><dd>${esc(x.s.project)}</dd>
+        <dt>Running for</dt><dd>${dur(nowS() - a.started)}</dd>
+        <dt>Tools used</dt><dd>${a.tools}</dd>
+        <dt>Agent id</dt><dd class="mono">${esc(a.id.slice(0, 10))}</dd>
+      </dl>`;
+    return;
+  }
+  const s = x.s, st = effState(s), f = fill(s);
+  const subs = s.subagents.length
+    ? "<ul>" + s.subagents.map((a) => `<li>${esc(a.type)}</li>`).join("") + "</ul>" : "<span class='hint'>none</span>";
+  box.innerHTML = `<h2>Session</h2><div class="big">${esc(s.project)}</div>
+    <p class="hint" style="margin:0 0 14px;color:${stColor(st)}">${esc(statusText(s, st))}</p>
+    <dl>
+      ${s.flow ? `<dt>Flow</dt><dd>${esc(s.flow.name)} · ${esc(s.flow.stage)}</dd>` : ""}
+      <dt>Folder</dt><dd class="mono">${esc(s.cwd || "—")}</dd>
+      <dt>Context</dt><dd>${s.tokens.toLocaleString()} / ${s.window.toLocaleString()} tokens (${Math.round(f * 100)}%)</dd>
+      <dt>Tools used</dt><dd>${s.tools}</dd>
+      <dt>Tasks done</dt><dd>${s.done}</dd>
+      <dt>Open for</dt><dd>${dur(nowS() - s.started)}</dd>
+      <dt>Session</dt><dd class="mono">${esc(s.id.slice(0, 8))}</dd>
+      <dt>Subagents</dt><dd>${subs}</dd>
+    </dl>`;
+}
+
+function renderChips() {
+  const n = { working: 0, waiting: 0, idle: 0 };
+  for (const s of data.sessions) {
+    const st = effState(s);
+    if (st === "working") n.working++; else if (st === "waiting") n.waiting++; else n.idle++;
+  }
+  const helpers = stations.filter((x) => x.kind === "sub").length;
+  $("chips").innerHTML = [["working", "Working", n.working], ["waiting", "Needs you", n.waiting], ["idle", "Idle", n.idle]]
+    .map(([k, label, v]) => `<span class="chip"><i style="background:${theme[k]}"></i>${label} <b>${v}</b></span>`).join("")
+    + (helpers ? `<span class="chip"><i style="background:#7aa2f7"></i>Subagents <b>${helpers}</b></span>` : "");
+  document.title = (n.waiting ? "(!) " : "") + "Office" + (n.working ? ` · ${n.working} working` : "");
+}
+
+// ---------------------------------------------------------------- main loop
+async function poll() {
+  try {
+    const r = await fetch("/api/sessions", { cache: "no-store" });
+    data = await r.json(); drift = data.now - Date.now() / 1000; online = true;
+    stations = buildStations();
+    if (selected && !stations.some((x) => stationId(x) === selected)) selected = null;
+    renderSide(); renderDetail(); renderChips();
+  } catch (e) { online = false; }
+  $("live").className = "live" + (online ? "" : " off");
+  $("live").lastChild.textContent = online ? "live" : "offline — is Lithnode running?";
+  $("empty").classList.toggle("show", online && data.sessions.length === 0);
+}
+
+let lastFrame = 0;
+function frame(ms) {
+  requestAnimationFrame(frame);
+  if (document.hidden || ms - lastFrame < 32) return;   // idle when hidden, ~30 fps otherwise
+  lastFrame = ms;
+  const t = ms / 1000, dpr = window.devicePixelRatio || 1, L = layout();
+  if (stage.width !== Math.round(L.W * dpr) || stage.height !== Math.round(L.H * dpr)) {
+    stage.width = Math.round(L.W * dpr); stage.height = Math.round(L.H * dpr);
+    stage.style.width = L.W + "px"; stage.style.height = L.H + "px";
+  }
+  sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  sctx.textBaseline = "alphabetic"; sctx.textAlign = "left";
+  drawFloor(sctx, L.W, L.H);
+  stations.forEach((x, i) => {
+    drawStation(sctx, x, L.left + (i % L.cols) * SW, L.top + Math.floor(i / L.cols) * SH, t, stationId(x) === selected);
+  });
+
+  document.querySelectorAll("#list .row").forEach((row, i) => {
+    const x = stations[i], cv = row.querySelector("canvas"); if (!x || !cv) return;
+    const c2 = cv.getContext("2d"); c2.clearRect(0, 0, cv.width, cv.height);
+    if (x.kind === "sub") drawClawd(c2, 6, 12, 9, { state: "working", t, body: subColor(x.a), seed: i });
+    else if (x.s.bot) drawBot(c2, x.s.bot, 6, 12, 9, { state: effState(x.s), t });
+    else drawClawd(c2, 6, 12, 9, { state: effState(x.s), t, tired: tiredLevel(fill(x.s)), seed: hash(x.s.id) % 50 });
+  });
+  const lg = $("logo").getContext("2d"); lg.clearRect(0, 0, 108, 84);
+  drawClawd(lg, 9, 14, 7.5, { state: "idle", t, seed: 3 });
+  const ec = $("emptyClawd"); if ($("empty").classList.contains("show")) {
+    const e2 = ec.getContext("2d"); e2.clearRect(0, 0, ec.width, ec.height);
+    drawClawd(e2, 100, 70, 13, { state: "sleeping", t });
+  }
+}
+readTheme(); poll(); setInterval(poll, 1000); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

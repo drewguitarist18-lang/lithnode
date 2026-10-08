@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+dist/
+build/
+installer/.venv-build/
+installer/lithnode.ico
+site/.vercel
+site/.env*
+site/download/
+installer/*.bmp
+installer/app/node_modules/
+installer/app/lithnode.ico
+
+# render outputs (the HTML sources are kept)
+marketing/*.mp4
+marketing/relay-ad.*

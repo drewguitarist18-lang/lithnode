@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>/* theme from the top-bar switch: dark (default), light or system */try { const t = localStorage.getItem("hq-theme") || "dark"; if (t !== "system") document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- the app window's title bar takes this color (Edge/Chrome app mode); kept in step with the theme switch -->
+<meta name="theme-color" id="barColor" content="#111111">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/favicon-32.png" type="image/png" sizes="32x32">
+<title>Lithnode</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f6f8; --bar: #ffffff; --line: #e3e4ea; --ink: #15161c; --muted: #6b6f80;
+    --accent: #D97757; --hover: #f0f0f4; --warn: #e5566e; --ok: #4fae6a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0a0a0a; --bar: #111111; --line: #232323; --ink: #ededed; --muted: #8d8d8d;
+            --hover: #1c1c1c; --warn: #f7768e; --ok: #9ece6a; }
+  }
+  /* the theme switch in the top bar forces one or the other */
+  :root[data-theme="dark"] { color-scheme: dark; --bg: #0a0a0a; --bar: #111111; --line: #232323; --ink: #ededed; --muted: #8d8d8d;
+            --hover: #1c1c1c; --warn: #f7768e; --ok: #9ece6a; }
+  :root[data-theme="light"] { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.4 "Segoe UI", system-ui, sans-serif;
+         display: grid; grid-template-rows: 48px 1fr; overflow: hidden; }
+  header { display: flex; align-items: center; gap: 6px; padding: 0 14px; background: var(--bar);
+           border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 8px; margin-right: 14px; font-weight: 700; font-size: 15px; }
+  .brand canvas { width: 32px; height: 24px; }
+  .brand small { font-weight: 500; font-size: 11.5px; color: var(--muted); margin-left: 4px; }
+  nav { display: flex; gap: 4px; height: 100%; }
+  nav a { display: flex; align-items: center; gap: 8px; padding: 0 14px; color: var(--muted); text-decoration: none;
+          font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  nav a:hover { color: var(--ink); }
+  nav a.on { color: var(--ink); border-bottom-color: var(--accent); }
+  .badge { min-width: 18px; height: 18px; padding: 0 6px; border-radius: 9px; font-size: 11px; font-weight: 700;
+           display: none; align-items: center; justify-content: center; background: var(--accent); color: #fff; }
+  .badge.show { display: inline-flex; }
+  .badge.warn { background: var(--warn); }
+  .status { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .status.ok i { background: var(--ok); } .status.bad i { background: var(--warn); }
+  .status code { background: var(--hover); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+  .signin { font: 600 12.5px inherit; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+  .signin:disabled { opacity: .6; cursor: default; }
+  .quit { margin-left: 6px; width: 32px; height: 30px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line);
+          background: transparent; color: var(--muted); cursor: pointer; }
+  .quit:hover { color: var(--warn); border-color: var(--warn); }
+  .quit svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+  .frames { position: relative; min-height: 0; }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; background: var(--bg); }
+  iframe.on { display: block; }
+  .theme { margin-left: 12px; display: flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 8px;
+           border: 1px solid var(--line); background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+  .theme:hover { color: var(--ink); background: var(--hover); }
+  @media (max-width: 640px) { .brand span, .status span, .theme span { display: none; } nav a { padding: 0 10px; } }
+  /* In Lithnode's own window this bar is the title bar: drag it to move the window; the window's own
+     minimize / maximize / close sit at the right (so the Quit button isn't needed) */
+  html.native header { -webkit-app-region: drag; user-select: none;
+                       padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 150px)) + 8px); }
+  html.native header :is(a, button, canvas) { -webkit-app-region: no-drag; }
+  html.native .quit { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><canvas id="logo" width="96" height="72"></canvas><span>Lithnode <small>for Claude Code</small></span></div>
+  <nav>
+    <a href="#flows" data-tab="flows">Flows <b class="badge" id="b-flows"></b></a>
+    <a href="#office" data-tab="office">Office <b class="badge" id="b-office"></b></a>
+  </nav>
+  <div class="status" id="status" title=""><i></i><span>Checking Claude Code…</span></div>
+  <button class="signin" id="signinBtn" hidden title="Opens Claude Code's sign-in in your browser">Sign in</button>
+  <button class="theme" id="themeBtn" title="Switch theme"><b id="themeIcon">◐</b><span id="themeName">Dark</span></button>
+  <button class="quit" id="quitBtn" title="Quit Lithnode" aria-label="Quit Lithnode"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></button>
+</header>
+<div class="frames" id="frames"></div>
+<script src="/static/sprites.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+"use strict";
+const TABS = ["flows", "office"];
+const frames = {};
+const $ = (id) => document.getElementById(id);
+
+function show(tab) {
+  if (!TABS.includes(tab)) tab = "flows";
+  if (!frames[tab]) {               // load each tab the first time it's opened, then keep it alive
+    const f = document.createElement("iframe");
+    f.src = "/" + tab; f.title = tab;
+    f.addEventListener("load", () => applyTheme(f));
+    $("frames").appendChild(f); frames[tab] = f;
+  }
+  for (const [k, f] of Object.entries(frames)) f.classList.toggle("on", k === tab);
+  document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
+  try { localStorage.setItem("hq-tab", tab); } catch (e) {}
+}
+// ---- theme: dark (default) → light → system, saved and applied to every tab at once
+const THEMES = { dark: ["◐", "Dark"], light: ["☀", "Light"], system: ["◑", "Auto"] };
+let themeMode = "dark";
+try { themeMode = localStorage.getItem("hq-theme") || "dark"; } catch (e) {}
+if (!THEMES[themeMode]) themeMode = "dark";
+function applyTheme(frame) {
+  const doc = frame ? frame.contentDocument : document;
+  if (!doc) return;
+  if (themeMode === "system") delete doc.documentElement.dataset.theme;
+  else doc.documentElement.dataset.theme = themeMode;
+  if (frame && typeof frame.contentWindow.readTheme === "function") frame.contentWindow.readTheme();  // canvas colors
+}
+function applyAll() {
+  applyTheme();
+  for (const f of Object.values(frames)) applyTheme(f);
+  [$("themeIcon").textContent, $("themeName").textContent] = THEMES[themeMode];
+  // the window's title bar matches the top bar, so it isn't a white strip over a dark app
+  const css = getComputedStyle(document.documentElement), bar = css.getPropertyValue("--bar").trim() || "#111111";
+  $("barColor").content = bar;
+  if (window.lithnodeApp) window.lithnodeApp.setBar(bar, css.getPropertyValue("--muted").trim() || "#8d8d8d");   // own window: recolor its title bar
+}
+if (window.lithnodeApp) document.documentElement.classList.add("native");
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themeMode === "system") applyAll(); });
+$("themeBtn").onclick = () => {
+  const order = Object.keys(THEMES);
+  themeMode = order[(order.indexOf(themeMode) + 1) % order.length];
+  try { localStorage.setItem("hq-theme", themeMode); } catch (e) {}
+  applyAll();
+};
+applyAll();
+
+window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+let first = location.hash.slice(1);
+if (!first) { try { first = localStorage.getItem("hq-tab") || "flows"; } catch (e) { first = "flows"; } }
+show(first);
+
+function badge(id, n, warn) {
+  const b = $(id); b.textContent = n; b.classList.toggle("show", n > 0); b.classList.toggle("warn", !!warn);
+}
+async function poll() {
+  try {
+    const d = await (await fetch("/api/hq", { cache: "no-store" })).json();
+    badge("b-flows", d.approvals || d.runs, d.approvals > 0);
+    badge("b-office", d.agents);
+    const cc = d.claude_code || {}, st = $("status");
+    st.className = "status " + (cc.logged_in ? "ok" : "bad");
+    st.querySelector("span").innerHTML = cc.logged_in ? "Claude Code signed in"
+      : cc.available ? "Claude Code isn't signed in" : "Claude Code not found · install it from claude.com/claude-code";
+    $("signinBtn").hidden = !!cc.logged_in || !cc.available;
+    document.title = (d.approvals ? "(!) " : "") + "Lithnode" + (d.agents ? ` · ${d.agents} working` : "");
+  } catch (e) {
+    $("status").className = "status bad"; $("status").querySelector("span").textContent = "Server offline";
+  }
+}
+poll(); setInterval(poll, 2000);
+
+// sign in: opens Claude Code's own login (a console, then your browser); the status above updates by itself
+$("signinBtn").onclick = async () => {
+  const b = $("signinBtn"); b.disabled = true; b.textContent = "Finish in your browser…";
+  try { await fetch("/api/signin", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) {}
+  setTimeout(() => { b.disabled = false; b.textContent = "Sign in"; }, 60000);
+};
+$("quitBtn").onclick = async () => {
+  const ok = await ui.confirm({ title: "Quit Lithnode?", text: "This closes the app and stops any running flows.", ok: "Quit", danger: true });
+  if (!ok) return;
+  try { await fetch("/api/quit", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) {}
+  document.body.innerHTML = '<p style="padding:40px;font:16px system-ui;color:#8d8d8d">Lithnode has quit. You can close this window.</p>';
+};
+
+const lg = $("logo").getContext("2d");
+(function frame(ms) {
+  requestAnimationFrame(frame);
+  lg.clearRect(0, 0, 96, 72);
+  drawClawd(lg, 6, 12, 7, { state: "idle", t: ms / 1000, seed: 3 });
+})(0);
+</script>
+</body>
+</html>

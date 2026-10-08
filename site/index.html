@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lithnode · Build an AI team. Watch it ship.</title>
+<meta name="description" content="Lithnode turns Claude Code into a team you can draw. Wire up agents, press run, and watch them plan, build, check and ship. Runs on your Claude plan.">
+<meta property="og:title" content="Lithnode">
+<meta property="og:description" content="Build an AI team. Watch it ship. For Claude Code.">
+<meta property="og:image" content="media/film-poster.jpg">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  :root {
+    --bg: #0a0a0a; --panel: #111111; --pad: #171717; --line: #262626; --line2: #333;
+    --ink: #ededed; --muted: #8d8d8d; --dim: #5c5c5c;
+    --accent: #D97757; --accent-2: #f0a07f; --done: #9ece6a; --blue: #7aa2f7; --violet: #bb9af7; --teal: #2fb5a0;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Inter", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }   /* hidden always wins, e.g. the film's play button once it's playing */
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  a { color: inherit; }
+  img, video, canvas { max-width: 100%; display: block; }
+  .wrap { width: min(1200px, 100% - 40px); margin-inline: auto; }
+  h1, h2, h3 { font-family: var(--display); letter-spacing: -0.03em; text-wrap: balance; margin: 0; }
+  .eyebrow { font: 600 12.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  .grain { position: fixed; inset: -50%; pointer-events: none; z-index: 100; opacity: .05; mix-blend-mode: overlay;
+           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+           animation: grain 1s steps(4) infinite; }
+  @keyframes grain { 0% { transform: translate(0, 0); } 25% { transform: translate(-3%, 2%); } 50% { transform: translate(2%, -3%); } 75% { transform: translate(-2%, -1%); } }
+
+  /* ---- buttons */
+  .btn { display: inline-flex; align-items: center; gap: 10px; font: 600 15.5px var(--body); text-decoration: none; border-radius: 999px;
+         padding: 13px 22px; border: 1px solid var(--line2); color: var(--ink); background: rgba(255,255,255,.03); cursor: pointer;
+         transition: transform .2s, background .2s, border-color .2s, box-shadow .2s; }
+  .btn:hover { transform: translateY(-2px); border-color: #555; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #170a05;
+                 box-shadow: 0 10px 40px -8px rgba(217,119,87,.6), inset 0 1px 0 rgba(255,255,255,.25); }
+  .btn.primary:hover { box-shadow: 0 16px 50px -6px rgba(217,119,87,.75), inset 0 1px 0 rgba(255,255,255,.25); }
+  .btn svg { width: 18px; height: 18px; flex: none; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ---- nav */
+  nav.top { position: fixed; top: 0; left: 0; right: 0; z-index: 50; transition: background .3s, border-color .3s, backdrop-filter .3s; border-bottom: 1px solid transparent; }
+  nav.top.solid { background: rgba(10,10,10,.72); backdrop-filter: blur(14px) saturate(1.3); border-color: var(--line); }
+  nav.top .wrap { display: flex; align-items: center; gap: 28px; height: 68px; }
+  .brand { display: flex; align-items: center; gap: 10px; font: 700 19px var(--display); text-decoration: none; letter-spacing: -.02em; }
+  .brand canvas { width: 30px; height: 20px; image-rendering: pixelated; }
+  nav.top .links { display: flex; gap: 26px; margin-left: auto; font-size: 14.5px; color: var(--muted); }
+  nav.top .links a { text-decoration: none; transition: color .2s; }
+  nav.top .links a:hover { color: var(--ink); }
+  nav.top .btn { padding: 9px 16px; font-size: 14px; }
+  @media (max-width: 760px) { nav.top .links { display: none; } nav.top .btn { margin-left: auto; } }
+
+  /* ---- hero */
+  .hero { position: relative; min-height: 100vh; display: grid; align-items: center; padding: 120px 0 80px; overflow: hidden; }
+  #heroCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hero::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+                 background: radial-gradient(ellipse 70% 60% at 30% 45%, rgba(10,10,10,.92) 0%, rgba(10,10,10,.55) 45%, rgba(10,10,10,0) 75%),
+                             linear-gradient(to bottom, rgba(10,10,10,0) 70%, var(--bg) 100%); }
+  .hero .wrap { position: relative; z-index: 2; }
+  .hero h1 { font-size: clamp(48px, 8.4vw, 116px); line-height: .94; font-weight: 800; max-width: 11ch; }
+  .hero h1 .line { display: block; overflow: hidden; padding-bottom: .06em; }
+  .hero h1 .line span { display: inline-block; transform: translateY(110%); animation: rise 1s cubic-bezier(.2,.8,.1,1) forwards; }
+  .hero h1 .line:nth-child(2) span { animation-delay: .12s; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  @keyframes rise { to { transform: translateY(0); } }
+  .hero p.lede { font-size: clamp(18px, 2vw, 21px); color: #bdbdbd; max-width: 520px; margin: 26px 0 34px; opacity: 0; animation: fade .9s .45s forwards; }
+  .hero .ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; opacity: 0; animation: fade .9s .6s forwards; }
+  .hero .meta { margin-top: 18px; font: 500 13px var(--mono); color: var(--dim); opacity: 0; animation: fade .9s .75s forwards; }
+  @keyframes fade { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .scrollcue { position: absolute; left: 50%; bottom: 28px; z-index: 2; translate: -50% 0; width: 24px; height: 38px; border: 1.5px solid var(--line2); border-radius: 12px; }
+  .scrollcue::after { content: ""; position: absolute; left: 50%; top: 8px; width: 3px; height: 8px; margin-left: -1.5px; border-radius: 2px; background: var(--accent); animation: cue 1.8s infinite; }
+  @keyframes cue { 0% { transform: translateY(0); opacity: 1; } 70% { transform: translateY(12px); opacity: 0; } 100% { opacity: 0; } }
+
+  /* ---- marquee of flows people build */
+  .marquee { border-block: 1px solid var(--line); padding: 22px 0; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+  .marquee .track { display: flex; gap: 14px; width: max-content; animation: slide 40s linear infinite; }
+  .marquee span { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; font: 500 15px var(--body); color: #bdbdbd;
+                  padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+  .marquee span i { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--accent)); box-shadow: 0 0 12px var(--c, var(--accent)); }
+  @keyframes slide { to { transform: translateX(-50%); } }
+
+  section { padding: 140px 0; position: relative; }
+  .head { max-width: 760px; margin-bottom: 64px; }
+  .head h2 { font-size: clamp(38px, 5.6vw, 72px); line-height: 1; font-weight: 800; margin-top: 14px; }
+  .head p { color: var(--muted); font-size: 19px; margin: 20px 0 0; max-width: 60ch; }
+
+  /* ---- reveal on scroll */
+  .rv { opacity: 0; transform: translateY(40px); transition: opacity 1s cubic-bezier(.2,.8,.1,1), transform 1s cubic-bezier(.2,.8,.1,1); transition-delay: var(--d, 0s); }
+  .rv.in { opacity: 1; transform: none; }
+
+  /* ---- film */
+  .film { position: relative; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); aspect-ratio: 16/9; background: #000;
+          box-shadow: 0 60px 140px -40px rgba(217,119,87,.35), 0 40px 80px rgba(0,0,0,.6); transform: perspective(1400px) rotateX(var(--tilt, 14deg)) scale(var(--sc, .92)); transform-origin: 50% 0; }
+  .film video { width: 100%; height: 100%; object-fit: cover; }
+  .film button { position: absolute; inset: 0; display: grid; place-items: center; border: 0; background: rgba(10,10,10,.25); cursor: pointer; transition: background .3s; }
+  .film button:hover { background: rgba(10,10,10,.1); }
+  .film button span { display: inline-flex; align-items: center; gap: 12px; padding: 16px 26px 16px 20px; border-radius: 999px; background: var(--accent); color: #170a05; font: 700 16px var(--body); box-shadow: 0 16px 50px rgba(217,119,87,.5); }
+  .film button svg { width: 24px; height: 24px; }
+
+  /* ---- steps */
+  .steps { display: grid; gap: 22px; grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 900px) { .steps { grid-template-columns: 1fr; } }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 26px; min-width: 0; overflow: hidden; position: relative; }
+  .step .n { font: 700 13px var(--mono); color: var(--accent); }
+  .step h3 { font-size: 30px; margin: 8px 0 8px; }
+  .step p { color: var(--muted); margin: 0 0 22px; font-size: 16px; }
+  .step canvas { width: 100%; height: 250px; border-radius: 14px; background: var(--bg); border: 1px solid var(--line); }
+
+  /* ---- connectors: the token bars */
+  .split { display: grid; grid-template-columns: 1.05fr 1fr; gap: 60px; align-items: center; }
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; gap: 40px; } }
+  .bars { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 30px; display: grid; gap: 26px; }
+  .bar b { display: flex; justify-content: space-between; font: 600 15px var(--body); margin-bottom: 10px; }
+  .bar b span { font: 700 15px var(--mono); font-variant-numeric: tabular-nums; }
+  .bar .t { height: 14px; border-radius: 8px; background: var(--pad); overflow: hidden; }
+  .bar .f { height: 100%; width: 0; border-radius: 8px; transition: width 1.8s cubic-bezier(.2,.8,.1,1); }
+  .bar.bad .f { background: linear-gradient(90deg, #e5566e, #f7768e); }
+  .bar.good .f { background: linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow: 0 0 20px rgba(217,119,87,.5); }
+  .bars small { color: var(--dim); font-size: 13px; }
+  .apps { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+  .apps span { display: inline-flex; align-items: center; gap: 9px; padding: 9px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font: 600 14px var(--body); }
+  .apps span i { width: 26px; height: 15px; border-radius: 8px; background: var(--line2); position: relative; }
+  .apps span i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #fff; transition: transform .3s; }
+  .apps span.on i { background: var(--done); }
+  .apps span.on i::after { transform: translateX(11px); }
+
+  /* ---- features */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 26px; min-width: 0; position: relative; overflow: hidden;
+          transition: border-color .3s, transform .3s; }
+  .card:hover { border-color: #3a3a3a; transform: translateY(-4px); }
+  .card::before { content: ""; position: absolute; inset: 0; background: radial-gradient(400px circle at var(--mx, 50%) var(--my, 0%), rgba(217,119,87,.10), transparent 40%); opacity: 0; transition: opacity .3s; }
+  .card:hover::before { opacity: 1; }
+  .card canvas { width: 48px; height: 32px; image-rendering: pixelated; margin-bottom: 18px; }
+  .card h3 { font-size: 22px; margin-bottom: 8px; letter-spacing: -.02em; }
+  .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+  /* ---- download */
+  .dl { text-align: center; overflow: hidden; }
+  .dl .glow { position: absolute; left: 50%; top: 55%; width: 1100px; height: 700px; translate: -50% -50%; pointer-events: none;
+              background: radial-gradient(closest-side, rgba(217,119,87,.22), transparent); filter: blur(20px); }
+  .dl h2 { font-size: clamp(46px, 8vw, 104px); line-height: .95; font-weight: 800; position: relative; }
+  .dl p { color: var(--muted); font-size: 19px; max-width: 54ch; margin: 22px auto 36px; position: relative; }
+  .dl .btn.primary { font-size: 18px; padding: 18px 30px; position: relative; }
+  .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 900px; margin: 64px auto 0; text-align: left; position: relative; }
+  @media (max-width: 760px) { .how { grid-template-columns: 1fr; } }
+  .how div { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; min-width: 0; }
+  .how b { display: block; font: 700 13px var(--mono); color: var(--accent); margin-bottom: 6px; }
+  .how span { color: #c8c8c8; font-size: 15px; }
+  .reqs { margin-top: 26px; font: 500 13px var(--mono); color: var(--dim); position: relative; }
+  .reqs a { color: var(--muted); }
+
+
+  /* ---- after you press Download: a panel that drops from the top-right, right under the browser's downloads icon */
+  .dlo { position: fixed; inset: 0; z-index: 90; pointer-events: none; }
+  .dlo[hidden] { display: none; }
+  .dlo .shade { position: absolute; inset: 0; background: radial-gradient(circle at calc(100% - 40px) 0, rgba(10,10,10,.25), rgba(5,5,5,.72) 60%);
+                opacity: 0; transition: opacity .4s; pointer-events: auto; }
+  .dlo.show .shade { opacity: 1; }
+  .dlo .ping { position: absolute; top: -18px; right: 6px; width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; }
+  .dlo.show .ping { animation: ping 1.6s ease-out .3s infinite; }
+  @keyframes ping { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
+  .dlo .arrow { position: absolute; top: 6px; right: 40px; width: 64px; height: 64px; color: var(--accent); opacity: 0;
+                filter: drop-shadow(0 0 12px rgba(217,119,87,.55)); }
+  .dlo.show .arrow { opacity: 1; animation: nudge 1.2s ease-in-out .3s infinite; transition: opacity .3s .2s; }
+  @keyframes nudge { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(5px, -6px); } }
+  .dlo .panel { position: absolute; top: 74px; right: 20px; width: min(400px, calc(100% - 32px)); max-height: calc(100vh - 94px); overflow: auto;
+                background: rgba(17,17,17,.96); border: 1px solid #2c2c2c; border-radius: 20px; padding: 20px 20px 16px; pointer-events: auto;
+                box-shadow: 0 30px 90px rgba(0,0,0,.65), 0 0 0 1px rgba(217,119,87,.08);
+                transform-origin: calc(100% - 40px) -20px; transform: translateY(-10px) scale(.96); opacity: 0;
+                transition: transform .5s cubic-bezier(.2,.8,.1,1), opacity .35s; }
+  .dlo.show .panel { transform: none; opacity: 1; }
+  .dlo .head { display: flex; align-items: center; gap: 12px; padding-right: 30px; }
+  .dlo .file { width: 40px; height: 40px; border-radius: 11px; background: #1c1c1c; border: 1px solid #2c2c2c; display: grid; place-items: center; flex: none; position: relative; }
+  .dlo .file canvas { width: 22px; height: 15px; image-rendering: pixelated; }
+  .dlo .bar { height: 3px; border-radius: 2px; background: #232323; margin-top: 14px; overflow: hidden; position: relative; }
+  .dlo .bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 35%; border-radius: 2px;
+                     background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: slide-bar 1.4s ease-in-out infinite; }
+  @keyframes slide-bar { from { left: -35%; } to { left: 100%; } }
+  .dlo .head b { display: block; font: 700 15px var(--body); }
+  .dlo .head small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.4; margin-top: 2px; }
+  .dlo .head b { line-height: 1.3; }
+  .dlo .x { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: transparent; color: var(--dim); cursor: pointer; font-size: 15px; }
+  .dlo .x:hover { color: var(--ink); background: #1f1f1f; }
+  .dlo ol { list-style: none; margin: 10px 0 0; padding: 0; position: relative; }
+  .dlo ol::before { content: ""; position: absolute; left: 13px; top: 14px; bottom: 14px; width: 2px; background: #262626; }
+  .dlo li { position: relative; display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 8px 0; opacity: .45; transition: opacity .35s; }
+  .dlo li.on, .dlo li.done { opacity: 1; }
+  .dlo li > i { width: 28px; height: 28px; border-radius: 50%; background: #1a1a1a; border: 2px solid #333; display: grid; place-items: center;
+                font: 700 12px var(--mono); font-style: normal; color: var(--muted); position: relative; z-index: 1; transition: all .35s; }
+  .dlo li.on > i { background: var(--accent); border-color: var(--accent); color: #170a05; box-shadow: 0 0 0 5px rgba(217,119,87,.18); }
+  .dlo li.done > i { border-color: var(--done); color: var(--done); }
+  .dlo li h4 { margin: 3px 0 2px; font: 700 14.5px var(--body); }
+  .dlo li p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+  .dlo li p em { font-style: normal; color: var(--ink); font-weight: 600; }
+  .smart { margin-top: 10px; border-radius: 10px; background: #0f4c81; color: #fff; padding: 11px 12px; font: 12.5px/1.4 var(--body); }
+  .smart strong { display: block; font-size: 13.5px; margin-bottom: 3px; }
+  .smart u { text-decoration: none; border-bottom: 1px solid #fff; padding: 0 2px; border-radius: 3px; }
+  .smart .row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+  .smart .bt { padding: 4px 10px; border-radius: 4px; background: rgba(255,255,255,.14); font-size: 12px; }
+  .dlo li.on .smart .hl { box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(217,119,87,.7); }
+  .dlo .again { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid #222; color: var(--dim); font-size: 12.5px; }
+  .dlo .again a { color: var(--muted); }
+  @media (max-width: 600px) {   /* phones: a bottom sheet instead */
+    .dlo .panel { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 80vh; transform-origin: 50% 100%; transform: translateY(20px); }
+    .dlo .arrow, .dlo .ping { display: none; }
+  }
+  footer { border-top: 1px solid var(--line); padding: 34px 0 50px; color: var(--dim); font-size: 13.5px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 30px; justify-content: space-between; align-items: center; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; transition-duration: .001s !important; }
+    .rv { opacity: 1; transform: none; }
+    .marquee .track { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<nav class="top" id="nav">
+  <div class="wrap">
+    <a class="brand" href="#top"><canvas data-sprite="crab" data-color="#D97757" width="12" height="8"></canvas>Lithnode</a>
+    <div class="links"><a href="#film">Film</a><a href="#how">How it works</a><a href="#connectors">Connectors</a><a href="#features">Features</a></div>
+    <a class="btn primary" href="#download">Download</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <canvas id="heroCanvas" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <div class="eyebrow">For Claude Code</div>
+    <h1 style="margin-top:18px"><span class="line"><span>Build an AI team.</span></span><span class="line"><span><em>Watch it ship.</em></span></span></h1>
+    <p class="lede">Draw a team of Claude Code agents, wire them together and press run. They plan, build, check each other's work and hand you the result, on your own computer and your own Claude plan.</p>
+    <div class="ctas">
+      <a class="btn primary" href="download/LithnodeSetup.exe" download data-dl><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Download for Windows</a>
+      <a class="btn" href="#film"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Watch the film</a>
+    </div>
+    <div class="meta">Free · Windows 10 and 11 · no API keys · 99 MB</div>
+  </div>
+  <div class="scrollcue" aria-hidden="true"></div>
+</header>
+
+<div class="marquee" aria-label="Flows people build">
+  <div class="track" id="marquee"></div>
+</div>
+
+<section id="film">
+  <div class="wrap">
+    <div class="head rv"><div class="eyebrow">31 seconds</div><h2>Find products. Check them. List the winners.</h2>
+      <p>A dropshipping flow, start to finish: a scout finds products, a checker cuts the duds, an uploader lists the rest. Then you tweak one line and run it again.</p></div>
+    <div class="film" id="filmBox">
+      <video id="filmVideo" src="media/lithnode-film.mp4" poster="media/film-poster.jpg" playsinline preload="metadata"></video>
+      <button id="filmPlay" aria-label="Play the film with sound"><span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Play with sound</span></button>
+    </div>
+  </div>
+</section>
+
+<section id="how" style="padding-top:40px">
+  <div class="wrap">
+    <div class="head rv"><div class="eyebrow">How it works</div><h2>Three moves. That's the whole thing.</h2></div>
+    <div class="steps">
+      <div class="step rv"><div class="n">01</div><h3>Draw the team</h3><p>Drop in bots, give each team a job and wire them up. Or describe the team in one line and Lithnode draws it.</p><canvas data-demo="draw"></canvas></div>
+      <div class="step rv" style="--d:.12s"><div class="n">02</div><h3>Press run</h3><p>Every agent is a real Claude Code session. Watch each one work live, with an approval step wherever you want a say.</p><canvas data-demo="run"></canvas></div>
+      <div class="step rv" style="--d:.24s"><div class="n">03</div><h3>Run it again</h3><p>Don't love the result? Change one line and run it again. Every run is saved, so you can see it getting better.</p><canvas data-demo="again"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<section id="connectors">
+  <div class="wrap split">
+    <div class="rv">
+      <div class="eyebrow">Connectors</div>
+      <h2 style="font-size:clamp(38px,5vw,64px);line-height:1;margin-top:14px">Your apps, without the bloat.</h2>
+      <p style="color:var(--muted);font-size:19px;margin:20px 0 0;max-width:52ch">Switch on the connectors a team needs, like Vercel, Notion or your store, and leave the rest off. Their tools load only when an agent searches for one, so every agent starts lean.</p>
+      <div class="apps" id="apps"><span data-app class="on"><i></i>Vercel</span><span data-app><i></i>Notion</span><span data-app class="on"><i></i>Your store</span><span data-app><i></i>Claude Docs</span></div>
+    </div>
+    <div class="bars rv" style="--d:.15s" id="bars">
+      <div class="bar bad"><b>Every connector loaded up front <span data-count="215">0k</span></b><div class="t"><div class="f" data-w="100"></div></div></div>
+      <div class="bar good"><b>Lithnode, on demand <span data-count="15">0k</span></b><div class="t"><div class="f" data-w="7"></div></div></div>
+      <small>Tokens in each agent's context before it starts working, measured on a real account with Claude Code.</small>
+    </div>
+  </div>
+</section>
+
+<section id="features" style="padding-top:60px">
+  <div class="wrap">
+    <div class="head rv"><div class="eyebrow">Built in</div><h2>Everything a team needs.</h2></div>
+    <div class="grid">
+      <div class="card rv"><canvas data-sprite="scout" data-color="#2fb5a0" width="12" height="8"></canvas><h3>Real Claude Code agents</h3><p>Not a chat imitation. Every agent is a Claude Code session with the tools you give it: read, web, edit or run code.</p></div>
+      <div class="card rv" style="--d:.08s"><canvas data-sprite="bug" data-color="#6cc070" width="12" height="8"></canvas><h3>Teams that check each other</h3><p>Put three bug hunters side by side, merge their reports, and only the short summary moves on.</p></div>
+      <div class="card rv" style="--d:.16s"><canvas data-sprite="hand" data-color="#e0a23c" width="12" height="8"></canvas><h3>You stay in charge</h3><p>Drop an approval step anywhere. The run waits for your go, and can ping your phone when it does.</p></div>
+      <div class="card rv"><canvas data-sprite="crab" data-color="#D97757" width="12" height="8"></canvas><h3>Your Claude plan</h3><p>No API keys, no extra bill. Lithnode uses your Claude Code sign-in like any other session.</p></div>
+      <div class="card rv" style="--d:.08s"><canvas data-sprite="owl" data-color="#7aa2f7" width="12" height="8"></canvas><h3>Describe it, get a flow</h3><p>Type "plan it, build it, then three reviewers check it" and the team is drawn for you, ready to run.</p></div>
+      <div class="card rv" style="--d:.16s"><canvas data-sprite="rocket" data-color="#bb9af7" width="12" height="8"></canvas><h3>Runs on your computer</h3><p>Your code and your sign-in never leave your machine. Lithnode is a local app, not a website.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="dl" id="download">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="eyebrow rv">Free download</div>
+    <h2 class="rv" style="margin-top:16px">Your team is<br>waiting.</h2>
+    <p class="rv">One installer. It sets up Lithnode, adds it to your Start menu and opens it. Tick <b>Claude Pet</b> and a little Clawd lives on your desktop, showing what Claude Code is doing.</p>
+    <a class="btn primary rv" id="dlBtn" href="download/LithnodeSetup.exe" download data-dl><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Download for Windows</a>
+    <div class="reqs rv">Version 0.1.0 · Windows 10 or 11 · needs <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a> and a Claude plan</div>
+    <div class="how">
+      <div class="rv"><b>01 · Download</b><span>Run LithnodeSetup.exe. No admin rights needed. If Windows says it protected your PC, click More info, then Run anyway.</span></div>
+      <div class="rv" style="--d:.1s"><b>02 · Sign in</b><span>Click Sign in at the top right. It uses Claude Code's own login.</span></div>
+      <div class="rv" style="--d:.2s"><b>03 · Run a team</b><span>Pick a template or describe one, choose a folder, press Run.</span></div>
+    </div>
+  </div>
+</section>
+
+
+<div class="dlo" id="dlo" role="dialog" aria-modal="true" aria-labelledby="dloTitle" hidden>
+  <div class="shade" data-close></div>
+  <div class="ping" aria-hidden="true"></div>
+  <svg class="arrow" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M8 58 C 18 36, 32 20, 54 10"/><path d="M38 8 L54 10 L50 26"/></svg>
+  <div class="panel">
+    <button class="x" data-close aria-label="Close">✕</button>
+    <div class="head">
+      <span class="file"><canvas data-sprite="crab" data-color="#D97757" width="12" height="8"></canvas></span>
+      <div><b id="dloTitle">LithnodeSetup.exe</b><small>99 MB · saving to your downloads</small></div>
+    </div>
+    <div class="bar" aria-hidden="true"></div>
+    <ol id="dloSteps">
+      <li><i>1</i><div><h4>Open it</h4><p>Click the <em>downloads icon</em> at the top right of your browser, then <em>LithnodeSetup.exe</em>.</p></div></li>
+      <li><i>2</i><div><h4>Let Windows run it</h4><p>Lithnode is new, so Windows may warn you. Click <em>More info</em>, then <em>Run anyway</em>.</p>
+        <div class="smart"><strong>Windows protected your PC</strong>Microsoft Defender SmartScreen prevented an unrecognized app from starting. <u class="hl">More info</u>
+          <div class="row"><span class="bt hl">Run anyway</span><span class="bt">Don't run</span></div></div></div></li>
+      <li><i>3</i><div><h4>Install</h4><p>Click <em>Next</em>. Keep <em>Claude Pet</em> ticked for a little Clawd on your desktop. No admin rights needed.</p></div></li>
+      <li><i>4</i><div><h4>Sign in</h4><p>Lithnode opens. Click <em>Sign in</em> at the top right to use your Claude Code account, then build your first team.</p></div></li>
+    </ol>
+    <p class="again">Didn't start? <a href="download/LithnodeSetup.exe" download>Download again</a> · Need Claude Code? <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Get it</a></p>
+  </div>
+</div>
+<footer>
+  <div class="wrap">
+    <span>© 2026 Lithnode · An independent project for Claude Code. Not made or endorsed by Anthropic.</span>
+    <span>The film uses a demo store and demo data.</span>
+  </div>
+</footer>
+
+<script>
+"use strict";
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const SHAPES = {
+  crab:  ["..########..", "..#e####e#..", "############", "############", "..########..", "..########..", "..#.#..#.#..", "..#.#..#.#.."],
+  scout: ["...#....#...", "....#..#....", "..########..", ".#e######e#.", ".##########.", "..########..", "...#.##.#...", "..##....##.."],
+  bug:   ["..k......k..", "...k....k...", "..########..", ".#e##kk##e#.", "#####kk#####", ".####kk####.", "#.########.#", "#..#....#..#"],
+  owl:   [".##......##.", ".###....###.", ".##########.", "##ee####ee##", "#####kk#####", ".##########.", "..########..", "...kk..kk..."],
+  rocket:[".....##.....", "....####....", "...######...", "...#e##e#...", "...######...", "..########..", ".##.####.##.", "....k..k...."],
+  hand:  ["...#.#.#....", "...#.#.#.#..", "...#.#.#.#..", ".#.#######..", ".#########..", "..########..", "...######...", "...kkkkkk..."],
+  trophy:[".##########.", "##.######.##", "#..######..#", ".#.######.#.", "...######...", ".....##.....", "....kkkk....", "...kkkkkk..."],
+  golem: ["..########..", "..#e####e#..", "..########..", "############", "##.######.##", "kk.######.kk", "...##..##...", "..###..###.."],
+  guard: [".....kk.....", "...######...", "..########..", "..#kkkkkk#..", "..#e#kk#e#..", "..########..", "...######...", "..##....##.."],
+};
+const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16); return `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k)).join(",")})`; };
+function sprite(g, shape, color, x, y, c, bob = 0) {
+  SHAPES[shape].forEach((row, ry) => [...row].forEach((ch, cx) => {
+    if (ch === ".") return;
+    g.fillStyle = ch === "k" ? shade(color, .6) : ch === "e" ? "#000" : color;
+    g.fillRect(x + cx * c, y - bob + ry * c, c + .5, c + .5);
+  }));
+}
+document.querySelectorAll("canvas[data-sprite]").forEach((cv) => sprite(cv.getContext("2d"), cv.dataset.sprite, cv.dataset.color, 0, 0, 1));
+const ease = (p) => 1 - Math.pow(1 - p, 3), clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const back = (p) => { const s = 1.7; return Math.max(0, 1 + (s + 1) * Math.pow(p - 1, 3) + s * Math.pow(p - 1, 2)); };
+function fit(cv) { const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); cv.width = Math.max(1, r.width * d); cv.height = Math.max(1, r.height * d); const g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0); return { g, w: r.width, h: r.height }; }
+function rr(g, x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+
+// ---- nav goes solid after the hero
+const nav = document.getElementById("nav");
+addEventListener("scroll", () => nav.classList.toggle("solid", scrollY > 40), { passive: true });
+
+// ---- marquee
+const FLOWS = [["Dropship finder", "#2fb5a0"], ["Bug sweep", "#6cc070"], ["Ship it", "#bb9af7"], ["Security review", "#e5566e"], ["Market research", "#7aa2f7"],
+  ["Landing page build", "#e0823d"], ["Fix the failing tests", "#e0af68"], ["App idea finder", "#a77be6"], ["Docs writer", "#D97757"], ["Code review ×3", "#6cc070"]];
+document.getElementById("marquee").innerHTML = [...FLOWS, ...FLOWS].map(([n, c]) => `<span style="--c:${c}"><i></i>${n}</span>`).join("");
+
+// ---- hero: a live flow that runs over and over, with parallax
+const hero = document.getElementById("heroCanvas");
+let H = fit(hero), mx = 0, my = 0, tmx = 0, tmy = 0, textRight = 0;
+function measureText() {   // where the headline and intro end, so the animation never runs under them
+  textRight = Math.max(0, ...[...document.querySelectorAll(".hero h1 .line > span, .hero p.lede, .hero .ctas > *")].map((e) => e.getBoundingClientRect().right)) + 40;
+}
+measureText(); document.fonts.ready.then(measureText);
+addEventListener("resize", () => { H = fit(hero); measureText(); });
+addEventListener("pointermove", (e) => { tmx = e.clientX / innerWidth - .5; tmy = e.clientY / innerHeight - .5; }, { passive: true });
+// The flow a real Lithnode run would show: same nodes, wires and badges as the app, wrapping onto a second row.
+const HW = 150, HH = 72, HGX = 30, HGY = 56;   // node size and gaps, in the app's own units
+const HN = [
+  { kind: "start", name: "Start", kindLabel: "START", sub: "Your task goes in here", shape: "crab", color: "#D97757", w: HW, h: HH, col: 0, row: 0 },
+  { kind: "team", name: "Product scout", kindLabel: "TEAM", sub: "1 × Sonnet 5.5 · web", job: "Finds trending products", shape: "scout", color: "#2fb5a0", w: HW, h: HH, col: 1, row: 0, step: "Reading supplier pages" },
+  { kind: "team", name: "Checker", kindLabel: "TEAM", sub: "2 × Haiku 4.5", job: "Cuts the duds", shape: "bug", color: "#6cc070", count: 2, w: HW, h: HH, col: 2, row: 0, step: "Margin 79% ✓" },
+  { kind: "approval", name: "You", kindLabel: "APPROVAL", sub: "Pauses until you approve", shape: "hand", color: "#e0a23c", w: HW, h: HH, col: 0, row: 1 },
+  { kind: "team", name: "Uploader", kindLabel: "TEAM", sub: "1 × Sonnet 5.5 · Store", job: "Lists the winners", shape: "rocket", color: "#bb9af7", w: HW, h: HH, col: 1, row: 1, step: "Listing 8 products" },
+  { kind: "done", name: "Done", kindLabel: "DONE", sub: "Final result lands here", shape: "trophy", color: "#e6b450", w: HW, h: HH, col: 2, row: 1 },
+];
+const HPHASE = [0, .7, 2.6, 4.4, 5.8, 7.6, 8.0];   // when each node starts; the last is when Done finishes
+const HLOOP = 10;
+function heroFrame(now) {
+  const t = now / 1000, { g, w, h } = H;
+  mx += (tmx - mx) * .05; my += (tmy - my) * .05;
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = "#1a1a1a";
+  const ox = (mx * 30) % 24, oy = (my * 30) % 24;
+  for (let x = -24 + ox; x < w + 24; x += 24) for (let y = -24 + oy; y < h + 24; y += 24) g.fillRect(x, y, 2, 2);
+  // fit the 3 x 2 flow into the space right of the headline (or behind it, faintly, when there's no room)
+  const flowW = 3 * HW + 2 * HGX, flowH = 2 * HH + HGY + 40;
+  const room = w - 40 - textRight, narrow = room < 470;
+  const k = narrow ? Math.min(1.5, (w - 32) / flowW) : Math.min(1.75, room / flowW);
+  const fx = narrow ? (w - flowW * k) / 2 : w - 40 - flowW * k, fy = (narrow ? h * .62 : h * .5) - flowH * k / 2;
+  const L = (t % HLOOP);
+  const st = (i) => (L < HPHASE[i] ? "wait" : L < HPHASE[i + 1] ? (HN[i].kind === "approval" ? "ask" : "work") : "done");
+  g.save(); g.globalAlpha = narrow ? .22 : 1;
+  g.translate(fx + mx * 16, fy + my * 12); g.scale(k, k);
+  const P = HN.map((n) => [n.col * (HW + HGX), 40 + n.row * (HH + HGY)]);
+  [[0, 1, false], [1, 2, false], [2, 3, true], [3, 4, false], [4, 5, false]].forEach(([a, b, wrapIt]) => {
+    const s2 = st(b) === "work" || st(b) === "ask" ? "live" : st(b) === "done" ? "done" : "idle";
+    wire(g, P[a][0] + HW, P[a][1] + HH / 2, P[b][0], P[b][1] + HH / 2, 1, s2, t, wrapIt);
+  });
+  HN.forEach((n, i) => node(g, ...P[i], n, st(i), t));
+  // the run pill, like the app's toolbar
+  const done = HN.filter((_, i) => st(i) === "done").length, finished = done === HN.length;
+  const label = finished ? `${HN.length}/${HN.length} · Done` : `${done}/${HN.length} · ${HN.some((_, i) => st(i) === "ask") ? "Needs you" : "Running"}`;
+  g.font = "600 9px Inter, sans-serif";
+  const pw = g.measureText(label).width + 30, px = flowW / 2 - pw / 2;
+  rr(g, px, 2, pw, 20, 10); g.fillStyle = "#111"; g.fill(); g.strokeStyle = "#2a2a2a"; g.lineWidth = 1; g.stroke();
+  g.fillStyle = finished ? "#9ece6a" : HN.some((_, i) => st(i) === "ask") ? "#e0a23c" : "#D97757"; g.beginPath(); g.arc(px + 10, 12, 3, 0, 7); g.fill();
+  g.fillStyle = "#ededed"; g.fillText(label, px + 18, 15);
+  g.restore();
+}
+
+// ---- the three step demos
+const demos = [...document.querySelectorAll("canvas[data-demo]")].map((cv) => ({ cv, kind: cv.dataset.demo, ...fit(cv), seen: 0, on: false }));
+addEventListener("resize", () => demos.forEach((d) => Object.assign(d, fit(d.cv))));
+// a node exactly as the app draws it: sprite, bold name, kind label, model line, job, status pill, agent dots
+const BADGE = { wait: ["WAITING", "#4a4a4a", "#d0d0d0"], work: ["RUNNING", "#D97757", "#170a05"], ask: ["NEEDS YOU", "#e0a23c", "#1a1205"], done: ["DONE", "#9ece6a", "#0f1a08"] };
+function node(g, x, y, n, st, t, p = 1) {
+  const w = n.w, h = n.h;
+  g.save();
+  if (p !== 1) { g.translate(x + w / 2, y + h / 2); g.scale(p, p); g.translate(-x - w / 2, -y - h / 2); g.globalAlpha *= clamp(p); }
+  if (st === "work" || st === "ask") { g.shadowColor = st === "ask" ? "#e0a23c" : "#D97757"; g.shadowBlur = 18; }
+  rr(g, x, y, w, h, 9); g.fillStyle = "#171717"; g.fill(); g.shadowBlur = 0;
+  g.lineWidth = st === "wait" || !st ? 1 : 1.4;
+  g.strokeStyle = st === "work" ? "#D97757" : st === "ask" ? "#e0a23c" : st === "done" ? "#9ece6a" : "#2a2a2a"; rr(g, x, y, w, h, 9); g.stroke();
+  // ports
+  for (const [px, show] of [[x, n.kind !== "start"], [x + w, n.kind !== "done"]]) if (show) { g.fillStyle = "#0a0a0a"; g.strokeStyle = "#4a4a4a"; g.lineWidth = 1; g.beginPath(); g.arc(px, y + h / 2, 3.2, 0, 7); g.fill(); g.stroke(); }
+  const c = 1.45, sx = x + 8;
+  if (n.count > 1) for (let i = 0; i < n.count; i++) sprite(g, n.shape, n.color, sx + i * 15, y + 9, 1.1, st === "work" ? Math.abs(Math.sin(t * 9 + i)) * 1.5 : 0);
+  else sprite(g, n.shape, n.color, sx, y + 8, c, st === "work" ? Math.abs(Math.sin(t * 9)) * 1.5 : 0);
+  const tx = n.count > 1 ? sx + n.count * 15 + 3 : sx + 12 * c + 6;
+  g.fillStyle = "#ededed"; g.font = "700 10.5px Inter, sans-serif"; g.fillText(n.name, tx, y + 15);
+  g.fillStyle = "#8d8d8d"; g.font = "600 6.5px Inter, sans-serif"; g.fillText(n.kindLabel, tx, y + 24);
+  g.font = "400 7.5px Inter, sans-serif"; g.fillText(n.sub, x + 8, y + 38);
+  if (n.job) { g.fillStyle = "#dcdcdc"; g.font = "500 7.5px Inter, sans-serif"; g.fillText(n.job, x + 8, y + 49); }
+  if (st && st !== "idle") {   // status pill on the top edge
+    const [label, bg, fg] = BADGE[st]; g.font = "800 6.5px Inter, sans-serif";
+    const bw = g.measureText(label).width + 10; rr(g, x + w - bw - 6, y - 6, bw, 12, 6); g.fillStyle = bg; g.fill();
+    g.fillStyle = fg; g.fillText(label, x + w - bw + -1, y + 2.5);
+  }
+  if (n.kind === "team" && st && st !== "idle") {   // one square per agent, then the live step
+    for (let i = 0; i < (n.count || 1); i++) { rr(g, x + 8 + i * 9, y + h - 13, 6, 6, 1.5); g.fillStyle = st === "done" ? "#9ece6a" : st === "work" ? "#D97757" : "#3a3a3a"; g.fill(); }
+    if (st === "work" && n.step) { g.fillStyle = "#cfcfcf"; g.font = "500 7.5px Inter, sans-serif"; g.fillText(n.step, x + 10 + (n.count || 1) * 9, y + h - 7.5); }
+  }
+  g.restore();
+}
+// wires like the app: grey idle, dashed orange while the next step works, green once it's done
+function wire(g, ax, ay, bx, by, p, state, t, wrap = false) {
+  g.save(); g.lineWidth = state === "live" ? 1.8 : 1.4;
+  g.strokeStyle = state === "live" ? "#D97757" : state === "done" ? "#9ece6a" : "#4a4a4a";
+  if (state === "live") { g.setLineDash([5, 4]); g.lineDashOffset = -t * 40; }
+  else if (p < 1) g.setLineDash([600 * p, 900]);
+  g.beginPath(); g.moveTo(ax, ay);
+  if (wrap) {   // the app wraps a long flow onto the next row with a loop round the side
+    const midY = (ay + by) / 2;
+    g.bezierCurveTo(ax + 14, ay, ax + 14, midY, (ax + bx) / 2, midY);
+    g.bezierCurveTo(bx - 14, midY, bx - 14, by, bx, by);
+  } else { const dx = (bx - ax) / 2; g.bezierCurveTo(ax + dx, ay, bx - dx, by, bx, by); }
+  g.stroke(); g.restore();
+}
+function demoFrame(d, now) {
+  const { g, w, h } = d, t = (now - d.seen) / 1000; g.clearRect(0, 0, w, h);
+  g.fillStyle = "#161616"; for (let x = 10; x < w; x += 16) for (let y = 10; y < h; y += 16) g.fillRect(x, y, 1.4, 1.4);
+  const nw = Math.min(150, (w - 60) / 2), nh = 72, xL = 18, xR = w - 18 - nw, y1 = 40, y2 = h - nh - 30;
+  if (d.kind === "draw") {
+    const L = t % 6.5;
+    const N = [
+      { kind: "start", name: "Start", kindLabel: "START", sub: "Your task goes in here", shape: "crab", color: "#D97757", w: nw, h: nh },
+      { kind: "team", name: "Product scout", kindLabel: "TEAM", sub: "1 × Sonnet 5.5", job: "Finds trending products", shape: "scout", color: "#2fb5a0", w: nw, h: nh },
+      { kind: "team", name: "Checker", kindLabel: "TEAM", sub: "2 × Haiku 4.5", job: "Cuts the duds", shape: "bug", color: "#6cc070", count: 2, w: nw, h: nh },
+      { kind: "team", name: "Uploader", kindLabel: "TEAM", sub: "1 × Sonnet 5.5 · Store", job: "Lists the winners", shape: "rocket", color: "#bb9af7", w: nw, h: nh },
+    ];
+    const P = [[xL, y1], [xR, y1], [xL, y2], [xR, y2]];
+    // the last bot is dragged in from the side by the cursor
+    const drag = ease(clamp((L - 1.6) / .9)), dropX = P[3][0] + (1 - drag) * 70, dropY = P[3][1] + (1 - drag) * 40;
+    const wires = [[0, 1, false], [1, 2, true], [2, 3, false]];
+    wires.forEach(([a, b, wrapIt], i) => { const pa = i === 2 ? P[a] : P[a], pb = b === 3 ? [dropX, dropY] : P[b];
+      wire(g, pa[0] + nw, pa[1] + nh / 2, pb[0], pb[1] + nh / 2, ease(clamp((L - (b === 3 ? 2.6 : .6 + i * .4)) / .6)), "idle", t, wrapIt); });
+    [0, 1, 2].forEach((i) => node(g, ...P[i], N[i], "idle", t, back(clamp((L - i * .25) / .45))));
+    if (L > 1.5) node(g, dropX, dropY, N[3], "idle", t, L < 2.6 ? .96 : 1);
+    if (L > 1.4 && L < 3) {   // the cursor carrying it
+      const cx = dropX + nw * .55, cy = dropY + nh * .6;
+      g.fillStyle = "#fff"; g.strokeStyle = "#000"; g.lineWidth = 1; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx, cy + 15); g.lineTo(cx + 4, cy + 11); g.lineTo(cx + 7, cy + 17); g.lineTo(cx + 10, cy + 16); g.lineTo(cx + 7, cy + 10); g.lineTo(cx + 12, cy + 10); g.closePath(); g.fill(); g.stroke();
+    }
+    // the inspector's Connectors switch flips on for the Uploader
+    if (L > 3.2) { const a = ease(clamp((L - 3.2) / .3)); g.save(); g.globalAlpha = a; g.font = "700 7.5px Inter, sans-serif";
+      rr(g, xR + nw - 50, y2 + nh + 6, 50, 15, 7.5); g.fillStyle = "rgba(149,191,71,.18)"; g.fill(); g.fillStyle = "#95bf47"; g.fillText("✓ Store", xR + nw - 42, y2 + nh + 16); g.restore(); }
+  } else if (d.kind === "run") {
+    const L = t % 7.5, phases = [0, .6, 2.6, 4.8, 5.4];   // when Start, Builder, Reviewers, Done begin
+    const N = [
+      { kind: "start", name: "Start", kindLabel: "START", sub: "Writes a plan first · Opus", shape: "crab", color: "#D97757", w: nw, h: nh },
+      { kind: "team", name: "Builder", kindLabel: "TEAM", sub: "1 × Sonnet 5.5", job: "Writes the code", shape: "golem", color: "#e0823d", w: nw, h: nh, step: "Editing app.tsx" },
+      { kind: "team", name: "Reviewers", kindLabel: "TEAM", sub: "3 × Haiku 4.5", job: "Check for bugs", shape: "bug", color: "#6cc070", count: 3, w: nw, h: nh, step: "Found 2 bugs" },
+      { kind: "done", name: "Done", kindLabel: "DONE", sub: "Final result lands here", shape: "trophy", color: "#e6b450", w: nw, h: nh },
+    ];
+    const st = (i) => (L < phases[i] ? "wait" : L < phases[i + 1] ? "work" : "done");
+    const P = [[xL, y1], [xR, y1], [xL, y2], [xR, y2]];
+    [[0, 1, false], [1, 2, true], [2, 3, false]].forEach(([a, b, wrapIt]) => {
+      const s = st(b) === "work" ? "live" : st(b) === "done" ? "done" : "idle";
+      wire(g, P[a][0] + nw, P[a][1] + nh / 2, P[b][0], P[b][1] + nh / 2, 1, s, t, wrapIt);
+    });
+    N.forEach((n, i) => node(g, ...P[i], n, st(i), t));
+    // the run pill at the top, like the app's
+    const done = [0, 1, 2, 3].filter((i) => st(i) === "done").length, finished = done === 4;
+    const label = finished ? "4/4 · Done" : `${done}/4 · Running`; g.font = "600 8.5px Inter, sans-serif";
+    const pw = g.measureText(label).width + 30, px = w / 2 - pw / 2;
+    rr(g, px, 8, pw, 18, 9); g.fillStyle = "#111"; g.fill(); g.strokeStyle = "#2a2a2a"; g.lineWidth = 1; g.stroke();
+    g.fillStyle = finished ? "#9ece6a" : "#D97757"; g.beginPath(); g.arc(px + 10, 17, 3, 0, 7); g.fill();
+    g.fillStyle = "#ededed"; g.fillText(label, px + 18, 20);
+  } else {
+    const L = t % 6, vals = [68, 74, 79, 83, 86], bw = (w * .8) / vals.length;
+    g.strokeStyle = "#232323"; g.lineWidth = 1; [.3, .55, .8].forEach((f) => { g.beginPath(); g.moveTo(w * .08, h * f); g.lineTo(w * .92, h * f); g.stroke(); });
+    const pts = vals.map((v, i) => [w * .1 + i * bw + bw / 2 - w * .02, h * .86 - (v - 60) / 30 * h * .7]);
+    const shown = Math.min(vals.length, Math.floor(L / .9) + 1);
+    g.save(); g.strokeStyle = "#D97757"; g.lineWidth = 3; g.shadowColor = "#D97757"; g.shadowBlur = 12; g.beginPath();
+    pts.slice(0, shown).forEach(([x, y], i) => { if (!i) g.moveTo(x, y); else { const e = i === shown - 1 ? ease(clamp((L - i * .9) / .5)) : 1; g.lineTo(pts[i - 1][0] + (x - pts[i - 1][0]) * e, pts[i - 1][1] + (y - pts[i - 1][1]) * e); } }); g.stroke(); g.restore();
+    pts.slice(0, shown).forEach(([x, y], i) => { const p = back(clamp((L - i * .9) / .35)); g.fillStyle = i === shown - 1 ? "#9ece6a" : "#D97757"; g.beginPath(); g.arc(x, y, 5 * p, 0, 7); g.fill();
+      g.fillStyle = "#8d8d8d"; g.font = '500 10px "JetBrains Mono", monospace'; g.textAlign = "center"; g.fillText("Run " + (i + 1), x, h - 8); g.fillStyle = "#ededed"; g.font = "700 11px Inter, sans-serif"; if (p > 0) g.fillText(vals[i] + "%", x, y - 12); g.textAlign = "left"; });
+  }
+}
+const io = new IntersectionObserver((es) => es.forEach((e) => { const d = demos.find((x) => x.cv === e.target); if (d) { d.on = e.isIntersecting; if (e.isIntersecting && !d.seen) d.seen = performance.now(); } }), { threshold: .2 });
+demos.forEach((d) => io.observe(d.cv));
+
+let heroOn = true;
+new IntersectionObserver(([e]) => { heroOn = e.isIntersecting; }).observe(hero);
+function loop(now) {
+  if (heroOn) heroFrame(reduce ? 2500 : now);
+  demos.forEach((d) => { if (d.on) demoFrame(d, reduce ? d.seen + 4000 : now); });
+  requestAnimationFrame(loop);
+}
+document.fonts.ready.then(() => requestAnimationFrame(loop));
+
+// ---- reveal on scroll
+const rio = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); rio.unobserve(e.target); } }), { threshold: .15, rootMargin: "0px 0px -60px 0px" });
+document.querySelectorAll(".rv").forEach((el) => rio.observe(el));
+
+// ---- film: tilts flat as you scroll to it, plays with sound on click
+const filmBox = document.getElementById("filmBox"), video = document.getElementById("filmVideo"), playBtn = document.getElementById("filmPlay");
+function tilt() {
+  const r = filmBox.getBoundingClientRect(), p = clamp(1 - (r.top - innerHeight * .15) / (innerHeight * .7));
+  filmBox.style.setProperty("--tilt", (14 * (1 - ease(p))).toFixed(2) + "deg"); filmBox.style.setProperty("--sc", (.92 + .08 * ease(p)).toFixed(3));
+}
+if (!reduce) { addEventListener("scroll", tilt, { passive: true }); tilt(); } else { filmBox.style.setProperty("--tilt", "0deg"); filmBox.style.setProperty("--sc", "1"); }
+playBtn.onclick = () => { playBtn.hidden = true; video.controls = true; video.play(); };
+video.addEventListener("ended", () => { playBtn.hidden = false; video.controls = false; playBtn.querySelector("span").lastChild.textContent = "Play again"; });
+
+// ---- token bars count up when seen
+const bars = document.getElementById("bars");
+new IntersectionObserver(([e], obs) => {
+  if (!e.isIntersecting) return; obs.disconnect();
+  bars.querySelectorAll(".f").forEach((f) => { f.style.width = f.dataset.w + "%"; });
+  bars.querySelectorAll("[data-count]").forEach((el) => { const to = +el.dataset.count, t0 = performance.now();
+    const step = (now) => { const p = ease(clamp((now - t0) / 1800)); el.textContent = Math.round(to * p) + "k"; if (p < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); });
+}, { threshold: .4 }).observe(bars);
+
+// ---- connector switches flick on and off by themselves
+const apps = [...document.querySelectorAll("[data-app]")];
+if (!reduce) setInterval(() => { const a = apps[Math.floor(Math.random() * apps.length)]; a.classList.toggle("on"); }, 1600);
+
+// ---- card spotlight follows the pointer
+document.querySelectorAll(".card").forEach((c) => c.addEventListener("pointermove", (e) => { const r = c.getBoundingClientRect(); c.style.setProperty("--mx", e.clientX - r.left + "px"); c.style.setProperty("--my", e.clientY - r.top + "px"); }));
+
+// ---- after Download: the browser keeps the file; point at where it went and walk through the next steps
+const dlo = document.getElementById("dlo"), dloSteps = [...document.querySelectorAll("#dloSteps li")];
+let stepTimer = 0;
+function lightStep(i) { dloSteps.forEach((li, j) => { li.classList.toggle("on", j === i); li.classList.toggle("done", j < i); }); }
+function showDownloadHelp() {
+  dlo.hidden = false;
+  dlo.querySelectorAll("canvas[data-sprite]").forEach((cv) => sprite(cv.getContext("2d"), cv.dataset.sprite, cv.dataset.color, 0, 0, 1));
+  requestAnimationFrame(() => requestAnimationFrame(() => dlo.classList.add("show")));
+  let i = 0; lightStep(0); clearInterval(stepTimer);
+  if (!reduce) stepTimer = setInterval(() => { i = (i + 1) % dloSteps.length; lightStep(i); }, 2600);
+  dlo.querySelector(".x").focus({ preventScroll: true });
+}
+function hideDownloadHelp() { clearInterval(stepTimer); dlo.classList.remove("show"); setTimeout(() => { dlo.hidden = true; }, 400); }
+dloSteps.forEach((li, j) => li.addEventListener("mouseenter", () => { clearInterval(stepTimer); lightStep(j); }));
+document.querySelectorAll("[data-dl]").forEach((a) => a.addEventListener("click", () => setTimeout(showDownloadHelp, 250)));
+dlo.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) hideDownloadHelp(); });
+addEventListener("keydown", (e) => { if (e.key === "Escape" && !dlo.hidden) hideDownloadHelp(); });
+</script>
+</body>
+</html>
