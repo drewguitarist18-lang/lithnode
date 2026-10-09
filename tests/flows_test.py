@@ -68,7 +68,9 @@ def server_env():
             "CLAWD_PET_HOME": str(pet_home), "LITHNODE_PICKER": str(project), "LITHNODE_AGENT_TIMEOUT": str(AGENT_TIMEOUT),
             "CLAWD_BOT_CLAUDE_CMD": json.dumps([sys.executable, str(ROOT / "tests" / "mock_claude.py")]),
             "CLAWD_MOCK_STATE": str(Path(cli_dir, "state.json")), "CLAWD_MOCK_LOG": str(Path(cli_dir, "calls.jsonl")),
-            "CLAWD_MOCK_SESSIONS": str(Path(cli_dir, "sessions.json")), "LITHNODE_CLIS": "git,gh,vercel"}
+            "CLAWD_MOCK_SESSIONS": str(Path(cli_dir, "sessions.json")), "LITHNODE_CLIS": "git,gh,vercel", "LITHNODE_CODEX_SANDBOX": "1",
+            "LITHNODE_CODEX_CMD": json.dumps([sys.executable, str(ROOT / "tests" / "mock_engines.py"), "codex"]),
+            "LITHNODE_CURSOR_CMD": json.dumps([sys.executable, str(ROOT / "tests" / "mock_engines.py"), "cursor"])}
 
 
 def start_server():
@@ -306,6 +308,49 @@ try:
     check("a team that can run anything isn't narrowed by its CLI list", f.get("--allowedTools") == "Read,Glob,Grep,Edit,Write,Bash"
           and "Command-line tools" not in f["--append-system-prompt"], f)
 
+    # ---- engines: a team can run on Codex or Cursor instead of Claude Code ------------------------------
+    s, en = call("/api/engines")
+    check("engines are listed with their sign-in", [(e["id"], e["installed"], e["signed_in"]) for e in en["engines"]]
+          == [("claude", True, True), ("codex", True, True), ("cursor", True, True)] and en["engines"][1]["sandbox"] is True, en)
+    _, made = call("/api/flows", {}, "POST")
+    mixed = {"name": "Mixed engines", "nodes": [{"id": "master", "type": "master", "x": 0, "y": 0, "mode": "pass"},
+             {"id": "cx", "type": "cluster", "x": 0, "y": 0, "name": "Codex team", "engine": "codex", "tools": "edit", "count": 1,
+              "connectors": ["claude.ai Vercel"], "clis": ["gh"]},
+             {"id": "cu", "type": "cluster", "x": 0, "y": 0, "name": "Cursor team", "engine": "cursor", "tools": "read", "engine_model": "gpt-5"},
+             {"id": "cl", "type": "cluster", "x": 0, "y": 0, "name": "Claude team", "engine": "nope", "model": "claude-haiku-4-5"},
+             {"id": "done", "type": "done", "x": 0, "y": 0}],
+             "edges": [{"from": a, "to": b} for a, b in [("master", "cx"), ("cx", "cu"), ("cu", "cl"), ("cl", "done")]]}
+    _, d = call(f"/api/flows/{made['flow']['id']}", mixed, "POST")
+    eng = {n["id"]: (n.get("engine"), n.get("engine_model")) for n in d["flow"]["nodes"] if n["type"] == "cluster"}
+    check("a team's engine is saved, and an unknown one falls back to Claude Code",
+          eng == {"cx": ("codex", ""), "cu": ("cursor", "gpt-5"), "cl": ("claude", "")} and d["estimate"]["per_model"].get("codex") == 1, (eng, d["estimate"]))
+    n0 = len(cli_calls())
+    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "Fix the bug", "folder": str(project)}, "POST")[1]["run"])
+    calls = cli_calls()[n0:]
+    cx = [c for c in calls if c.get("engine") == "codex"]
+    cu = [c for c in calls if c.get("engine") == "cursor"]
+    check("the Codex team runs codex exec with the right sandbox, the prompt on stdin, role first", run["status"] == "done" and len(cx) == 1
+          and cx[0]["args"][:2] == ["exec", "--json"] and cx[0]["args"][cx[0]["args"].index("--sandbox") + 1] == "workspace-write"
+          and cx[0]["args"][-1] == "-" and cx[0]["prompt"].startswith("# Your instructions") and "# Task\nFix the bug" in cx[0]["prompt"]
+          and cx[0]["agent_env"] == "1", (run["status"], cx))
+    check("the Cursor team runs in print mode, read-only (no --force), with its model", len(cu) == 1
+          and cu[0]["args"][:3] == ["-p", "--output-format", "stream-json"] and "--force" not in cu[0]["args"]
+          and cu[0]["args"][-2:] == ["--model", "gpt-5"], cu)
+    nodes = run["nodes"]
+    check("their reports and live steps come through like Claude's", nodes["cx"]["agents"][0]["report"] == "Codex team report from codex."
+          and "Running: Get-Content app.py" in nodes["cx"]["agents"][0]["steps"] and nodes["cu"]["agents"][0]["report"] == "Cursor team report from cursor."
+          and "Reading app.py" in nodes["cu"]["agents"][0]["steps"] and nodes["cx"]["agents"][0]["model"] == "Codex",
+          ({k: (v["agents"][0]["report"], v["agents"][0]["steps"]) for k, v in nodes.items() if v["agents"]}))
+    check("the Cursor team gets the Codex team's report, and connectors and CLIs say they're Claude-only",
+          "Codex team report from codex." in cu[0]["prompt"] and "only work on Claude Code teams" in (nodes["cx"].get("note") or ""), nodes["cx"].get("note"))
+    for nd in mixed["nodes"]:
+        if nd["id"] == "cx":
+            nd["instructions"] = "LIMITME"
+    call(f"/api/flows/{made['flow']['id']}", mixed, "POST")
+    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    check("a plan that hit its limit says so in plain words", run["status"] == "failed"
+          and "Codex plan has hit its usage limit" in run["nodes"]["cx"]["error"], run["nodes"]["cx"].get("error"))
+
     # ---- split: one job cut into parts, done side by side, then checked ---------------------------------
     s, d = call("/api/flows", {"template": "batch"}, "POST")
     batch = d["flow"]
@@ -426,6 +471,22 @@ try:
         _, made = call("/api/flows", {}, "POST")
         _, saved = call(f"/api/flows/{made['flow']['id']}", flow, "POST")
         return saved["flow"]["id"]
+
+    # a team with nothing wired in (a planner beside Start) gets the task from Start
+    _, made = call("/api/flows", {}, "POST")
+    side = {"name": "Side", "nodes": [{"id": "master", "type": "master", "x": 0, "y": 0, "mode": "pass"},
+                                      {"id": "atlas", "type": "cluster", "x": 0, "y": 0, "name": "Atlas", "model": "claude-haiku-4-5"},
+                                      {"id": "scout", "type": "cluster", "x": 0, "y": 0, "name": "Scout", "model": "claude-haiku-4-5"},
+                                      {"id": "done", "type": "done", "x": 0, "y": 0}],
+            "edges": [{"from": "master", "to": "scout"}, {"from": "atlas", "to": "scout"}, {"from": "scout", "to": "done"}]}
+    s, d = call(f"/api/flows/{made['flow']['id']}", side, "POST")
+    check("a team with nothing wired in gets a real wire from Start when saved", d["problems"] == []
+          and {"from": "master", "to": "atlas"} in d["flow"]["edges"] and len(d["flow"]["edges"]) == 4, d)
+    n0 = len(cli_calls())
+    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "Plan a trip", "folder": str(project)}, "POST")[1]["run"])
+    sc = [c for c in agent_calls(n0) if '"Scout" stage' in c["flags"]["--append-system-prompt"]]
+    check("it runs with the task, and the team it feeds waits for it", run["status"] == "done" and run["nodes"]["atlas"]["status"] == "done"
+          and sc and "Atlas report from" in sc[0]["prompt"], (run["status"], {k: v["status"] for k, v in run["nodes"].items()}))
 
     f = simple_flow({"name": "FAILSTAGE", "count": 2, "model": "claude-haiku-4-5"})
     run = wait_run(call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])

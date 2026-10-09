@@ -89,6 +89,22 @@ other command is blocked (simple read-only ones like `ls` still work). A team se
 run anything, so the list doesn't apply to it. Like connectors, CLIs act for real, so the Run menu asks you to
 confirm first.
 
+### Engines: Claude Code, Codex and Cursor
+
+Each team picks what it runs on under **Runs on** in the right panel, so one flow can mix them: Claude builds,
+Codex reviews, a Cursor team on Grok double-checks. Every engine uses your own sign-in and plan.
+
+| Engine | Install and sign in | Models |
+|---|---|---|
+| **Claude Code** (default) | `claude auth login` | Haiku, Sonnet, Opus, Fable |
+| **Codex** (OpenAI) | `npm i -g @openai/codex`, then `codex login` | the ones your ChatGPT plan offers |
+| **Cursor** | the Cursor CLI from cursor.com/cli, then `cursor-agent login` | every model your Cursor plan offers (GPT, Claude, Grok, Gemini, ...) |
+
+Lithnode shows whether each one is installed and signed in, and lists its models for free (no tokens). Access
+levels map to Codex's sandbox (read-only, workspace-write, full access) and to Cursor's `--force`. Connectors and
+command-line tool lists are Claude Code features. On some Windows computers Codex's own sandbox doesn't start (a
+known Codex bug); Lithnode detects that, runs Codex teams with full access, and asks you to confirm first.
+
 ### Connectors
 
 A team can use your claude.ai connectors (Vercel, Notion, and any you add, like Shopify). Switch them on per team
@@ -137,8 +153,9 @@ Agents are real Claude Code sessions working in the folder you choose. Read this
 
 ### Disclaimer
 
-Lithnode is an independent project. It is not made, endorsed or supported by Anthropic. "Claude" and
-"Claude Code" are Anthropic's trademarks, and they're used here only to say what this works with. The
+Lithnode is an independent project. It is not made, endorsed or supported by Anthropic, OpenAI or Cursor. "Claude" and
+"Claude Code" are Anthropic's trademarks, "Codex" and "ChatGPT" are OpenAI's, and "Cursor" is Anysphere's; they're
+used here only to say what this works with. The
 software is provided under the MIT license, **as is, without warranty of any kind**. You're
 responsible for what your agents do in your folders and for your use of your Claude account.
 
@@ -161,6 +178,7 @@ reports are kept.
 - `agents.py`: one pipeline agent as one `claude -p` session.
 - `office_feed.py`: the Office's session list (hook sessions plus flow agents).
 - `claude_code.py`: finding Claude Code, signing in, and checking which connectors and CLIs are available.
+- `engines.py`: the Codex and Cursor engines: finding them, sign-in, models, command lines and their live output.
 - `static/`:
   - pages: `shell.html` (tabs), `flows.html`, `office.html`
   - shared: `sprites.js` (pixel art) and `ui.js` (styled dialogs and right-click menus)

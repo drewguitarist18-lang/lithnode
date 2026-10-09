@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 
 import agents
 import claude_code
+import engines
 
 NODE_TYPES = ("master", "cluster", "checkpoint", "approval", "done")
 DEFAULT_NAMES = {"master": "Start", "cluster": "Team", "checkpoint": "Checkpoint", "approval": "Approval", "done": "Done"}
@@ -197,7 +198,9 @@ def clean_node(raw):
                     color=raw.get("color") if COLOR_RE.match(str(raw.get("color") or "")) else "#D97757",
                     bot=_text(raw, "bot", 40),
                     connectors=_connectors(raw.get("connectors")), clis=_clis(raw.get("clis")),
-                    split=raw.get("split") is True)
+                    split=raw.get("split") is True,
+                    engine=raw.get("engine") if raw.get("engine") in engines.ENGINES else "claude",
+                    engine_model=_text(raw, "engine_model", 60) if MODEL_RE.match(_text(raw, "engine_model", 60)) else "")
     if kind == "checkpoint":
         node.update(mode=raw.get("mode") if raw.get("mode") in ("pass", "summarize") else "pass",
                     model=_model(raw, SUMMARY_MODEL),
@@ -234,6 +237,9 @@ def clean_flow(raw):
             raise ValueError("a done node can't feed another node")
     if _has_cycle(ids, edges):
         raise ValueError("the flow has a loop; connections must go one way")
+    start = next((n["id"] for n in nodes if n["type"] == "master"), None)
+    if start:
+        edges += [{"from": start, "to": nid} for nid in fed_by_start({"nodes": nodes, "edges": edges})]
     return {"id": raw.get("id"), "name": _text(raw, "name", 60, "Untitled flow") or "Untitled flow",
             "folder": _text(raw, "folder", 500), "nodes": nodes, "edges": edges,
             "task": _text(raw, "task", 4000),   # what the Run menu opens with: your description, or the last task run
@@ -259,6 +265,14 @@ def _has_cycle(ids, edges):
         return False
 
     return any(visit(i) for i in ids)
+
+
+def fed_by_start(flow):
+    """Steps with no wire coming in but wired onward (say, a planner beside Start). Saving a flow wires Start
+    to them, so they get the task. Steps with no wires at all stay loose."""
+    into = {e["to"] for e in flow["edges"]}
+    out_of = {e["from"] for e in flow["edges"]}
+    return [n["id"] for n in flow["nodes"] if n["type"] not in ("master", "done") and n["id"] not in into and n["id"] in out_of]
 
 
 def check_runnable(flow):
@@ -300,7 +314,7 @@ def estimate(flow):
         if n["type"] == "master" and n.get("mode") == "brief":
             add(n["model"])
         elif n["type"] == "cluster":
-            add(n["model"], n["count"])
+            add(n["model"] if n.get("engine", "claude") == "claude" else n["engine"], n["count"])
         elif n["type"] == "checkpoint" and n.get("mode") == "summarize":
             add(n["model"])
     sessions = sum(per_model.values())
@@ -857,6 +871,9 @@ class Run:
         want = node.get("connectors") or []
         if not want:
             return [], []
+        if node.get("engine", "claude") != "claude":
+            st["note"] = (st.get("note", "") + " Connectors only work on Claude Code teams, so this team runs without them.").strip()
+            return [], []
         info = claude_code.list_connectors()
         have = {c["id"] for c in info["connectors"]}
         use = [c for c in want if c in have]
@@ -870,7 +887,7 @@ class Run:
     def _clis_for(self, node, st):
         """The node's command-line tools that are installed here; notes the ones that aren't."""
         want = node.get("clis") or []
-        if node.get("tools") == "full":   # can already run any command
+        if node.get("tools") == "full" or node.get("engine", "claude") != "claude":   # can already run commands, or picks its own
             return []
         use = [c for c in want if claude_code.cli_installed(c)]
         missing = [c for c in want if c not in use]
@@ -934,10 +951,10 @@ class Run:
 
     # -- node kinds -----------------------------------------------------------------
     def _agent(self, node, st, label, *, model, effort, tools, system, prompt, max_turns=0, shape=None, color=None,
-               connectors=(), known=(), clis=()):
+               connectors=(), known=(), clis=(), engine="claude", engine_model=""):
         """Run one agent to completion, tracked in the node's state. Returns its record."""
         rec = {"name": label, "status": "running", "step": "", "steps": [], "report": "", "items": [], "error": "",
-               "cost": 0.0, "turns": 0, "model": model, "session_id": "", "started": time.time(), "ended": None,
+               "cost": 0.0, "turns": 0, "model": model if engine == "claude" else engines.LABELS[engine], "engine": engine, "session_id": "", "started": time.time(), "ended": None,
                "shape": shape or node.get("shape") or "crab", "color": color or node.get("color") or "#D97757"}
 
         def update():
@@ -947,7 +964,7 @@ class Run:
 
         agent = agents.Agent(model=model, effort=effort, tools=tools, system=system, prompt=prompt,
                              cwd=self.folder, on_update=update, max_turns=max_turns,
-                             connectors=connectors, known=known, clis=clis)
+                             connectors=connectors, known=known, clis=clis, engine=engine, engine_model=engine_model)
         with self.lock:
             rec["session_id"] = agent.session_id
             st["agents"].append(rec)
@@ -1014,12 +1031,16 @@ class Run:
 
         apps, known = self._connectors_for(node, st)
         clis = self._clis_for(node, st)
+        engine = node.get("engine", "claude")
+        if engine == "codex" and engines.status("codex").get("sandbox") is False and node["tools"] != "full":
+            st["note"] = (st.get("note", "") + " Codex's sandbox doesn't work on this computer, so this team ran with full access.").strip()
 
         def one(i, teammates=""):
             return self._agent(node, st, f"{node['name']} {i}" if n > 1 else node["name"],
                                model=node["model"], effort=node.get("effort", "low"), tools=node["tools"],
                                system=self._system(node, i, n, apps, clis), prompt=self._prompt(node["id"], focus(i), teammates),
-                               max_turns=node.get("max_turns", 0), connectors=apps, known=known, clis=clis)
+                               max_turns=node.get("max_turns", 0), connectors=apps, known=known, clis=clis,
+                               engine=engine, engine_model=node.get("engine_model", ""))
 
         # Agents that edit files take turns, so they never overwrite each other. A team that splits the job
         # works side by side instead: each agent only writes its own part.

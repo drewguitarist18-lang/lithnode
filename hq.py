@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib import request as urlrequest
 
 import claude_code
+import engines
 import flows
 import office_feed
 
@@ -323,6 +324,14 @@ class Handler(BaseHTTPRequestHandler):
         """Connectors a team can be given (a free check, cached; ?refresh=1 checks again)."""
         info = claude_code.list_connectors(force="refresh=1" in self.path)
         self.send_json({k: info[k] for k in ("ok", "connectors", "error")})
+
+    def GET_api_engines(self):
+        """Which agent CLIs a team can run on (Claude Code, Codex, Cursor): installed, signed in, any note."""
+        info = engines.all_status(force="refresh=1" in self.path)
+        force = "refresh=1" in self.path
+        self.send_json({"engines": [{"id": e, "name": engines.LABELS[e], **info[e],
+                                     "models": engines.models(e, force) if e != "claude" and info[e]["signed_in"] else []}
+                                    for e in engines.ENGINES]})
 
     def GET_api_clis(self):
         """Command-line tools installed on this computer that a team can be allowed to run."""

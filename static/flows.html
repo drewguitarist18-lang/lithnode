@@ -223,6 +223,7 @@
   .item .thumb { width: 56px; height: 56px; border-radius: 9px; overflow: hidden; display: grid; place-items: center; font: 800 17px system-ui; color: #fff;
                  background: linear-gradient(135deg, hsl(var(--h) 55% 46%), hsl(calc(var(--h) + 40) 50% 30%)); }
   .item .thumb img { width: 100%; height: 100%; object-fit: cover; background: #fff; }
+  .item.noimg { grid-template-columns: 1fr; }   /* no photo: just the text, never a stand-in of initials */
   .item .info { min-width: 0; }
   .item .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; font-weight: 700; line-height: 1.3; padding-right: 16px; }
   .item .row { display: flex; gap: 8px; align-items: baseline; margin-top: 3px; font-size: 12px; }
@@ -249,7 +250,23 @@
   .switch.conn input:checked { background: var(--done); }
   .switch.conn .cico { width: 22px; height: 22px; border-radius: 6px; font-size: 11px; }
   .cico.cli { background: #1d1f24; color: #9ece6a; font-family: ui-monospace, Consolas, monospace; box-shadow: inset 0 0 0 1px #3a3d45; }
-  .switch.conn .cico.cli { font-size: 10px; }
+  .cico svg { width: 72%; height: 72%; display: block; }
+  .engines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .engines button { display: grid; justify-items: start; gap: 3px; text-align: left; padding: 9px 10px; border-radius: 10px;
+                     font-size: 12.5px; font-weight: 700; white-space: nowrap; min-width: 0; }
+  .engines button .eico { margin-bottom: 3px; }
+  .engines button small { white-space: normal; line-height: 1.3; }
+  .eico { width: 26px; height: 26px; border-radius: 7px; display: inline-grid; place-items: center; flex: none; overflow: hidden; background: #161616; }
+  .eico img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .eico.codex img { width: 70%; height: 70%; object-fit: contain; }
+  .eico canvas { width: 20px; height: 15px; image-rendering: pixelated; }
+  .chipc .eico { width: 15px; height: 15px; border-radius: 4px; }
+  .chipc .eico canvas { width: 12px; height: 9px; }
+  .engines button small { font-size: 10.5px; font-weight: 500; color: var(--muted); }
+  .engines button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--pad)); }
+  .engines button.off { opacity: .55; }
+  .enote { margin-top: 8px; padding: 8px 10px; border-radius: 9px; font-size: 12px; line-height: 1.45; color: var(--muted);
+           background: color-mix(in srgb, var(--approval) 8%, var(--pad)); border: 1px solid color-mix(in srgb, var(--approval) 30%, var(--line)); }
   .cliadd { display: flex; gap: 6px; margin-top: 8px; }
   .cliadd input { flex: 1; min-width: 0; font-family: ui-monospace, Consolas, monospace; }
   .port { position: absolute; top: 26px; width: 16px; height: 16px; border-radius: 50%; background: var(--pad);
@@ -691,14 +708,31 @@ function connLook(id) {   // a connector's little icon: its first letter on its 
   let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) % 360;
   return { name, letter: (name.match(/[A-Za-z0-9]/) || ["?"])[0].toUpperCase(), color: CONN_COLORS[key] || `hsl(${h} 55% 62%)` };
 }
-const connIcon = (id) => { const c = connLook(id); return `<i class="cico" style="--c:${c.color}">${esc(c.letter)}</i>`; };
+// icons, not letters: a plug for a connector, a terminal prompt for a command-line tool
+const PLUG_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v3M10 2v3M4 5h8v2.5a4 4 0 0 1-8 0V5zM8 11.5V14"/></svg>';
+const PROMPT_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5l3 3-3 3M8.5 11.5h4"/></svg>';
+const connIcon = (id) => `<i class="cico" style="--c:${connLook(id).color}">${PLUG_SVG}</i>`;
 async function loadConnectors(force) {
   if (force) { connectors = null; renderInspector(); }
   connectors = await api("/api/connectors" + (force ? "?refresh=1" : "")).catch((e) => ({ ok: false, connectors: [], error: e.message }));
   renderInspector();
 }
+let engines = null;   // null while checking; then [{id, name, installed, signed_in, note, sandbox?}]
+const ENGINE_NAME = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" };
+const engineOf = (n) => n.engine || "claude";
+const engineInfo = (id) => (engines || []).find((e) => e.id === id) || { id, name: ENGINE_NAME[id], installed: true, signed_in: true, note: "" };
+async function loadEngines(force) {
+  engines = (await api("/api/engines" + (force ? "?refresh=1" : "")).catch(() => ({ engines: [] }))).engines || [];
+  renderInspector();
+}
+// what a team runs on, for its node and header: "2 × Sonnet 5.5" or "2 × Codex"
+const teamModel = (n) => {
+  if (engineOf(n) === "claude") return modelLabel(n.model);
+  const m = n.engine_model && (engineInfo(engineOf(n)).models || []).find((x) => x.id === n.engine_model);
+  return ENGINE_NAME[engineOf(n)] + (n.engine_model ? ` · ${m ? m.label : n.engine_model}` : "");
+};
 let clis = null;   // null while checking; then [{id, name, blurb}]: command-line tools installed here
-const cliIcon = (id) => `<i class="cico cli">${esc(id.slice(0, 2))}</i>`;
+const cliIcon = () => `<i class="cico cli">${PROMPT_SVG}</i>`;
 async function loadClis() {
   clis = (await api("/api/clis").catch(() => ({ clis: [] }))).clis || [];
   renderInspector();
@@ -713,7 +747,7 @@ const TOOL_INFO = {
   edit: "Read and edit files", full: "Edit files and run commands",
 };
 const TYPE_LABEL = { master: "Start", cluster: "Team", checkpoint: "Checkpoint", approval: "Approval", done: "Done" };
-const modelLabel = (id) => (meta.models.find((m) => m.id === id) || {}).label || id;
+const modelLabel = (id) => (meta.models.find((m) => m.id === id) || {}).label || ENGINE_NAME[id] || id;
 const locked = () => !!run;
 const shown = () => (run ? run.flow : flow);     // the run view draws the flow as it was when it ran
 const nodeById = (id) => shown().nodes.find((n) => n.id === id);
@@ -725,6 +759,7 @@ async function boot() {
   bots = (await api("/api/bots").catch(() => ({ bots: [] }))).bots || [];
   loadConnectors(false);
   loadClis();
+  loadEngines(false);
   renderBotPalette();
   $("tplList").innerHTML = meta.templates.map((t) => `<div class="tpl" data-tpl="${esc(t.id)}"><b>${esc(t.name)}</b><small>${esc(t.blurb)}</small></div>`).join("");
   let want; try { want = localStorage.getItem("hq-flow"); } catch (e) {}
@@ -1035,7 +1070,7 @@ function nodeInfo(n) {
   const st = nodeState(n.id);
   let lines = [], job = "";
   if (n.type === "cluster") {
-    lines.push(`${n.count} × ${modelLabel(n.model)}` + (n.split && n.count > 1 ? ` · split ${n.count} ways` : ""));
+    lines.push(`${n.count} × ${teamModel(n)}` + (n.split && n.count > 1 ? ` · split ${n.count} ways` : ""));
     // what this team does: your own job if you wrote one, else the bot's
     const base = bots.find((b) => b.id === n.bot);
     job = (n.instructions || "").trim().replace(/\s+/g, " ") || (base ? base.tagline || "" : "");
@@ -1085,7 +1120,8 @@ function renderNodes() {
     e.el.querySelector(".ttl small").textContent = TYPE_LABEL[n.type];
     const html = nodeInfo(n);
     if (html !== e.info) { e.el.querySelector(".body").innerHTML = html; e.info = html; }
-    const tags = [...(n.connectors || []).map((id) => { const c = connLook(id); return `<span class="chipc" style="--c:${c.color}" title="${esc(c.name)} connector">${connIcon(id)}${esc(c.name)}</span>`; }),
+    const tags = [...(n.type === "cluster" && engineOf(n) !== "claude" ? [`<span class="chipc" style="--c:#cfcfcf" title="Runs on ${ENGINE_NAME[engineOf(n)]}">${engineIcon(engineOf(n))}${ENGINE_NAME[engineOf(n)]}</span>`] : []),
+                  ...(n.connectors || []).map((id) => { const c = connLook(id); return `<span class="chipc" style="--c:${c.color}" title="${esc(c.name)} connector">${connIcon(id)}${esc(c.name)}</span>`; }),
                   ...(n.clis || []).map((id) => `<span class="chipc" style="--c:#9ece6a" title="${esc(id)} command-line tool">${cliIcon(id)}${esc(id)}</span>`)];
     const conns = tags.slice(0, 2).join("") + (tags.length > 2 ? `<span class="chipc" style="--c:#8d8d8d">+${tags.length - 2}</span>` : "");
     if (conns !== e.conns) { e.el.querySelector(".conns").innerHTML = conns; e.conns = conns; }
@@ -1275,6 +1311,12 @@ function connect(a, b) {
   if (flow.edges.some((e) => e.from === a && e.to === b)) return renderWires();
   if (reaches(b, a)) return toast("That would make a loop. Connections go one way.");
   flow.edges.push({ from: a, to: b });
+  // a team that starts its own branch gets the task from Start: wire it, so the canvas shows how it runs
+  const from = nodeById(a), start = flow.nodes.find((n) => n.type === "master");
+  if (start && from.type !== "master" && !flow.edges.some((e) => e.to === a)) {
+    flow.edges.push({ from: start.id, to: a });
+    toast(`${from.name} gets your task from Start, so it's wired to Start.`);
+  }
   changed();
 }
 function reaches(start, goal) {
@@ -1380,6 +1422,46 @@ function connectorRows(n) {
     + `<div class="sub" style="display:flex;justify-content:space-between;gap:8px;margin-top:8px"><span>Teams only see the ones you switch on.</span><a href="#" id="connRefresh">Refresh</a></div>`;
 }
 
+// each engine's mark: Claude Code's pixel crab (drawn by drawEngineIcons), Codex's and Cursor's app icons
+const engineIcon = (id) => id === "claude"
+  ? `<i class="eico claude"><canvas width="24" height="18" data-engine-crab></canvas></i>`
+  : `<i class="eico ${id}"><img src="/static/engine-${id}.png" alt=""></i>`;
+function drawEngineIcons(root) {
+  root.querySelectorAll("canvas[data-engine-crab]").forEach((cv) => {
+    const g = cv.getContext("2d"); g.clearRect(0, 0, cv.width, cv.height);
+    drawBot(g, { shape: "crab", color: "#D97757" }, 0, 1, 2, { state: "idle", t: 0 });
+  });
+}
+
+// the models an engine offers this account, grouped by family (Cursor alone has hundreds)
+function modelFamily(m) {
+  const k = (m.id + " " + m.label).toLowerCase();
+  return k.includes("claude") ? "Claude" : k.includes("grok") ? "Grok" : k.includes("gemini") ? "Gemini"
+    : k.includes("composer") ? "Cursor" : /gpt|codex|\bo\d/.test(k) ? "OpenAI" : "Other";
+}
+function engineModels(n) {
+  const list = (engineInfo(engineOf(n)).models || []).filter((m) => m.id !== "auto");
+  const cur = n.engine_model || "", known = list.some((m) => m.id === cur);
+  const groups = {};
+  list.forEach((m) => (groups[modelFamily(m)] = groups[modelFamily(m)] || []).push(m));
+  const order = ["OpenAI", "Claude", "Grok", "Gemini", "Cursor", "Other"].filter((g) => groups[g]);
+  const opts = order.map((g) => `<optgroup label="${g}">${groups[g].map((m) => `<option value="${esc(m.id)}"${m.id === cur ? " selected" : ""}>${esc(m.label)}</option>`).join("")}</optgroup>`).join("");
+  return `<select data-k="engine_model" aria-label="Model"><option value="">${engineOf(n) === "codex" ? "Default (your Codex setting)" : "Auto (Cursor picks)"}</option>`
+    + (cur && !known ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : "") + opts + `</select>`;
+}
+
+// which agent CLI a team runs on, with whether it's ready on this computer
+function engineCards(n) {
+  const cur = engineOf(n), info = engineInfo(cur);
+  const cards = ["claude", "codex", "cursor"].map((id) => {
+    const e = engineInfo(id), ready = e.installed && e.signed_in;
+    const sub = !engines ? "Checking…" : !e.installed ? "Not installed" : !e.signed_in ? "Not signed in" : id === "claude" ? "Your Claude plan" : id === "codex" ? "Your ChatGPT plan" : "Your Cursor plan";
+    return `<button type="button" data-engine="${id}" class="${id === cur ? "on" : ""}${ready ? "" : " off"}">${engineIcon(id)}<span>${ENGINE_NAME[id]}</span><small>${sub}</small></button>`;
+  }).join("");
+  return `<div class="engines">${cards}</div>` + (cur !== "claude" && info.note ? `<div class="enote">${esc(info.note)}</div>` : "")
+    + `<div class="sub" style="display:flex;justify-content:space-between;gap:8px;margin-top:6px"><span>Mix them: one team on Claude, the next on Codex.</span><a href="#" id="engRefresh">Check again</a></div>`;
+}
+
 // a team's command-line tools: it may run only commands that start with one of these
 function cliRows(n) {
   if (n.tools === "full") return `<p class="hint" style="margin:0">This team can already run any command (Access: Edit + run code). Pick a lower access level to allow only certain tools.</p>`;
@@ -1432,7 +1514,7 @@ function renderInspector() {
 
   const look = n.type === "cluster" ? { shape: n.shape, color: n.color } : n.type === "master" ? { shape: "owl", color: "#7aa2f7" }
     : { icon: n.type, color: { checkpoint: "#7aa2f7", approval: "#e0a23c", done: "#e6b450" }[n.type] };
-  const kind = n.type === "cluster" ? `Team · ${n.count} × ${modelLabel(n.model)}` : n.type === "master" ? (n.mode === "pass" ? "Start · passes your task on" : `Start · writes a plan first · ${modelLabel(n.model)}`)
+  const kind = n.type === "cluster" ? `Team · ${n.count} × ${teamModel(n)}` : n.type === "master" ? (n.mode === "pass" ? "Start · passes your task on" : `Start · writes a plan first · ${modelLabel(n.model)}`)
     : { checkpoint: "Checkpoint · waits for everything before it", approval: "Approval · pauses until you say go", done: "Done · the final result lands here" }[n.type];
   const seg = (key, options, value) => `<div class="seg" data-seg="${key}">${options.map(([v, l, tip]) => `<button type="button" data-v="${esc(v)}" class="${v === value ? "on" : ""}"${tip ? ` title="${esc(tip)}"` : ""}>${esc(l)}</button>`).join("")}</div>`;
   const chips = (key, options, value) => `<div class="chips" data-seg="${key}">${options.map(([v, l]) => `<button type="button" data-v="${esc(v)}" class="${v === value ? "on" : ""}">${esc(l)}</button>`).join("")}</div>`;
@@ -1480,10 +1562,14 @@ function renderInspector() {
         ${n.count > 1 ? `<label class="switch" style="margin-top:10px"><span><b>Split the job</b><small>${n.split ? `On: one job, cut into ${n.count} parts, done side by side` : "Off: every agent does the whole job"}</small></span>
           <input type="checkbox" id="splitSw"${n.split ? " checked" : ""}></label>` : ""}</div>
       <div class="isec"><h4>Job</h4><textarea data-k="instructions" rows="3" placeholder="${esc(builtinOf(n) ? `Uses ${builtinOf(n).name}'s built-in job. Type here to give them your own.` : "e.g. Review the changes for bugs. Don't edit files.")}">${esc(n.instructions || "")}</textarea></div>
-      <div class="isec"><h4>Model</h4>${models(n.model)}${modelNote(n.model)}${effortBar(n)}</div>
+      <div class="isec"><h4>Runs on</h4>${engineCards(n)}</div>
+      ${engineOf(n) === "claude" ? `<div class="isec"><h4>Model</h4>${models(n.model)}${modelNote(n.model)}${effortBar(n)}</div>`
+        : `<div class="isec"><h4>Model</h4>${engineModels(n)}
+          <div class="sub">Leave empty to use ${ENGINE_NAME[engineOf(n)]}'s default. Usage comes from your ${engineOf(n) === "codex" ? "ChatGPT" : "Cursor"} plan.</div></div>`}
       <div class="isec"><h4>Access</h4>${chips("tools", ACCESS, n.tools)}<div class="sub">${esc(n.split && n.count > 1 && n.tools === "edit" ? "Can change files. With Split the job on, they work side by side and each writes only its own part." : ACCESS_NOTE[n.tools] || "")}</div></div>
-      <div class="isec"><h4>Connectors</h4>${connectorRows(n)}</div>
-      <div class="isec"><h4>Command-line tools</h4>${cliRows(n)}</div>
+      ${engineOf(n) === "claude" ? `<div class="isec"><h4>Connectors</h4>${connectorRows(n)}</div>
+      <div class="isec"><h4>Command-line tools</h4>${cliRows(n)}</div>`
+        : `<div class="isec"><h4>Connectors and command-line tools</h4><p class="hint" style="margin:0">These are Claude Code features. A ${ENGINE_NAME[engineOf(n)]} team uses its own tools: it can run commands when its access allows.</p></div>`}
       <div class="isec">${more(`<div class="field"><label>Focus per agent</label><textarea data-k="focuses" rows="3" placeholder="One line per agent, e.g.&#10;Logic and edge cases&#10;Error handling">${esc(n.focuses || "")}</textarea>
           <div class="sub">Agent 1 gets line 1, and so on, so they don't all check the same thing.</div></div>
         <div class="row2" style="margin-top:12px"><div class="field"><label>Max turns</label><input type="number" min="0" max="200" data-k="max_turns" data-num value="${n.max_turns || 0}"><div class="sub">0 = no limit</div></div>
@@ -1556,6 +1642,9 @@ function renderInspector() {
     n.clis = [...(n.clis || []).filter((x) => x !== id), id]; changed(false); renderInspector();
   };
   if ($("cliAdd")) { $("cliAdd").onclick = addCli; $("cliNew").onkeydown = (e) => { if (e.key === "Enter") addCli(); }; }
+  drawEngineIcons(box);
+  box.querySelectorAll("[data-engine]").forEach((b) => b.addEventListener("click", () => { n.engine = b.dataset.engine; changed(false); renderInspector(); }));
+  if ($("engRefresh")) $("engRefresh").onclick = (e) => { e.preventDefault(); engines = null; renderInspector(); loadEngines(true); };
   if ($("splitSw")) $("splitSw").onchange = (e) => { n.split = e.target.checked; changed(false); renderInspector(); };
 }
 
@@ -1577,7 +1666,8 @@ $("runBtn").onclick = () => {
   const actors = flow.nodes.filter((n) => n.type === "cluster" && (n.connectors || []).length);
   const cliTeams = flow.nodes.filter((n) => n.type === "cluster" && n.tools !== "full" && (n.clis || []).length);
   const apps = [...new Set(actors.flatMap((n) => n.connectors.map(connName)))];
-  const careful = writers.length > 0 || actors.length > 0 || cliTeams.length > 0;
+  const codexOpen = flow.nodes.filter((n) => n.type === "cluster" && engineOf(n) === "codex" && engineInfo("codex").sandbox === false && n.tools !== "full");
+  const careful = writers.length > 0 || actors.length > 0 || cliTeams.length > 0 || codexOpen.length > 0;
   $("riskBox").hidden = !careful; $("riskOk").checked = false;
   $("riskText").textContent = [
     !writers.length ? "" : runners.length
@@ -1585,6 +1675,7 @@ $("runBtn").onclick = () => {
       : `${writers.map((w) => w.name).join(", ")} can change files in the folder. Use a folder whose work is committed to git, so you can undo anything.`,
     actors.length ? `${actors.map((n) => n.name).join(", ")} can read and change things in ${apps.join(", ")} for real.` : "",
     cliTeams.length ? cliTeams.map((n) => `${n.name} can run ${n.clis.join(", ")} on this computer.`).join(" ") : "",
+    codexOpen.length ? `${codexOpen.map((n) => n.name).join(", ")} run${codexOpen.length === 1 ? "s" : ""} on Codex with full access, because Codex's sandbox doesn't work on this computer.` : "",
   ].filter(Boolean).join(" ");
   const ready = () => { $("goBtn").disabled = problems.length > 0 || (careful && !$("riskOk").checked); };
   $("riskOk").onchange = ready; ready();
@@ -1630,11 +1721,10 @@ function itemCard(it, key, opts = {}) {
   const id = key + "|" + it.title, fresh = !seenItems.has(id), vid = id + "|" + (it.verdict || "");
   const stampFresh = it.verdict && !seenVerdicts.has(vid);
   if (opts.mark !== false) { seenItems.add(id); if (it.verdict) seenVerdicts.add(vid); }
-  const initials = it.title.split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase().replace(/[^A-Z0-9]/g, "") || "•";
   const facts = Object.entries(it.facts || {}).slice(0, 3).map(([k, v]) => `${k} ${v}`).join(" · ") || it.subtitle || "";
   const tag = it.url ? "a" : "div", href = it.url ? ` href="${esc(it.url)}" target="_blank" rel="noopener" title="Open ${esc(it.title)}"` : "";
-  return `<${tag} class="item${it.verdict ? " v-" + it.verdict : ""}${fresh && opts.animate !== false ? " new" : ""}${opts.scan ? " scan" : ""}"${href} style="--h:${hueOf(it.title)};--d:${(opts.i || 0) * .15}s">
-    <span class="thumb">${it.image ? `<img src="${esc(it.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${esc(initials)}'))">` : esc(initials)}</span>
+  return `<${tag} class="item${it.image ? "" : " noimg"}${it.verdict ? " v-" + it.verdict : ""}${fresh && opts.animate !== false ? " new" : ""}${opts.scan ? " scan" : ""}"${href} style="--h:${hueOf(it.title)};--d:${(opts.i || 0) * .15}s">
+    ${it.image ? `<span class="thumb"><img src="${esc(it.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('.item').classList.add('noimg'); this.parentNode.remove()"></span>` : ""}
     <span class="info"><span class="t">${esc(it.title)}</span>
       <span class="row">${it.price ? `<span class="price">${esc(/^\d/.test(it.price) ? "$" + it.price : it.price)}</span>` : ""}${it.rating != null ? `<span class="rate">★ ${esc(it.rating)}</span>` : ""}</span>
       ${facts ? `<span class="facts" title="${esc(facts)}">${esc(facts)}</span>` : ""}</span>

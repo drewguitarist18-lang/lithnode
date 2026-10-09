@@ -46,6 +46,12 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
   });
   win.removeMenu();
+  // no menu means no built-in shortcuts: keep reload (Ctrl+R, F5) like a browser
+  win.webContents.on("before-input-event", (e, input) => {
+    if (input.type === "keyDown" && (input.key === "F5" || ((input.control || input.meta) && input.key.toLowerCase() === "r"))) {
+      e.preventDefault(); win.webContents.reloadIgnoringCache();
+    }
+  });
   win.once("ready-to-show", () => win.show());
   // links to the outside world open in the normal browser; the window only ever shows Lithnode
   win.webContents.setWindowOpenHandler(({ url }) => {

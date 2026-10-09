@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 
 import claude_code
+import engines
 
 # The longest one session may run before it's killed, so a hung CLI can't hold up its run forever.
 TIMEOUT = float(os.environ.get("LITHNODE_AGENT_TIMEOUT") or 4 * 3600)
@@ -118,8 +119,10 @@ def kill_tree(proc):
 class Agent:
     """Runs one session. `on_update` is called (with no arguments) whenever its state changes."""
 
-    def __init__(self, *, model, effort, tools, system, prompt, cwd, on_update, max_turns=0, connectors=(), known=(), clis=()):
+    def __init__(self, *, model, effort, tools, system, prompt, cwd, on_update, max_turns=0, connectors=(), known=(), clis=(),
+                 engine="claude", engine_model=""):
         self.model, self.effort, self.tools, self.clis = model, effort, tools, list(clis)
+        self.engine, self.engine_model = engine if engine in engines.ENGINES else "claude", engine_model
         self.connectors, self.known = [s for s in connectors if s in known], list(known)
         self.system, self.prompt, self.cwd = system, prompt, Path(cwd)
         self.max_turns = max_turns
@@ -163,6 +166,8 @@ class Agent:
 
     def run(self):
         """Blocks until the session ends. Returns True on success."""
+        if self.engine != "claude":
+            return self._run_other()
         command = claude_code.find_command()
         if not command:
             self.error = "Claude Code isn't installed on this computer."
@@ -247,6 +252,77 @@ class Agent:
             self.error = "The session ended without a result." + (f" {tail}" if tail else "")
         if self.error and ("Not logged in" in self.error or "/login" in self.error):
             self.error = "Claude Code isn't signed in. Run `claude auth login` once, then try again."
+        self.step = "Done" if not self.error else "Failed"
+        self.on_update()
+        return not self.error
+
+    def _run_other(self):
+        """The same session on Codex or Cursor: their own command line and JSON events, same steps and report."""
+        name = engines.LABELS[self.engine]
+        command = engines.FINDERS[self.engine]()
+        if not command:
+            self.error = f"{name} isn't installed on this computer."
+            return False
+        try:
+            self.cwd.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            self.error = f"Couldn't use the folder {self.cwd}: {exc}"
+            return False
+        args = engines.build_args(self.engine, command, tools=self.tools, model=self.engine_model)
+        self.prompt = engines.wrap_prompt(self.system, self.prompt)
+        with self._lock:
+            if self.stopped:
+                return False
+            try:
+                self.proc = subprocess.Popen(args, cwd=str(self.cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                                             creationflags=claude_code.NO_WINDOW, env=claude_code.lean_env())
+            except OSError as exc:
+                self.error = f"Couldn't start {name}: {exc}"
+                return False
+        proc = self.proc
+        stderr_tail = []
+        threading.Thread(target=lambda: stderr_tail.extend(proc.stderr.readlines()[-20:]), daemon=True).start()
+        threading.Thread(target=self._feed, args=(proc,), daemon=True).start()
+        timer = threading.Timer(TIMEOUT, self._time_out)
+        timer.daemon = True
+        timer.start()
+        self._set_step("Starting up")
+        out = {"texts": [], "final": None, "error": ""}
+        parse = engines.PARSERS[self.engine]
+        try:
+            for line in proc.stdout:
+                line = line.strip()
+                if not line.startswith("{"):
+                    continue
+                try:
+                    step = parse(json.loads(line), out)
+                except (ValueError, AttributeError, TypeError):
+                    continue
+                if step:
+                    self._set_step(step)
+            proc.wait(timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        finally:
+            timer.cancel()
+            if proc.poll() is None:
+                kill_tree(proc)
+        tail = "".join(stderr_tail).strip()
+        if out["error"]:
+            self.error = out["error"]
+        elif out["final"] is not None:
+            self.text = out["final"]
+        elif out["texts"] and proc.returncode == 0:
+            self.text = "\n\n".join(out["texts"])
+        if self.stopped:
+            self.error = "Stopped"
+        elif self.timed_out:
+            self.error = f"Timed out after {TIMEOUT / 60:g} minutes, so it was stopped."
+        elif not self.text and not self.error:
+            self.error = f"The {name} session ended without a result." + (f" {tail[-300:]}" if tail else "")
+        if self.error:
+            self.error = engines.friendly_error(self.engine, self.error + (" " + tail[-300:] if "limit" in tail.lower() else ""))
         self.step = "Done" if not self.error else "Failed"
         self.on_update()
         return not self.error
