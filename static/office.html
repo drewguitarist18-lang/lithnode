@@ -60,6 +60,8 @@
   .row:hover { background: var(--pad); }
   .row.child { margin-left: 18px; padding-top: 4px; padding-bottom: 4px; border-left: 2px dashed var(--line); border-radius: 0 12px 12px 0; }
   .row.sel { background: var(--pad); border-color: var(--accent); }
+  .glabel { margin: 12px 6px 4px; font-size: 11.5px; font-weight: 650; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .glabel:first-child { margin-top: 2px; }
   .row canvas { width: 40px; height: 30px; }
   .row .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .sub { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -118,14 +120,23 @@ let data = { now: 0, sessions: [] }, stations = [], drift = 0, selected = null, 
 const subColor = (a) => SUB_COLORS[hash(a.id) % SUB_COLORS.length];
 const subKey = (s, a) => s.id + ":" + a.id;
 const stationId = (st) => (st.kind === "sub" ? subKey(st.s, st.a) : st.s.id);
-// One station per session, each followed by one per running subagent.
+// One station per session, each followed by one per running subagent; grouped by run, your own sessions last.
+const groupKey = (s) => (s.flow ? "run:" + s.flow.run : "you");
 function buildStations() {
-  const out = [];
-  for (const s of data.sessions) {
-    out.push({ kind: "main", s });
-    for (const a of s.subagents) out.push({ kind: "sub", s, a });
+  const out = [], order = [];
+  for (const s of data.sessions) if (!order.includes(groupKey(s))) order.push(groupKey(s));
+  order.sort((a, b) => (a === "you") - (b === "you"));
+  for (const key of order) for (const s of data.sessions.filter((x) => groupKey(x) === key)) {
+    out.push({ kind: "main", s, group: key });
+    for (const a of s.subagents) out.push({ kind: "sub", s, a, group: key });
   }
   return out;
+}
+function groupTitle(key) {
+  const first = stations.find((x) => x.group === key), n = stations.filter((x) => x.group === key).length;
+  if (key === "you") return [`Your Claude Code sessions`, `${n} open`];
+  const working = stations.filter((x) => x.group === key && effState(x.s) === "working").length;
+  return [first.s.flow.name, `${n} agent${n === 1 ? "" : "s"}${working ? ` · ${working} working` : ""}`];
 }
 let theme = {};
 
@@ -277,11 +288,14 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
   if (isSub) {
     ctx.fillText(clip(ctx, "helping " + station.s.project, sw), sx, oy + 176);
     ctx.fillText(`running ${dur(nowS() - station.a.started)} · ${station.a.tools} tools`, sx, oy + 192);
+  } else if (s.flow || !s.window) {   // flow agents and engines that don't report context: time and actions
+    ctx.fillText(clip(ctx, s.flow ? s.flow.stage : "", sw), sx, oy + 176);
+    ctx.fillText(`${st === "working" ? "working" : "open"} ${dur(nowS() - s.started)} · ${s.tools || 0} action${s.tools === 1 ? "" : "s"}`, sx, oy + 192);
   } else {
     ctx.fillStyle = theme.line; roundRect(ctx, sx, oy + 174, sw, 7, 3.5); ctx.fill();
     ctx.fillStyle = energyColor(1 - f); roundRect(ctx, sx, oy + 174, Math.max(7, sw * (1 - f)), 7, 3.5); ctx.fill();
     ctx.fillStyle = theme.muted; ctx.textAlign = "right";
-    ctx.fillText(`energy ${Math.round((1 - f) * 100)}%`, sx + sw, oy + 170); ctx.textAlign = "left";
+    ctx.fillText(`context left ${Math.round((1 - f) * 100)}%`, sx + sw, oy + 170); ctx.textAlign = "left";
   }
 }
 
@@ -295,18 +309,33 @@ const stage = $("stage"), sctx = stage.getContext("2d");
 const stageBox = { w: 800, h: 600 };
 new ResizeObserver(([e]) => { stageBox.w = e.contentRect.width; stageBox.h = e.contentRect.height; })
   .observe($("stagewrap"));
+const HEAD_H = 40;
 function layout() {
-  const W = stageBox.w;
-  const cols = Math.max(1, Math.floor(W / SW)), n = Math.max(1, stations.length);
-  const rows = Math.ceil(n / cols), usedCols = Math.min(cols, n);
-  const left = Math.max(0, (W - usedCols * SW) / 2);
-  return { W, H: Math.max(stageBox.h, rows * SH + 40), cols, left, top: 20 };
+  const W = stageBox.w, cols = Math.max(1, Math.floor((W - 24) / SW));
+  const keys = [...new Set(stations.map((x) => x.group))], placed = new Array(stations.length), heads = [];
+  const widest = Math.min(cols, Math.max(1, ...keys.map((k) => stations.filter((x) => x.group === k).length)));
+  const left = Math.max(12, (W - widest * SW) / 2);   // every group shares one left edge
+  let y = 14;
+  for (const key of keys) {
+    const idx = stations.map((x, i) => (x.group === key ? i : -1)).filter((i) => i >= 0);
+    heads.push({ key, x: left + 10, y: y + 24 });
+    y += HEAD_H;
+    idx.forEach((i, k) => { placed[i] = { x: left + (k % cols) * SW, y: y + Math.floor(k / cols) * SH }; });
+    y += Math.ceil(idx.length / cols) * SH + 16;
+  }
+  return { W, H: Math.max(stageBox.h, y + 24), placed, heads };
 }
 function stationAt(mx, my) {
-  const L = layout(), c = Math.floor((mx - L.left) / SW), r = Math.floor((my - L.top) / SH);
-  if (c < 0 || c >= L.cols || r < 0) return -1;
-  const i = r * L.cols + c;
-  return i < stations.length ? i : -1;
+  const L = layout();
+  return L.placed.findIndex((pt) => pt && mx >= pt.x + 8 && mx <= pt.x + SW - 8 && my >= pt.y + 8 && my <= pt.y + SH - 8);
+}
+function drawHead(ctx, h, W) {
+  const [title, sub] = groupTitle(h.key);
+  ctx.textBaseline = "alphabetic";
+  ctx.font = "650 13px system-ui, sans-serif"; ctx.fillStyle = theme.ink || "#ededed";
+  const tw = Math.min(ctx.measureText(title).width, 420); ctx.fillText(clip(ctx, title, 420), h.x, h.y);
+  ctx.font = "12px system-ui, sans-serif"; ctx.fillStyle = theme.muted; ctx.fillText(sub, h.x + tw + 10, h.y);
+  if (h.key !== "you") { ctx.fillStyle = theme.working; ctx.beginPath(); ctx.arc(h.x - 10, h.y - 4.5, 3.5, 0, 7); ctx.fill(); }
 }
 stage.addEventListener("click", (e) => {
   const r = stage.getBoundingClientRect(), i = stationAt(e.clientX - r.left, e.clientY - r.top);
@@ -330,19 +359,20 @@ function esc(str) { const d = document.createElement("div"); d.textContent = str
 let lastSideHtml = "";
 function renderSide() {
   const list = $("list");
-  const html = !stations.length ? '<p class="hint">No sessions open.</p>' : stations.map((x) => {
+  const html = !stations.length ? '<p class="hint">No sessions open.</p>' : stations.map((x, i) => {
     const id = stationId(x), cls = "row" + (id === selected ? " sel" : "") + (x.kind === "sub" ? " child" : "");
+    const label = i === 0 || stations[i - 1].group !== x.group ? `<div class="glabel">${esc(groupTitle(x.group)[0])}</div>` : "";
     if (x.kind === "sub") {
-      return `<div class="${cls}" data-id="${esc(id)}"><canvas class="av" width="120" height="90"></canvas>
+      return label + `<div class="${cls}" data-id="${esc(id)}"><canvas class="av" width="120" height="90"></canvas>
         <div><div class="name">${esc(x.a.type)}</div>
         <div class="sub" style="color:${subColor(x.a)}">${esc(x.a.detail || "Thinking…")}</div></div></div>`;
     }
     const s = x.s, st = effState(s), f = fill(s);
-    return `<div class="${cls}" data-id="${esc(id)}">
+    return label + `<div class="${cls}" data-id="${esc(id)}">
       <canvas class="av" width="120" height="90"></canvas>
       <div><div class="name">${esc(s.project)}</div>
       <div class="sub" style="color:${stColor(st)}">${s.engine && s.engine !== "claude" ? esc(ENGINE_NAME[s.engine] || s.engine) + " · " : ""}${esc(statusText(s, st))}</div>
-      <div class="bar"><b style="width:${Math.round((1 - f) * 100)}%;background:${energyColor(1 - f)}"></b></div></div></div>`;
+      ${s.window ? `<div class="bar"><b style="width:${Math.round((1 - f) * 100)}%;background:${energyColor(1 - f)}"></b></div>` : ""}</div></div>`;
   }).join("");
   if (html !== lastSideHtml) { list.innerHTML = html; lastSideHtml = html; }  // skip no-op rebuilds
 }
@@ -424,9 +454,8 @@ function frame(ms) {
   sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   sctx.textBaseline = "alphabetic"; sctx.textAlign = "left";
   drawFloor(sctx, L.W, L.H);
-  stations.forEach((x, i) => {
-    drawStation(sctx, x, L.left + (i % L.cols) * SW, L.top + Math.floor(i / L.cols) * SH, t, stationId(x) === selected);
-  });
+  L.heads.forEach((h) => drawHead(sctx, h, L.W));
+  stations.forEach((x, i) => { const pt = L.placed[i]; if (pt) drawStation(sctx, x, pt.x, pt.y, t, stationId(x) === selected); });
 
   document.querySelectorAll("#list .row").forEach((row, i) => {
     const x = stations[i], cv = row.querySelector("canvas"); if (!x || !cv) return;

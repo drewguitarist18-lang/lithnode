@@ -52,6 +52,9 @@ def shot(target, seconds=2.0, size="1280x800", out_dir=None):
         if not path.is_file():
             raise RuntimeError(f"There's no file at {path}.")
         name = path.stem
+        for stale in path.parent.glob(".lithnode-shot-*"):   # copies left behind by a run that was cut off
+            if time.time() - stale.stat().st_mtime > 300:
+                stale.unlink(missing_ok=True)
         if path.suffix.lower() in (".html", ".htm"):
             # a copy beside the original (so its relative links still work) that freezes animations at `seconds`
             html = path.read_text(encoding="utf-8", errors="replace")

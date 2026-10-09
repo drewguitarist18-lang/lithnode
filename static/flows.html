@@ -76,6 +76,27 @@
   .pal:active { cursor: grabbing; }
   .pal:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* building blocks look like the nodes they make: a team card, then step pills */
+  .blocks { display: grid; gap: 7px; }
+  .blk { display: flex; align-items: center; gap: 10px; background: var(--pad); border: 1px solid var(--line); color: var(--ink);
+         transition: border-color .15s, transform .15s, box-shadow .15s; }
+  .blk:hover { border-color: color-mix(in srgb, var(--ink) 24%, var(--line)); transform: translateY(-1px); box-shadow: 0 8px 20px -12px var(--shadow); }
+  .blk b { font-size: 13px; font-weight: 650; }
+  .blk small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .blk b { white-space: nowrap; }
+  .bteam { padding: 10px; border-radius: 12px; }
+  .bteam .bt { width: 34px; height: 34px; border-radius: 9px; flex: none; display: grid; place-items: center;
+               background: color-mix(in srgb, #e8784f 17%, var(--pad)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #e8784f 24%, transparent); }
+  .bteam .bt canvas { width: 26px; height: 19.5px; image-rendering: pixelated; }
+  .bteam .bx { display: grid; min-width: 0; flex: 1; }
+  .bteam .bdots { display: flex; flex: none; }
+  .bteam .bdots i { width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, #e8784f 70%, var(--pad)); box-shadow: 0 0 0 2px var(--pad); }
+  .bteam .bdots i + i { margin-left: -3px; }
+  .bstep { height: 34px; padding: 0 14px 0 10px; border-radius: 999px; }
+  .bstep .bi { width: 17px; height: 17px; flex: none; color: var(--muted); display: grid; place-items: center; }
+  .bstep .bi svg { width: 17px; height: 17px; }
+  .bstep small { margin-left: auto; }
+  .blk.used { opacity: .4; }
   .tile { --c: var(--accent); position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px 10px;
           text-align: center; border: 1px solid var(--line); border-radius: 14px; background: var(--pad); overflow: hidden;
           transition: border-color .15s, transform .15s; }
@@ -659,11 +680,17 @@
   <div class="palette" id="palette">
     <div class="psec">
       <h3>Building blocks</h3>
-      <div class="tiles">
-        <div class="pal tile" draggable="true" tabindex="0" data-type="cluster" title="A blank team: pick how many agents, what they do, their model and what they can touch. The bots below are ready-made teams." style="--c:#e8784f"><canvas width="96" height="72" data-shape="byte" data-color="#e8784f"></canvas><b>Custom team</b><small>blank, no preset</small></div>
-        <div class="pal tile" draggable="true" tabindex="0" data-type="checkpoint" title="Waits for everything before it, then passes the reports on" style="--c:#7aa2f7"><canvas width="96" height="72" data-icon="checkpoint"></canvas><b>Checkpoint</b><small>waits, then merges</small></div>
-        <div class="pal tile" draggable="true" tabindex="0" data-type="approval" title="Pauses the run until you say go" style="--c:#e0a23c"><canvas width="96" height="72" data-icon="approval"></canvas><b>Approval</b><small>you say go</small></div>
-        <div class="pal tile" draggable="true" tabindex="0" data-type="done" title="Where the final result lands" style="--c:#e6b450"><canvas width="96" height="72" data-icon="done"></canvas><b>Done</b><small>the result</small></div>
+      <div class="blocks">
+        <div class="pal blk bteam" draggable="true" tabindex="0" data-type="cluster" title="A team of agents with one job. Pick how many, what they do, their engine and what they can touch. The bots below are ready-made teams.">
+          <span class="bt"><canvas width="96" height="72" data-shape="byte" data-color="#e8784f"></canvas></span>
+          <span class="bx"><b>Team</b><small>Agents with one job</small></span>
+          <span class="bdots"><i></i><i></i><i></i></span></div>
+        <div class="pal blk bstep" draggable="true" tabindex="0" data-type="approval" title="Pauses the run until you say go">
+          <span class="bi" style="color:var(--approval)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12M11 11V4.5a1.5 1.5 0 0 1 3 0V12M14 11.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3.5 13a1.6 1.6 0 0 1 2.6-1.8L8 13"/></svg></span><b>Approval</b><small>you say go</small></div>
+        <div class="pal blk bstep" draggable="true" tabindex="0" data-type="checkpoint" title="Waits for everything before it, then passes the reports on or merges them into one">
+          <span class="bi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M6 8.2v7.6M8 6.6c5 .5 7.6 2.4 8 4M8 17.4c5-.5 7.6-2.4 8-4"/></svg></span><b>Checkpoint</b><small>merges</small></div>
+        <div class="pal blk bstep" draggable="true" tabindex="0" data-type="done" title="Where the final result lands">
+          <span class="bi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg></span><b>Done</b><small>the result</small></div>
       </div>
     </div>
     <div class="psec">
@@ -1162,7 +1189,7 @@ function renderAll() {
   document.querySelector("main").classList.toggle("running", locked());
   if (run) followActive();
   $("canvas").classList.toggle("vertical", vertical());
-  const doneTile = document.querySelector('.tile[data-type="done"]'), hasDone = !locked() && flow.nodes.some((x) => x.type === "done");
+  const doneTile = document.querySelector('.blk[data-type="done"]'), hasDone = !locked() && flow.nodes.some((x) => x.type === "done");
   doneTile.classList.toggle("used", hasDone);
   doneTile.title = hasDone ? "This flow already has its Done step" : "Where the final result lands";
   $("zAuto").classList.toggle("on", !locked() && flow.auto !== false);
