@@ -22,8 +22,28 @@ AGENT_ENV = {"LITHNODE_AGENT": "1"}
 NO_CONNECTORS_ARGS = ["--strict-mcp-config", "--disallowedTools", "mcp__*"]
 
 
+TOOLS_BIN = None   # Lithnode's own commands for agents (lithnode-shot), set by setup_tools at startup
+
+
+def setup_tools(home):
+    """Puts `lithnode-shot` (shot.py) in home/bin for the agents' PATH. Returns that folder."""
+    global TOOLS_BIN
+    import shot
+    import sys
+    frozen = getattr(sys, "frozen", False)
+    command = [str(Path(sys.executable).with_name("lithnode-cli.exe")), "shot"] if frozen else [sys.executable, str(Path(shot.__file__).resolve())]
+    TOOLS_BIN = str(shot.bin_dir(home, command))
+    return TOOLS_BIN
+
+
+def _with_tools(env):
+    if TOOLS_BIN:
+        env["PATH"] = TOOLS_BIN + os.pathsep + env.get("PATH", "")
+    return env
+
+
 def lean_env():
-    return {**os.environ, **NO_CONNECTORS_ENV, **AGENT_ENV}
+    return _with_tools({**os.environ, **NO_CONNECTORS_ENV, **AGENT_ENV})
 
 
 def connectors_env():
@@ -32,7 +52,7 @@ def connectors_env():
     env = {k: v for k, v in os.environ.items() if k != "ENABLE_CLAUDEAI_MCP_SERVERS"}
     env["ENABLE_TOOL_SEARCH"] = "true"
     env.update(AGENT_ENV)
-    return env
+    return _with_tools(env)
 
 
 def tool_prefix(server):

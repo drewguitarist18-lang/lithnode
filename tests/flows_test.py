@@ -137,11 +137,13 @@ try:
     ship = d["flow"]
     check("ship-it template: 9 nodes, ready to run", len(ship["nodes"]) == 9 and d["problems"] == [], d["problems"])
     by = {n["id"]: n for n in ship["nodes"]}
-    check("templates go left to right, parallel stages stacked, long chains wrap to a new row", ship["dir"] == "lr"
-          and by["master"]["x"] < by["build"]["x"] < by["bugs"]["x"] == by["sec"]["x"] and by["bugs"]["y"] != by["sec"]["y"]
-          and by["ok"]["x"] < by["cp2"]["x"] and by["ok"]["y"] > by["master"]["y"] and by["done"]["y"] == by["ok"]["y"])
-    check("estimate counts every agent session", d["estimate"]["sessions"] == 9
-          and d["estimate"]["per_model"] == {"claude-sonnet-5-5": 7, "claude-opus-5-5": 1, "claude-haiku-4-5": 1}, d["estimate"])
+    mid = lambda n: n["y"] + (97 if n["type"] == "cluster" else 38) / 2   # noqa: E731   steps are centered on their row
+    check("templates go left to right on one line, parallel stages stacked, every step centered on the row", ship["dir"] == "lr"
+          and by["master"]["x"] < by["build"]["x"] < by["bugs"]["x"] == by["sec"]["x"] < by["cp2"]["x"] < by["ok"]["x"] < by["prod"]["x"] < by["done"]["x"]
+          and mid(by["bugs"]) < mid(by["master"]) < mid(by["sec"]) and max(abs(mid(by[k]) - mid(by["master"])) for k in ("build", "cp1", "cp2", "ok", "prod", "done")) <= 1,
+          {k: (v["x"], v["y"]) for k, v in by.items()})
+    check("estimate counts every agent session; the template is lean (no planning step, no Opus)", d["estimate"]["sessions"] == 6
+          and d["estimate"]["per_model"] == {"claude-sonnet-5-5": 5, "claude-haiku-4-5": 1}, d["estimate"])
     s, blank = call("/api/flows", {}, "POST")
     check("a blank flow says what's missing", any("cluster" in p for p in blank["problems"]), blank["problems"])
     two = {**blank["flow"], "nodes": blank["flow"]["nodes"] + [{"id": "done-2", "type": "done", "x": 0, "y": 0}],
@@ -214,7 +216,10 @@ try:
     merger = [c for c in calls if "merge reports" in c["flags"]["--append-system-prompt"]]
     check("3 reviewers + 1 merger, no lead (pass mode)", len(reviewers) == 3 and len(merger) == 1 and len(calls) == 4, len(calls))
     f0 = reviewers[0]["flags"]
-    check("reviewers are read-only", f0["--tools"] == "Read,Glob,Grep" and f0["--allowedTools"] == "Read,Glob,Grep"
+    check("teams that read files can look at pages (lithnode-shot on their PATH, told how), and run nothing else",
+          "lithnode-shot <file or URL>" in f0["--append-system-prompt"] and Path(hq_home, "bin", "lithnode-shot.cmd").exists()
+          and Path(hq_home, "bin", "lithnode-shot").read_text().startswith("#!/bin/sh"), f0["--append-system-prompt"][-600:])
+    check("reviewers are read-only", f0["--tools"] == "Read,Glob,Grep,Bash" and f0["--allowedTools"] == "Read,Glob,Grep,Bash(lithnode-shot:*)"
           and "--permission-mode" not in f0, f0)
     check("agents skip MCP servers, claude.ai connectors and the slash-command list (keeps prompts small)",
           all("--strict-mcp-config" in c["flags"] and c["flags"].get("--disallowedTools") == "mcp__*"
@@ -267,10 +272,10 @@ try:
     other = [c for c in calls if c not in team]
     f = team[0]["flags"] if team else {}
     check("a team with connectors loads them on demand", run["status"] == "done" and len(team) == 1
-          and f.get("--tools") == "Read,Glob,Grep,ToolSearch" and "--strict-mcp-config" not in f
+          and f.get("--tools") == "Read,Glob,Grep,Bash,ToolSearch" and "--strict-mcp-config" not in f
           and team[0]["connectors"] is None and team[0]["toolsearch"] == "true", (run["status"], f))
     check("only its own connector is allowed; every other server is blocked by name",
-          f.get("--allowedTools") == "Read,Glob,Grep,mcp__claude_ai_Vercel"
+          f.get("--allowedTools") == "Read,Glob,Grep,mcp__claude_ai_Vercel,Bash(lithnode-shot:*)"
           and set(f.get("--disallowedTools", "").split(",")) == {"mcp__claude_ai_Notion", "mcp__claude_ai_Broken"}, f)
     check("the agent is told which apps it has and to search narrowly",
           "Connected apps you can use: Vercel." in f.get("--append-system-prompt", "") and "Gone" not in f.get("--append-system-prompt", ""))
@@ -295,7 +300,7 @@ try:
     team = [c for c in agent_calls(n0) if "Reviewers" in c["flags"]["--append-system-prompt"]]
     f = team[0]["flags"] if team else {}
     check("a team with CLIs gets Bash, allowed only for those tools", run["status"] == "done"
-          and f.get("--tools") == "Read,Glob,Grep,Bash" and f.get("--allowedTools") == "Read,Glob,Grep,Bash(gh:*),Bash(vercel:*)", f)
+          and f.get("--tools") == "Read,Glob,Grep,Bash" and f.get("--allowedTools") == "Read,Glob,Grep,Bash(gh:*),Bash(vercel:*),Bash(lithnode-shot:*)", f)
     check("the agent is told which tools it may run", "Command-line tools you can run with Bash: gh, vercel." in f.get("--append-system-prompt", ""))
     check("a CLI that isn't installed is reported", "nothere isn't installed" in (run["nodes"]["rev"].get("note") or ""), run["nodes"]["rev"])
     for nd in tf["nodes"]:
@@ -417,7 +422,8 @@ try:
     check("an agent using a connector tool shows it as a readable step", "Store: create product" in up["agents"][0]["steps"], up["agents"][0]["steps"])
 
     # ---- run: the full chain with an approval gate and a webhook ping ----------------------------
-    ship["nodes"] = [{**n, "webhook": f"http://127.0.0.1:{HOOK}/ping"} if n["type"] == "approval" else n for n in ship["nodes"]]
+    ship["nodes"] = [{**n, "webhook": f"http://127.0.0.1:{HOOK}/ping"} if n["type"] == "approval"
+                     else {**n, "mode": "brief"} if n["type"] == "master" else n for n in ship["nodes"]]   # with the planning step on
     s, d = call(f"/api/flows/{ship['id']}", ship, "POST")
     check("ship-it saved with a webhook", s == 200, d)
     n0 = len(cli_calls())
@@ -434,12 +440,12 @@ try:
     build = [c for c in calls if '"Builders" stage' in c["flags"]["--append-system-prompt"]]
     bugs = [c for c in calls if '"Bug reviewers" stage' in c["flags"]["--append-system-prompt"]]
     sec = [c for c in calls if '"Security" stage' in c["flags"]["--append-system-prompt"]]
-    check("lead, builder, 3 bug reviewers, 2 security, 1 merger so far", (len(lead), len(build), len(bugs), len(sec), len(calls))
-          == (1, 1, 3, 2, 8), (len(lead), len(build), len(bugs), len(sec), len(calls)))
+    check("lead, builder, 2 bug reviewers, 1 security, 1 merger so far", (len(lead), len(build), len(bugs), len(sec), len(calls))
+          == (1, 1, 2, 1, 6), (len(lead), len(build), len(bugs), len(sec), len(calls)))
     bf = build[0]["flags"]
-    check("builder can edit (auto-accepted), with Opus and medium effort",
-          bf["--tools"] == "Read,Glob,Grep,Edit,Write" and bf["--permission-mode"] == "acceptEdits"
-          and bf["--model"] == "claude-opus-5-5" and bf["--effort"] == "medium", bf)
+    check("builder can edit (auto-accepted), with Sonnet and medium effort",
+          bf["--tools"] == "Read,Glob,Grep,Edit,Write,Bash" and bf["--allowedTools"] == "Read,Glob,Grep,Edit,Write,Bash(lithnode-shot:*)" and bf["--permission-mode"] == "acceptEdits"
+          and bf["--model"] == "claude-sonnet-5-5" and bf["--effort"] == "medium", bf)
     check("everyone after the lead gets its brief", all("# Brief from the lead\nlead report from" in c["prompt"] for c in build + bugs + sec))
     check("reviewers get the builder's report as handoff", all("## From Build done" in c["prompt"] and "Builders report from" in c["prompt"] for c in bugs + sec))
     # when Lithnode launched each agent and saw it finish (process start-up on a busy machine doesn't count)

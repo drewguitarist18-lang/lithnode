@@ -69,6 +69,8 @@ instructions never leave the server. Make your own bots with **Make a bot** at t
   A summarizing checkpoint (Haiku by default) shrinks big clusters further.
 - Agents skip your MCP connectors and the slash-command list. In testing this took each agent's starting context
   from about 218k tokens to about 10k.
+- Templates start lean: no planning step unless you switch it on, Sonnet to build, Haiku for checks and merges,
+  and only as many agents as each job needs. The flow designer is told to pick the cheapest model that fits.
 - The toolbar shows how many agents a flow will start. Each one uses your Claude plan like a normal session,
   so cheaper models (Haiku, Sonnet) and fewer agents go further.
 
@@ -79,6 +81,14 @@ in a fenced ` ```items ` JSON block, and Lithnode shows it as cards: photo, pric
 judges a list marks each card pass or cut with a reason; when several agents judge, one cut is enough. During a run
 the cards sit in a strip under the flow, and the result page has an **Items** section with "Copy as table". In
 *Split a big job*, the checker hands back one card per part, passed or cut.
+
+### Agents can look at what they make
+
+Teams that read or edit files get `lithnode-shot`, a command that takes a screenshot of a web page or HTML file
+(headless Edge or Chrome) and saves it under `.lithnode-shots/` in the project. The agent then opens the picture, so
+a builder can check its page and a checker can judge the real thing instead of only the code. For animations it
+freezes the frame at a moment you pick (`lithnode-shot ad.html 4`). Agents are told never to call visual work good
+without looking at it. Read-only teams can run this command and nothing else.
 
 ### Command-line tools
 
@@ -179,6 +189,7 @@ reports are kept.
 - `office_feed.py`: the Office's session list (hook sessions plus flow agents).
 - `claude_code.py`: finding Claude Code, signing in, and checking which connectors and CLIs are available.
 - `engines.py`: the Codex and Cursor engines: finding them, sign-in, models, command lines and their live output.
+- `shot.py`: `lithnode-shot`, the screenshot command agents use to look at pages and HTML they make or check.
 - `static/`:
   - pages: `shell.html` (tabs), `flows.html`, `office.html`
   - shared: `sprites.js` (pixel art) and `ui.js` (styled dialogs and right-click menus)

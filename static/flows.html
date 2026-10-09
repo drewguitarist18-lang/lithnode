@@ -49,7 +49,24 @@
   .grow { flex: 1; }
   #saved { color: var(--muted); font-size: 12px; min-width: 56px; }
 
-  main { display: grid; grid-template-columns: 240px 1fr 350px; min-height: 0; }
+  main { display: grid; grid-template-columns: 240px 1fr 350px; min-height: 0; transition: grid-template-columns .25s ease; }
+  main.running { grid-template-columns: 0 1fr 350px; }   /* building blocks aren't needed while a run goes */
+  main.running #palette { visibility: hidden; }
+  /* the run's steps, live, in the side panel */
+  .runsteps { display: grid; gap: 2px; margin: 2px 0 12px; }
+  .runsteps button { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; text-align: left;
+                  padding: 7px 8px; border: 0; border-radius: 9px; background: transparent; color: var(--ink); font-size: 12.5px; }
+  .runsteps button:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .runsteps .rs-dot { width: 10px; height: 10px; border-radius: 50%; justify-self: center; background: color-mix(in srgb, var(--waiting) 55%, transparent); }
+  .runsteps .rs-dot.running { background: var(--running); animation: agent-pulse 1.1s ease-in-out infinite; }
+  .runsteps .rs-dot.done { background: var(--done); } .runsteps .rs-dot.failed { background: var(--failed); } .runsteps .rs-dot.approval { background: var(--approval); }
+  .runsteps .rs-name { min-width: 0; }
+  .runsteps .rs-name b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .runsteps .rs-name small { display: block; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .runsteps .rs-name small.live { color: var(--running); font-family: ui-monospace, Consolas, monospace; }
+  .runsteps .rs-time { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .runsteps .waiting { opacity: .6; }
+  .rp-top .meta .mono { font-family: ui-monospace, Consolas, monospace; }
   /* palette */
   .palette { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 14px 12px;
              display: flex; flex-direction: column; gap: 16px; }
@@ -144,58 +161,69 @@
   #wires .cut:hover path { stroke: #fff; }
   #wires path.temp { stroke: var(--accent); stroke-dasharray: 6 5; }
   @keyframes flow { to { stroke-dashoffset: -14; } }
-  .node { position: absolute; width: 214px; background: var(--pad); border: 1.5px solid var(--line); border-radius: 14px;
-          box-shadow: 0 6px 18px var(--shadow); user-select: none; cursor: move; }
-  .node.sel { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent), 0 6px 18px var(--shadow); }
-  .node .head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
-  .node .head canvas { width: 44px; height: 33px; flex: none; }
-  .node .ttl { min-width: 0; }
-  .node .ttl b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .node .ttl small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
-  .node .body { padding: 0 12px 10px; font-size: 12px; color: var(--muted); }
-  .node .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .node .job { color: var(--ink); margin-top: 3px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .node .job.empty { color: var(--approval); }
-  .node .sk { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; color: #fff; }
-  .node .dots { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
-  .node .dots i { width: 10px; height: 10px; border-radius: 3px; background: var(--waiting); }
-  .node .step { margin-top: 5px; color: var(--ink); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* nodes: teams are cards, every other step is a pill */
+  .node { position: absolute; background: var(--pad); border: 1px solid var(--line); color: var(--ink); user-select: none; cursor: move;
+          box-shadow: 0 1px 2px var(--shadow), 0 10px 28px -14px var(--shadow); transition: border-color .2s, box-shadow .2s, opacity .3s; }
+  .node:hover { border-color: color-mix(in srgb, var(--ink) 24%, var(--line)); }
+  .node.nd-team { width: 248px; border-radius: 14px; }
+  .node.nd-step { height: 38px; border-radius: 999px; display: flex; align-items: center; gap: 8px; padding: 0 16px 0 12px; max-width: 230px;
+               font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .node.nd-step .pico { width: 18px; height: 18px; flex: none; color: var(--muted); display: grid; place-items: center; }
+  .node.nd-step .pico svg { width: 18px; height: 18px; }
+  .node.nd-step.approval .pico { color: var(--approval); }
+  .node.nd-step .pname { overflow: hidden; text-overflow: ellipsis; }
+  .node.nd-step .pstate { font-size: 11.5px; font-weight: 500; color: var(--muted); }
+  .node.nd-step .pstate:empty { display: none; }
+  .node .hd { display: flex; align-items: center; gap: 11px; padding: 12px 12px 11px; }
+  .node .ntile { width: 38px; height: 38px; border-radius: 10px; flex: none; display: grid; place-items: center; position: relative;
+                background: color-mix(in srgb, var(--tc) 17%, var(--pad)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 24%, transparent); }
+  .node .ntile canvas { width: 30px; height: 22.5px; image-rendering: pixelated; }
+  .node .ntile .ok { position: absolute; right: -5px; bottom: -5px; width: 17px; height: 17px; border-radius: 50%; display: none; place-items: center;
+                    background: var(--done); color: #fff; box-shadow: 0 0 0 2px var(--pad); }
+  .node .ntile .ok svg { width: 11px; height: 11px; }
+  .node.st-done .ntile .ok { display: grid; }
+  .node .tt { min-width: 0; flex: 1; }
+  .node .nm { font-size: 14px; font-weight: 650; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .jb { font-size: 12px; line-height: 1.4; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .jb.live { color: var(--running); font: 500 11.5px/1.4 ui-monospace, Consolas, monospace; }
+  .node .jb.warn { color: var(--approval); }
+  .node .jb.err { color: var(--failed); }
+  .node .jb .y { color: var(--done); font-weight: 600; } .node .jb .n { color: var(--failed); font-weight: 600; }
+  .node .ft { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
+  .node .ag { display: flex; flex: none; }
+  .node .ag i { width: 12px; height: 12px; border-radius: 50%; background: color-mix(in srgb, var(--tc) 70%, var(--pad)); box-shadow: 0 0 0 2px var(--pad); }
+  .node .ag i + i { margin-left: -3px; }
+  .node .ag i.wait { background: color-mix(in srgb, var(--waiting) 55%, var(--pad)); }
+  .node .ag i.run { background: var(--running); animation: agent-pulse 1.1s ease-in-out infinite; }
+  .node .ag i.done { background: var(--done); } .node .ag i.fail { background: var(--failed); }
+  @keyframes agent-pulse { 50% { box-shadow: 0 0 0 2px var(--pad), 0 0 0 4px color-mix(in srgb, var(--running) 35%, transparent); } }
+  .node .how { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .tools { display: flex; align-items: center; gap: 7px; flex: none; color: var(--muted); }
+  .node .tools svg { width: 14px; height: 14px; display: block; }
+  .node .tools img { width: 14px; height: 14px; border-radius: 3px; display: block; }
+  .node .mdl { flex: none; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; color: var(--muted);
+               background: color-mix(in srgb, var(--ink) 7%, transparent); font-variant-numeric: tabular-nums; }
+  /* states while a run goes */
+  .node.st-running { border-color: var(--running); box-shadow: 0 0 0 3px color-mix(in srgb, var(--running) 20%, transparent), 0 10px 28px -12px color-mix(in srgb, var(--running) 45%, transparent); }
+  .node.st-done { border-color: color-mix(in srgb, var(--done) 65%, var(--line)); }
+  .node.st-failed { border-color: var(--failed); box-shadow: 0 0 0 3px color-mix(in srgb, var(--failed) 16%, transparent); }
+  .node.st-approval { border-color: var(--approval); animation: pulse 1.4s ease-in-out infinite; }
+  .node.st-approval .pstate { color: var(--approval); font-weight: 600; }
+  .node.st-waiting { opacity: .62; }
+  .node.st-skipped, .node.st-stopped { opacity: .45; }
+  .node.nd-step.st-done .pico { color: var(--done); }
+  .node.nd-step.st-running .pico { color: var(--running); }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--approval) 22%, transparent), 0 10px 28px -14px var(--shadow); } }
+  .node.sel { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent), 0 10px 28px -14px var(--shadow); }
   .node .x { position: absolute; top: -10px; left: -10px; width: 22px; height: 22px; border-radius: 50%; padding: 0;
              display: none; place-items: center; font-size: 12px; line-height: 1; background: var(--pad); border: 1.5px solid var(--line); color: var(--muted); z-index: 2; }
   .node:hover .x, .node.sel .x { display: grid; }
   .node .x:hover { background: var(--failed); border-color: var(--failed); color: #fff; }
   .locked .node .x { display: none !important; }
-  .node .badge { position: absolute; top: -9px; right: 10px; font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
-                 color: #fff; background: var(--waiting); text-transform: uppercase; letter-spacing: .4px; }
-  .node.st-running { border-color: var(--running); } .node.st-running .badge { background: var(--running); }
-  .node.st-done { border-color: var(--done); } .node.st-done .badge { background: var(--done); }
-  .node.st-failed { border-color: var(--failed); } .node.st-failed .badge { background: var(--failed); }
-  .node.st-approval { border-color: var(--approval); animation: pulse 1.2s ease-in-out infinite; } .node.st-approval .badge { background: var(--approval); }
-  .node.st-skipped, .node.st-stopped { opacity: .55; }
-  @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--approval) 30%, transparent), 0 6px 18px var(--shadow); } }
-  /* a working team glows, like the ad */
-  .node.st-running { animation: glow 1.6s ease-in-out infinite; }
-  @keyframes glow { 0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--running) 40%, transparent), 0 0 18px color-mix(in srgb, var(--running) 30%, transparent); }
-                    50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--running) 60%, transparent), 0 0 34px color-mix(in srgb, var(--running) 45%, transparent); } }
-  /* what the agent is doing right now, floating above its node */
-  .node .bubble { position: absolute; bottom: calc(100% + 16px); left: 50%; transform: translateX(-50%); display: none; max-width: 280px;
-                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 5px 12px; border-radius: 999px;
-                  font: 600 11.5px/1.3 ui-monospace, Consolas, monospace; color: #170a05; background: var(--running);
-                  box-shadow: 0 0 16px color-mix(in srgb, var(--running) 55%, transparent); pointer-events: none; z-index: 3; }
-  .node .bubble::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px; border: 6px solid transparent; border-top-color: inherit; }
-  .node.st-running .bubble, .node.st-approval .bubble { display: block; }
-  .node.st-running .bubble { border-top-color: var(--running); animation: bubble-in .25s ease-out; }
-  .node .bubble.conn { background: #95bf47; border-top-color: #95bf47; box-shadow: 0 0 16px rgba(149,191,71,.55); color: #10200a; }
-  .node.st-approval .bubble { background: var(--approval); border-top-color: var(--approval); box-shadow: 0 0 16px color-mix(in srgb, var(--approval) 55%, transparent); }
-  @keyframes bubble-in { from { opacity: 0; transform: translate(-50%, 6px); } }
-  /* connector chips in a node's header */
-  .node .conns { margin-left: auto; display: flex; gap: 4px; flex: none; align-self: flex-start; margin-top: 2px; }
   .chipc { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; padding: 2px 7px 2px 3px; border-radius: 999px;
            background: color-mix(in srgb, var(--c) 16%, transparent); color: color-mix(in srgb, var(--c) 85%, var(--ink)); }
   .cico { width: 15px; height: 15px; border-radius: 4px; display: inline-grid; place-items: center; font: 800 9px/1 system-ui; font-style: normal;
           background: var(--c); color: #111; flex: none; }
-  .node .icount { margin-top: 5px; font-size: 11.5px; font-weight: 600; color: var(--ink); }
-  .node .icount .y { color: var(--done); } .node .icount .n { color: var(--failed); }
   /* the items tray: what the teams found, and how they judged it */
   #tray { position: absolute; left: 12px; right: 12px; bottom: 52px; z-index: 4; display: none;
           background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 16px;
@@ -253,6 +281,35 @@
   .switch.conn .cico { width: 22px; height: 22px; border-radius: 6px; font-size: 11px; }
   .cico.cli { background: #1d1f24; color: #9ece6a; font-family: ui-monospace, Consolas, monospace; box-shadow: inset 0 0 0 1px #3a3d45; }
   .cico svg { width: 72%; height: 72%; display: block; }
+  /* toggle chips: connectors and command-line tools, many to a row */
+  .tchips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tchip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border-radius: 999px; cursor: pointer;
+           border: 1px solid var(--line); background: var(--pad); font-size: 12px; font-weight: 500; color: var(--muted); user-select: none;
+           transition: border-color .15s, background .15s, color .15s; }
+  .tchip:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 22%, var(--line)); }
+  .tchip input { position: absolute; opacity: 0; pointer-events: none; }
+  .tchip:has(input:checked) { color: var(--ink); border-color: color-mix(in srgb, var(--done) 55%, var(--line)); background: color-mix(in srgb, var(--done) 10%, var(--pad)); }
+  .tchip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tchip .cico { width: 20px; height: 20px; border-radius: 6px; }
+  .tchip .tick { width: 12px; height: 12px; color: var(--done); display: none; }
+  .tchip:has(input:checked) .tick { display: block; }
+  .tchip.missing { opacity: .5; }
+  .tchip.add { padding: 4px 10px; border-style: dashed; }
+  .slabel { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--ink); }
+  .slabel a, .slabel span { font-weight: 500; font-size: 11.5px; color: var(--muted); }
+  /* which engine a team runs on: a compact switch with each engine's mark */
+  .eseg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 11px; }
+  .eseg button { display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; background: transparent; padding: 6px 4px; border-radius: 8px;
+                 font-size: 12.5px; color: var(--muted); white-space: nowrap; min-width: 0; }
+  .eseg button:hover { color: var(--ink); background: transparent; }
+  .eseg button.on { background: var(--pad); color: var(--ink); font-weight: 600; box-shadow: 0 1px 4px var(--shadow); outline: 1px solid var(--line); }
+  .eseg button.off { opacity: .5; }
+  .eseg .eico { width: 18px; height: 18px; border-radius: 5px; }
+  .eseg .eico canvas { width: 14px; height: 10.5px; }
+  .estat { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+  .estat i { width: 7px; height: 7px; border-radius: 50%; background: var(--done); flex: none; }
+  .estat i.bad { background: var(--approval); }
+  .estat a { margin-left: auto; }
   .engines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .engines button { display: grid; justify-items: start; gap: 3px; text-align: left; padding: 9px 10px; border-radius: 10px;
                      font-size: 12.5px; font-weight: 700; white-space: nowrap; min-width: 0; }
@@ -271,13 +328,14 @@
            background: color-mix(in srgb, var(--approval) 8%, var(--pad)); border: 1px solid color-mix(in srgb, var(--approval) 30%, var(--line)); }
   .cliadd { display: flex; gap: 6px; margin-top: 8px; }
   .cliadd input { flex: 1; min-width: 0; font-family: ui-monospace, Consolas, monospace; }
-  .port { position: absolute; top: 26px; width: 16px; height: 16px; border-radius: 50%; background: var(--pad);
-          border: 2.5px solid var(--wire); cursor: crosshair; }
-  .port:hover, .port.hot { border-color: var(--accent); background: var(--accent); }
-  .port.in { left: -9px; } .port.out { right: -9px; }
+  .port { position: absolute; top: calc(50% - 7px); width: 14px; height: 14px; border-radius: 50%; background: var(--pad);
+          border: 2px solid var(--wire); cursor: crosshair; transition: transform .15s, border-color .15s, background .15s; }
+  .node:hover .port { border-color: color-mix(in srgb, var(--ink) 40%, var(--wire)); }
+  .port:hover, .port.hot { border-color: var(--accent); background: var(--accent); transform: scale(1.25); }
+  .port.in { left: -8px; } .port.out { right: -8px; }
   .vertical .port { top: auto; }
-  .vertical .port.in { top: -9px; left: calc(50% - 8px); }
-  .vertical .port.out { bottom: -9px; right: auto; left: calc(50% - 8px); }
+  .vertical .port.in { top: -8px; left: calc(50% - 7px); }
+  .vertical .port.out { bottom: -8px; right: auto; left: calc(50% - 7px); }
   .locked .port { display: none; }
   .locked .node { cursor: pointer; }
   #banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--pad); border: 1px solid var(--line);
@@ -975,6 +1033,33 @@ function toWorld(cx, cy) {
   const r = $("canvas").getBoundingClientRect();
   return { x: (cx - r.left - view.x) / view.k, y: (cy - r.top - view.y) / view.k };
 }
+// during a run, glide the view to whatever is working or waiting for you, if it's off screen
+let lastActive = "", glide = 0;
+function panTo(cx, cy) {
+  const r = $("canvas").getBoundingClientRect(), from = { x: view.x, y: view.y };
+  const to = { x: r.width / 2 - cx * view.k, y: (r.height - (($("tray") && $("tray").classList.contains("show")) ? $("tray").offsetHeight : 0)) / 2 - cy * view.k };
+  const t0 = performance.now(); cancelAnimationFrame(glide);
+  const step = (now) => { const p = Math.min(1, (now - t0) / 450), e = 1 - Math.pow(1 - p, 3);
+    view.x = from.x + (to.x - from.x) * e; view.y = from.y + (to.y - from.y) * e; applyView(); if (p < 1) glide = requestAnimationFrame(step); };
+  glide = requestAnimationFrame(step);
+}
+function followNode(id) {
+  const e = els[id], n = nodeById(id); if (!e || !n) return;
+  panTo(n.x + e.el.offsetWidth / 2, n.y + e.el.offsetHeight / 2);
+}
+function followActive() {
+  const active = run.flow.nodes.filter((n) => ["running", "approval"].includes((run.nodes[n.id] || {}).status));
+  const key = active.map((n) => n.id).join(",");
+  if (!active.length || key === lastActive) return;
+  lastActive = key;
+  const r = $("canvas").getBoundingClientRect();
+  const box = active.reduce((b, n) => { const e = els[n.id]; if (!e) return b; const w = e.el.offsetWidth, h = e.el.offsetHeight;
+    return { x0: Math.min(b.x0, n.x), y0: Math.min(b.y0, n.y), x1: Math.max(b.x1, n.x + w), y1: Math.max(b.y1, n.y + h) }; }, { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 });
+  if (box.x0 > box.x1) return;
+  const sx0 = box.x0 * view.k + view.x, sx1 = box.x1 * view.k + view.x, sy0 = box.y0 * view.k + view.y, sy1 = box.y1 * view.k + view.y;
+  if (sx0 >= 40 && sx1 <= r.width - 40 && sy0 >= 60 && sy1 <= r.height - 60) return;   // already in view: leave the camera alone
+  panTo((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2);
+}
 function applyView() { $("world").style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`; }
 function zoomAt(cx, cy, k) {
   const r = $("canvas").getBoundingClientRect(), before = toWorld(cx, cy);
@@ -1010,9 +1095,15 @@ function tidy(direction) {   // arrange now and keep auto-arranging
   flow.auto = true;
   changed(); autoFit = true; fit();
 }
+const TEAM_W = 248;
+function nodeSize(n) {   // the real size once drawn; the server's numbers before that
+  const el = els[n.id] && els[n.id].el;
+  if (el && el.offsetWidth) return { w: el.offsetWidth, h: el.offsetHeight };
+  return n.type === "cluster" ? { w: TEAM_W, h: 97 } : { w: 120, h: 38 };
+}
 function layoutFlow(direction) {   // same rules as the server's flows._layout
   flow.dir = direction;
-  const WRAP = 5, STACK = 3, edges = flow.edges;
+  const WRAP = 5, STACK = 3, COL_GAP = 84, ROW_H = 150, MAX_ROW_W = 2100, edges = flow.edges;
   const wired = new Set(edges.flatMap((e) => [e.from, e.to]));
   const loose = flow.nodes.filter((n) => !wired.has(n.id) && n.type !== "master");
   const main = flow.nodes.filter((n) => wired.has(n.id) || n.type === "master");
@@ -1034,15 +1125,29 @@ function layoutFlow(direction) {   // same rules as the server's flows._layout
     loose.forEach((n, i) => { n.x = 60 + (i % WRAP) * 250; n.y = y + 60 + Math.floor(i / WRAP) * 170; });
     return;
   }
-  let top = 80;
-  const perRow = stacks.length === WRAP + 1 ? WRAP + 1 : WRAP;   // never leave one step alone on a new row
-  for (let start = 0; start < stacks.length; start += perRow) {
-    const row = stacks.slice(start, start + perRow), tallest = Math.max(...row.map((s) => s.length));
-    const middle = top + (tallest - 1) * 170 / 2;
-    row.forEach((stack, col) => stack.forEach((n, i) => { n.x = 60 + col * 270; n.y = Math.round(middle + (i - (stack.length - 1) / 2) * 170); }));
-    top += tallest * 170 + 90;
+  const colW = (stack) => Math.max(...stack.map((n) => nodeSize(n).w));   // each column as wide as what's in it
+  const rows = []; let cur = [], width = 0;
+  for (const stack of stacks) {   // wrap onto a new row once a row gets too wide
+    if (cur.length && width + colW(stack) > MAX_ROW_W) { rows.push(cur); cur = []; width = 0; }
+    cur.push(stack); width += colW(stack) + COL_GAP;
   }
-  loose.forEach((n, i) => { n.x = 60 + (i % WRAP) * 270; n.y = top + 40 + Math.floor(i / WRAP) * 170; });   // not wired yet: a row underneath
+  if (cur.length) rows.push(cur);
+  if (rows.length > 1 && rows[rows.length - 1].length === 1) rows[rows.length - 2].push(rows.pop()[0]);   // never leave one step alone
+  let top = 80;
+  for (const row of rows) {
+    const tallest = Math.max(...row.map((s) => s.length)), middle = top + (tallest - 1) * ROW_H / 2;
+    let x = 60;
+    for (const stack of row) {
+      const cw = colW(stack);
+      stack.forEach((n, i) => {   // centered in its column and on its row
+        const { w, h } = nodeSize(n), cy = middle + (i - (stack.length - 1) / 2) * ROW_H;
+        n.x = Math.round(x + (cw - w) / 2); n.y = Math.round(cy - h / 2);
+      });
+      x += cw + COL_GAP;
+    }
+    top += tallest * ROW_H + 90;
+  }
+  loose.forEach((n, i) => { n.x = 60 + (i % WRAP) * (TEAM_W + COL_GAP); n.y = top + 40 + Math.floor(i / WRAP) * 170; });   // not wired yet: a row underneath
 }
 $("zAuto").onclick = () => {
   if (flow.auto !== false) { flow.auto = false; changed(false); toast("Auto-arrange is off. Place nodes wherever you like."); }
@@ -1054,6 +1159,8 @@ $("canvas").addEventListener("wheel", (e) => { e.preventDefault(); autoFit = fal
 // ------------------------------------------------------------------ rendering
 function renderAll() {
   $("canvas").classList.toggle("locked", locked());
+  document.querySelector("main").classList.toggle("running", locked());
+  if (run) followActive();
   $("canvas").classList.toggle("vertical", vertical());
   const doneTile = document.querySelector('.tile[data-type="done"]'), hasDone = !locked() && flow.nodes.some((x) => x.type === "done");
   doneTile.classList.toggle("used", hasDone);
@@ -1068,78 +1175,109 @@ function renderAll() {
 
 function nodeState(id) { return run ? (run.nodes[id] || { status: "waiting", agents: [] }) : null; }
 
-function nodeInfo(n) {
-  const st = nodeState(n.id);
-  let lines = [], job = "";
-  if (n.type === "cluster") {
-    lines.push(`${n.count} × ${teamModel(n)}` + (n.split && n.count > 1 ? ` · split ${n.count} ways` : ""));
-    // what this team does: your own job if you wrote one, else the bot's
-    const base = bots.find((b) => b.id === n.bot);
-    job = (n.instructions || "").trim().replace(/\s+/g, " ") || (base ? base.tagline || "" : "");
-  } else if (n.type === "master") {
-    lines.push(n.mode === "pass" ? "Your task goes in here" : `Writes a plan first · ${modelLabel(n.model)}`);
-  } else if (n.type === "checkpoint") {
-    lines.push(n.mode === "summarize" ? `Waits, then summarizes · ${modelLabel(n.model)}` : "Waits for everything before it");
-  } else if (n.type === "approval") {
-    lines.push(n.webhook ? "Pauses and pings your webhook" : "Pauses until you approve");
-  } else lines.push("Final result lands here");
-  let html = lines.map((l) => `<div class="line">${esc(l)}</div>`).join("");
-  if (n.type === "cluster") html += job ? `<div class="job">${esc(job)}</div>` : `<div class="job empty">No job yet: click to set one</div>`;
-  if (st) {
-    if (st.agents.length) {
-      html += `<div class="dots">${st.agents.map((a) => `<i title="${esc(a.name)}: ${esc(a.status)}" style="background:${{ running: theme.running, done: theme.done, failed: theme.failed }[a.status] || theme.waiting}"></i>`).join("")}</div>`;
-      const busy = st.agents.find((a) => a.status === "running");
-      if (busy) html += `<div class="step">${esc(busy.step || "Thinking…")}</div>`;
-    }
-    if (st.status === "approval") html += `<div class="step">Waiting for you</div>`;
-    const its = st.items || [];
-    if (its.length) {
-      const y = its.filter((i) => i.verdict === "pass").length, no = its.filter((i) => i.verdict === "cut").length;
-      html += `<div class="icount">${y || no ? `<span class="y">${y} ✓</span> · <span class="n">${no} ✕</span>` : `${its.length} item${its.length === 1 ? "" : "s"} found`}</div>`;
-    }
-    if (st.error) html += `<div class="step" style="color:var(--failed)">${esc(st.error)}</div>`;
+// ---- nodes: a team is a card (who, what it does, how it works), every other step is a pill
+const SVG = (d, w = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  read: SVG('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
+  web: SVG('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
+  edit: SVG('<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
+  run: SVG('<path d="M5 7l5 5-5 5M12 18h7"/>'),
+  plug: SVG('<path d="M9 3v4M15 3v4M7 7h10v3a5 5 0 0 1-10 0zM12 15v6"/>'),
+  play: SVG('<path d="M8 5.5v13l10.5-6.5z"/>'),
+  flag: SVG('<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>'),
+  hand: SVG('<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12M11 11V4.5a1.5 1.5 0 0 1 3 0V12M14 11.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3.5 13a1.6 1.6 0 0 1 2.6-1.8L8 13"/>'),
+  merge: SVG('<circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M6 8.2v7.6M8 6.6c5 .5 7.6 2.4 8 4M8 17.4c5-.5 7.6-2.4 8-4"/>'),
+  check: SVG('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 2.6),
+};
+const PILL_ICON = { master: "play", done: "flag", approval: "hand", checkpoint: "merge" };
+const mmss = (s) => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+// one line, written for a person: your summary, else the first real sentence of the job, else the bot's tagline
+function summaryOf(n) {
+  if (n.summary) return n.summary;
+  const job = (n.instructions || "").trim().replace(/\s+/g, " ");
+  if (job) {
+    const parts = job.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const real = parts.find((x) => !/^you are\b/i.test(x)) || parts[0];
+    return real.replace(/[.!]$/, "");
   }
-  return html;
+  const base = bots.find((b) => b.id === n.bot);
+  return base ? base.tagline || "" : "";
 }
-
+function toolIcons(n) {
+  const out = [], t = n.tools;
+  if (engineOf(n) !== "claude") out.push(`<img src="/static/engine-${engineOf(n)}.png" alt="" title="Runs on ${ENGINE_NAME[engineOf(n)]}" style="${engineOf(n) === "codex" ? "background:#161616;padding:2px" : ""}">`);
+  if (t === "read" || t === "research") out.push(`<span title="Reads files">${ICON.read}</span>`);
+  if (t === "web" || t === "research") out.push(`<span title="Searches the web">${ICON.web}</span>`);
+  if (t === "edit") out.push(`<span title="Edits files">${ICON.edit}</span>`);
+  if (t === "full" || (n.clis || []).length) out.push(`<span title="${t === "full" ? "Runs any command" : "Runs " + n.clis.join(", ")}">${ICON.run}</span>`);
+  if ((n.connectors || []).length) out.push(`<span title="${esc(n.connectors.map(connName).join(", "))}">${ICON.plug}</span>`);
+  return out.length ? `<span class="tools">${out.join("")}</span>` : "";
+}
+function teamText(n) {   // [title html, footer html] for a team card, at rest or mid-run
+  const st = nodeState(n.id), count = n.count || 1;
+  const how = count < 2 ? "1 agent" : n.split ? `${count} · split ${count} ways` : n.tools === "edit" || n.tools === "full" ? `${count} · take turns` : `${count} · side by side`;
+  const model = `<span class="mdl">${esc(engineOf(n) === "claude" ? modelLabel(n.model).replace(/^Claude /, "") : (n.engine_model ? teamModel(n).split(" · ")[1] : ENGINE_NAME[engineOf(n)]))}</span>`;
+  const sum = summaryOf(n);
+  let job = sum ? `<div class="jb" title="${esc(sum)}">${esc(sum)}</div>` : `<div class="jb warn">Click to give this team a job</div>`;
+  let dots = Array.from({ length: Math.min(count, 6) }, () => "<i></i>").join(""), foot = `<span class="how">${esc(how)}</span>${toolIcons(n)}${model}`;
+  if (st) {
+    const ag = st.agents || [], running = ag.find((a) => a.status === "running");
+    dots = Array.from({ length: Math.min(count, 6) }, (_, i) => {
+      const a = ag[i]; return `<i class="${!a ? "wait" : { running: "run", done: "done", failed: "fail" }[a.status] || "wait"}" title="${esc(a ? a.name + ": " + a.status : "Waiting")}"></i>`;
+    }).join("");
+    const doneN = ag.filter((a) => a.status === "done").length;
+    const took = st.started ? mmss(((st.ended || Date.now() / 1000)) - st.started) : "";
+    if (st.status === "running") {
+      job = `<div class="jb live" title="${esc(running ? running.step : "")}">${esc((running && running.step) || "Starting up")}</div>`;
+      foot = `<span class="how">${count > 1 ? `${doneN} of ${count} done` : "Working"}</span><span class="mdl">${took}</span>`;
+    } else if (st.status === "done") {
+      const its = st.items || [], y = its.filter((i) => i.verdict === "pass").length, no = its.filter((i) => i.verdict === "cut").length;
+      if (its.length) job = `<div class="jb">${y || no ? `<span class="y">${y} passed</span> · <span class="n">${no} cut</span>` : `${its.length} found`}</div>`;
+      foot = `<span class="how">Done</span><span class="mdl">${took}</span>`;
+    } else if (st.status === "failed") {
+      job = `<div class="jb err" title="${esc(st.error || "")}">${esc(st.error || "Didn't finish")}</div>`;
+      foot = `<span class="how">Failed</span><span class="mdl">${took}</span>`;
+    } else if (st.status === "skipped" || st.status === "stopped") {
+      foot = `<span class="how">${st.status === "skipped" ? "Skipped" : "Stopped"}</span>`;
+    }
+  }
+  return [`<div class="nm">${esc(n.name)}</div>${job}`, `<span class="ag">${dots}</span>${foot}`];
+}
+function pillState(n) {
+  const st = nodeState(n.id); if (!st) return "";
+  return { approval: "Needs you", running: n.type === "checkpoint" ? "Merging" : n.type === "master" ? "Planning" : "", failed: "Failed" }[st.status] || "";
+}
 function renderNodes() {
   const nodes = shown().nodes, world = $("world");
   for (const id of Object.keys(els)) if (!nodes.some((n) => n.id === id)) { els[id].el.remove(); delete els[id]; }
   for (const n of nodes) {
     let e = els[n.id];
+    const team = n.type === "cluster";
     if (!e) {
       const el = document.createElement("div");
-      el.className = "node"; el.dataset.id = n.id;
-      el.innerHTML = (n.type !== "master" ? '<button class="x" data-del title="Delete node">✕</button>' : "")
-        + `<span class="badge"></span><span class="bubble"></span><div class="head"><canvas width="132" height="99"></canvas><div class="ttl"><b></b><small></small></div><div class="conns"></div></div><div class="body"></div>`
+      el.dataset.id = n.id;
+      el.innerHTML = (n.type !== "master" ? '<button class="x" data-del title="Delete node" aria-label="Delete node">✕</button>' : "")
+        + (team ? `<div class="hd"><div class="ntile"><canvas width="72" height="54"></canvas><span class="ok">${ICON.check}</span></div><div class="tt"></div></div><div class="ft"></div>`
+                : `<span class="pico">${ICON[PILL_ICON[n.type]]}</span><span class="pname"></span><span class="pstate"></span>`)
         + (n.type !== "master" ? '<div class="port in" data-port="in"></div>' : "")
         + (n.type !== "done" ? '<div class="port out" data-port="out"></div>' : "");
       world.appendChild(el);
-      e = els[n.id] = { el, cv: el.querySelector("canvas"), info: "" };
+      e = els[n.id] = { el, cv: el.querySelector("canvas"), tt: "", ft: "" };
     }
     e.el.style.left = n.x + "px"; e.el.style.top = n.y + "px";
-    e.el.querySelector(".ttl b").textContent = n.name;
-    e.el.querySelector(".ttl small").textContent = TYPE_LABEL[n.type];
-    const html = nodeInfo(n);
-    if (html !== e.info) { e.el.querySelector(".body").innerHTML = html; e.info = html; }
-    const tags = [...(n.type === "cluster" && engineOf(n) !== "claude" ? [`<span class="chipc" style="--c:#cfcfcf" title="Runs on ${ENGINE_NAME[engineOf(n)]}">${engineIcon(engineOf(n))}${ENGINE_NAME[engineOf(n)]}</span>`] : []),
-                  ...(n.connectors || []).map((id) => { const c = connLook(id); return `<span class="chipc" style="--c:${c.color}" title="${esc(c.name)} connector">${connIcon(id)}${esc(c.name)}</span>`; }),
-                  ...(n.clis || []).map((id) => `<span class="chipc" style="--c:#9ece6a" title="${esc(id)} command-line tool">${cliIcon(id)}${esc(id)}</span>`)];
-    const conns = tags.slice(0, 2).join("") + (tags.length > 2 ? `<span class="chipc" style="--c:#8d8d8d">+${tags.length - 2}</span>` : "");
-    if (conns !== e.conns) { e.el.querySelector(".conns").innerHTML = conns; e.conns = conns; }
     const st = nodeState(n.id);
-    const bub = e.el.querySelector(".bubble");
-    if (st && st.status === "running") {
-      const busy = st.agents.find((a) => a.status === "running"), step = (busy && busy.step) || "Starting up";
-      const viaConn = (n.connectors || []).some((id) => step.toLowerCase().startsWith(connName(id).toLowerCase() + ":"))
-        || (n.clis || []).some((id) => step.startsWith(`Running: ${id} `) || step === `Running: ${id}`);
-      if (bub.textContent !== step) { bub.textContent = step; bub.style.animation = "none"; void bub.offsetWidth; bub.style.animation = ""; }
-      bub.classList.toggle("conn", viaConn);
-    } else if (st && st.status === "approval") { bub.textContent = "Needs you: approve on the right"; bub.classList.remove("conn"); }
-    e.el.className = "node" + (sel && sel.kind === "node" && sel.id === n.id ? " sel" : "") + (st ? " st-" + st.status : "");
-    const b = e.el.querySelector(".badge");
-    b.style.display = st ? "" : "none";
-    if (st) b.textContent = { approval: "needs you", running: "running", done: "done", failed: "failed", skipped: "skipped", stopped: "stopped", waiting: "waiting" }[st.status] || st.status;
+    if (team) {
+      e.el.style.setProperty("--tc", n.color || "#D97757");
+      const [tt, ft] = teamText(n);
+      if (tt !== e.tt) { e.el.querySelector(".tt").innerHTML = tt; e.tt = tt; }
+      if (ft !== e.ft) { e.el.querySelector(".ft").innerHTML = ft; e.ft = ft; }
+    } else {
+      e.el.querySelector(".pname").textContent = n.name;
+      e.el.querySelector(".pstate").textContent = pillState(n);
+      e.el.title = { master: n.mode === "pass" ? "Start: your task goes in here" : "Start: writes a plan first", done: "Done: the final result lands here",
+                     approval: "Approval: pauses until you say go", checkpoint: n.mode === "summarize" ? "Checkpoint: merges reports into one" : "Checkpoint: waits for everything before it" }[n.type] || "";
+    }
+    e.el.className = "node " + (team ? "nd-team" : "nd-step " + n.type) + (sel && sel.kind === "node" && sel.id === n.id ? " sel" : "") + (st ? " st-" + st.status : "");
   }
 }
 
@@ -1148,7 +1286,7 @@ function portPos(id, side) {
   const e = els[id]; if (!e) return { x: 0, y: 0 };
   const n = nodeById(id);
   if (vertical()) return { x: n.x + e.el.offsetWidth / 2, y: n.y + (side === "out" ? e.el.offsetHeight : 0) };
-  return { x: n.x + (side === "out" ? e.el.offsetWidth : 0), y: n.y + 34 };
+  return { x: n.x + (side === "out" ? e.el.offsetWidth : 0), y: n.y + e.el.offsetHeight / 2 };
 }
 function wirePath(a, b) {
   if (vertical()) {
@@ -1411,17 +1549,15 @@ function getStarted() {
     }).join("")}</div>`;
 }
 // a team's connectors: only the ones switched on here load, and only when an agent searches for a tool
+const TICK = '<svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+// a team's connectors, as chips: only the ones switched on load, and only when an agent searches for a tool
 function connectorRows(n) {
   const on = n.connectors || [];
-  if (!connectors) return `<p class="hint" style="margin:0">Checking which connectors Claude Code can use…</p>`;
+  if (!connectors) return `<p class="hint" style="margin:0">Checking your connectors…</p>`;
   const list = connectors.connectors.map((c) => ({ ...c, missing: false }));
   on.filter((id) => !list.some((c) => c.id === id)).forEach((id) => list.push({ id, name: connName(id), missing: true }));
-  const rows = list.map((c) => `<label class="switch conn">${connIcon(c.id)}<span><b>${esc(c.name)}</b><small>${c.missing ? "Not available to Claude Code right now" : on.includes(c.id) ? "On: loads only when this team needs it" : "Off"}</small></span>
-      <input type="checkbox" data-conn="${esc(c.id)}"${on.includes(c.id) ? " checked" : ""}></label>`).join("");
-  const empty = !connectors.ok ? esc(connectors.error || "Couldn't check your connectors.")
-    : "No connectors yet. Connect apps like Shopify or Notion at claude.ai, Settings, Connectors.";
-  return (rows || `<p class="hint" style="margin:0">${empty}</p>`)
-    + `<div class="sub" style="display:flex;justify-content:space-between;gap:8px;margin-top:8px"><span>Teams only see the ones you switch on.</span><a href="#" id="connRefresh">Refresh</a></div>`;
+  if (!list.length) return `<p class="hint" style="margin:0">${!connectors.ok ? esc(connectors.error || "Couldn't check your connectors.") : "None yet. Connect apps like Notion or Vercel at claude.ai, in Settings, Connectors."}</p>`;
+  return `<div class="tchips">${list.map((c) => `<label class="tchip${c.missing ? " missing" : ""}" title="${esc(c.missing ? `${c.name} isn't available to Claude Code right now` : `${c.name}: loads only when this team needs it`)}"><input type="checkbox" data-conn="${esc(c.id)}"${on.includes(c.id) ? " checked" : ""}>${connIcon(c.id)}<span>${esc(c.name)}</span>${TICK}</label>`).join("")}</div>`;
 }
 
 // each engine's mark: Claude Code's pixel crab (drawn by drawEngineIcons), Codex's and Cursor's app icons
@@ -1454,14 +1590,15 @@ function engineModels(n) {
 
 // which agent CLI a team runs on, with whether it's ready on this computer
 function engineCards(n) {
-  const cur = engineOf(n), info = engineInfo(cur);
-  const cards = ["claude", "codex", "cursor"].map((id) => {
-    const e = engineInfo(id), ready = e.installed && e.signed_in;
-    const sub = !engines ? "Checking…" : !e.installed ? "Not installed" : !e.signed_in ? "Not signed in" : id === "claude" ? "Your Claude plan" : id === "codex" ? "Your ChatGPT plan" : "Your Cursor plan";
-    return `<button type="button" data-engine="${id}" class="${id === cur ? "on" : ""}${ready ? "" : " off"}">${engineIcon(id)}<span>${ENGINE_NAME[id]}</span><small>${sub}</small></button>`;
+  const cur = engineOf(n), info = engineInfo(cur), ready = (e) => e.installed && e.signed_in;
+  const seg = ["claude", "codex", "cursor"].map((id) => {
+    const e = engineInfo(id), why = !engines ? "" : !e.installed ? `${ENGINE_NAME[id]} isn't installed` : !e.signed_in ? `${ENGINE_NAME[id]} isn't signed in` : "";
+    return `<button type="button" data-engine="${id}" class="${id === cur ? "on" : ""}${engines && !ready(e) ? " off" : ""}" title="${esc(why || ENGINE_NAME[id])}">${engineIcon(id)}<span>${id === "claude" ? "Claude" : ENGINE_NAME[id]}</span></button>`;
   }).join("");
-  return `<div class="engines">${cards}</div>` + (cur !== "claude" && info.note ? `<div class="enote">${esc(info.note)}</div>` : "")
-    + `<div class="sub" style="display:flex;justify-content:space-between;gap:8px;margin-top:6px"><span>Mix them: one team on Claude, the next on Codex.</span><a href="#" id="engRefresh">Check again</a></div>`;
+  const plan = { claude: "your Claude plan", codex: "your ChatGPT plan", cursor: "your Cursor plan" }[cur];
+  const stat = !engines ? `<i class="bad"></i>Checking…` : !ready(info) ? `<i class="bad"></i>${esc(info.note || `${ENGINE_NAME[cur]} isn't ready on this computer`)}`
+    : info.note ? `<i class="bad"></i>${esc(info.note)}` : `<i></i>Ready · uses ${plan}`;
+  return `<div class="eseg" role="group" aria-label="Runs on">${seg}</div><div class="estat">${stat}<a href="#" id="engRefresh">Check again</a></div>`;
 }
 
 // a team's command-line tools: it may run only commands that start with one of these
@@ -1469,22 +1606,21 @@ function engineCards(n) {
 const cmdMode = (n) => (n.tools === "full" ? "any" : (n.clis || []).length || n._cmds === "some" ? "some" : "none");
 function cliRows(n) {
   const mode = cmdMode(n);
-  const pick = `<div class="seg" data-cmds style="margin-bottom:10px">${[["none", "No commands"], ["some", "Only these"], ["any", "Any command"]]
+  const pick = `<div class="seg" data-cmds>${[["none", "None"], ["some", "Only these"], ["any", "Anything"]]
     .map(([v, l]) => `<button type="button" data-v="${v}" class="${v === mode ? "on" : ""}">${l}</button>`).join("")}</div>`;
-  if (mode === "any") return pick + `<p class="hint" style="margin:0">This team can run any command on this computer, like you could in a terminal: git, npm, python, scripts, anything.</p>`;
-  if (mode === "none") return pick + `<p class="hint" style="margin:0">This team doesn't run commands. Pick <b>Only these</b> to allow a few tools, or <b>Any command</b> for everything.</p>`;
+  if (mode === "any") return pick + `<div class="sub">Runs any command on this computer, like you could in a terminal.</div>`;
+  if (mode === "none") return pick;
   if (!clis) return pick + `<p class="hint" style="margin:0">Checking which tools are installed…</p>`;
   const on = n.clis || [];
   const list = clis.map((c) => ({ ...c }));
   on.filter((id) => !list.some((c) => c.id === id)).forEach((id) => list.push({ id, name: id, blurb: "" }));
-  const rows = list.map((c) => `<label class="switch conn">${cliIcon(c.id)}<span><b>${esc(c.name)} <code style="font-size:11px;color:var(--muted)">${esc(c.id)}</code></b><small>${on.includes(c.id) ? `On: can run ${esc(c.id)} commands` : esc(c.blurb || "Off")}</small></span>
-      <input type="checkbox" data-cli="${esc(c.id)}"${on.includes(c.id) ? " checked" : ""}></label>`).join("");
-  return pick + (rows || `<p class="hint" style="margin:0">None of the common tools (git, gh, vercel, npm…) are installed. Add one by name below.</p>`)
-    + `<div class="cliadd"><input id="cliNew" maxlength="40" placeholder="Another command, e.g. stripe" aria-label="Command name"><button type="button" id="cliAdd">Add</button></div>
-      <div class="sub" style="margin-top:6px">The team can run only commands that start with these. Everything else is blocked.</div>`;
+  return pick + `<div class="tchips">${list.map((c) => `<label class="tchip" title="${esc(c.blurb ? `${c.name}: ${c.blurb}` : c.name)}"><input type="checkbox" data-cli="${esc(c.id)}"${on.includes(c.id) ? " checked" : ""}>${cliIcon(c.id)}<span>${esc(c.id)}</span>${TICK}</label>`).join("")}
+      <label class="tchip add" title="Allow another command by name"><input id="cliNew" maxlength="40" placeholder="+ another" aria-label="Another command" style="position:static;opacity:1;pointer-events:auto;border:0;background:transparent;padding:0;width:84px;font:inherit;color:inherit;outline:0"></label></div>
+    <div class="sub">Only commands that start with these can run. Everything else is blocked.</div>`;
 }
 
 function renderInspector() {
+  if (!flow) return;   // checks that finish before the first flow loads have nothing to draw yet
   if (run) return renderRunPanel();
   lastPanel = "";      // the editor took over the panel; the run view must rebuild next time
   const box = $("insp");
@@ -1538,6 +1674,7 @@ function renderInspector() {
   };
   const effortBar = (node) => {   // five rising bars, like Claude Code's effort control
     const off = String(node.model || "").startsWith("claude-haiku"), k = Math.max(0, EFFORTS.findIndex(([v]) => v === node.effort));
+    if (off) return "";   // Haiku has no effort setting
     return `<div class="effort${off ? " off" : ""}"><div class="bars">${EFFORTS.map(([v, l], j) =>
       `<button type="button" data-effort="${v}" class="${j <= k ? "lit" : ""}" style="height:${30 + j * 17.5}%" title="${l}" aria-label="Effort: ${l}"></button>`).join("")}</div>
       <div class="lbl"><span>Effort</span><b>${off ? "Haiku doesn't use effort" : EFFORTS[k][1]}</b></div></div>`;
@@ -1563,21 +1700,24 @@ function renderInspector() {
       <div class="isec">${more(`<div class="field"><label>It can</label>${chips("tools", ACCESS, n.tools)}</div>`)}</div>`;
   }
   if (n.type === "cluster") {
-    html += `<div class="isec"><h4>Team</h4>
-        <select id="iBot" aria-label="Bot"><option value="">Custom team</option>${teamBots().map((b) => `<option value="${esc(b.id)}"${b.id === n.bot ? " selected" : ""}>${esc(b.name)} · ${esc(b.tagline || "")}</option>`).join("")}</select>
+    const claude = engineOf(n) === "claude";
+    html += `<div class="isec"><h4>Job</h4>
+        <textarea data-k="instructions" rows="4" placeholder="${esc(builtinOf(n) ? `Uses ${builtinOf(n).name}'s built-in job. Write here to give them your own.` : "Review the changes for bugs. Don't edit files.")}">${esc(n.instructions || "")}</textarea>
+        <div class="field"><label>On the card</label><input data-k="summary" maxlength="80" value="${esc(n.summary || "")}" placeholder="${esc(summaryOf({ ...n, summary: "" }) || "What this team does, in a few words")}"></div>
+        <div class="field"><label>Start from a bot</label><select id="iBot" aria-label="Bot"><option value="">Custom team</option>${teamBots().map((b) => `<option value="${esc(b.id)}"${b.id === n.bot ? " selected" : ""}>${esc(b.name)} · ${esc(b.tagline || "")}</option>`).join("")}</select></div></div>
+      <div class="isec"><h4>Agents</h4>
         <div class="inrow"><div class="stepper"><button type="button" data-step="-1" aria-label="Fewer agents">−</button><output id="countOut">${n.count}</output><button type="button" data-step="1" aria-label="More agents">+</button></div>
-          <span class="sub">agent${n.count === 1 ? "" : "s"} · more check more ground</span></div>
-        ${n.count > 1 ? `<label class="switch" style="margin-top:10px"><span><b>Split the job</b><small>${n.split ? `On: one job, cut into ${n.count} parts, done side by side` : "Off: every agent does the whole job"}</small></span>
+          <span class="sub">${n.count === 1 ? "One agent does the job" : n.split ? `${n.count} agents split the job` : n.tools === "edit" || n.tools === "full" ? `${n.count} agents, taking turns` : `${n.count} agents, side by side`}</span></div>
+        ${n.count > 1 ? `<label class="switch"><span><b>Split the job</b><small>${n.split ? `One job, cut into ${n.count} parts, done at once` : "Off: every agent does the whole job"}</small></span>
           <input type="checkbox" id="splitSw"${n.split ? " checked" : ""}></label>` : ""}</div>
-      <div class="isec"><h4>Job</h4><textarea data-k="instructions" rows="3" placeholder="${esc(builtinOf(n) ? `Uses ${builtinOf(n).name}'s built-in job. Type here to give them your own.` : "e.g. Review the changes for bugs. Don't edit files.")}">${esc(n.instructions || "")}</textarea></div>
-      <div class="isec"><h4>Runs on</h4>${engineCards(n)}</div>
-      ${engineOf(n) === "claude" ? `<div class="isec"><h4>Model</h4>${models(n.model)}${modelNote(n.model)}${effortBar(n)}</div>`
-        : `<div class="isec"><h4>Model</h4>${engineModels(n)}
-          <div class="sub">Leave empty to use ${ENGINE_NAME[engineOf(n)]}'s default. Usage comes from your ${engineOf(n) === "codex" ? "ChatGPT" : "Cursor"} plan.</div></div>`}
-      <div class="isec"><h4>Access</h4>${chips("tools", ACCESS, n.tools)}<div class="sub">${esc(n.split && n.count > 1 && n.tools === "edit" ? "Can change files. With Split the job on, they work side by side and each writes only its own part." : ACCESS_NOTE[n.tools] || "")}</div></div>
-      ${engineOf(n) === "claude" ? `<div class="isec"><h4>Connectors</h4>${connectorRows(n)}</div>
-      <div class="isec"><h4>Commands</h4>${cliRows(n)}</div>`
-        : `<div class="isec"><h4>Connectors and command-line tools</h4><p class="hint" style="margin:0">These are Claude Code features. A ${ENGINE_NAME[engineOf(n)]} team uses its own tools: it can run commands when its access allows.</p></div>`}
+      <div class="isec"><h4>Engine</h4>${engineCards(n)}
+        ${claude ? `${models(n.model)}${modelNote(n.model)}${effortBar(n)}`
+          : `<div class="field"><label>Model</label>${engineModels(n)}</div>`}</div>
+      <div class="isec"><h4>Access</h4>${chips("tools", ACCESS, n.tools)}
+        <div class="sub">${esc(n.split && n.count > 1 && n.tools === "edit" ? "Can change files. With Split the job on, each agent writes only its own part." : ACCESS_NOTE[n.tools] || "")}</div>
+        ${claude ? `<div class="slabel">Commands</div>${cliRows(n)}
+        <div class="slabel">Connectors <a href="#" id="connRefresh">Refresh</a></div>${connectorRows(n)}`
+          : `<div class="sub">Connectors and command lists are Claude Code features. A ${ENGINE_NAME[engineOf(n)]} team runs commands when its access allows.</div>`}</div>
       <div class="isec">${more(`<div class="field"><label>Focus per agent</label><textarea data-k="focuses" rows="3" placeholder="One line per agent, e.g.&#10;Logic and edge cases&#10;Error handling">${esc(n.focuses || "")}</textarea>
           <div class="sub">Agent 1 gets line 1, and so on, so they don't all check the same thing.</div></div>
         <div class="row2" style="margin-top:12px"><div class="field"><label>Max turns</label><input type="number" min="0" max="200" data-k="max_turns" data-num value="${n.max_turns || 0}"><div class="sub">0 = no limit</div></div>
@@ -1649,7 +1789,7 @@ function renderInspector() {
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/.test(id)) { toast("Type a command name, like stripe or supabase."); return; }
     n.clis = [...(n.clis || []).filter((x) => x !== id), id]; changed(false); renderInspector();
   };
-  if ($("cliAdd")) { $("cliAdd").onclick = addCli; $("cliNew").onkeydown = (e) => { if (e.key === "Enter") addCli(); }; }
+  if ($("cliNew")) { $("cliNew").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addCli(); } }; $("cliNew").onchange = () => { if ($("cliNew").value.trim()) addCli(); }; }
   drawEngineIcons(box);
   box.querySelectorAll("[data-engine]").forEach((b) => b.addEventListener("click", () => { n.engine = b.dataset.engine; changed(false); renderInspector(); }));
   if ($("engRefresh")) $("engRefresh").onclick = (e) => { e.preventDefault(); engines = null; renderInspector(); loadEngines(true); };
@@ -1901,6 +2041,20 @@ function runMeta(r) {
 }
 function logClass(text) { return /finished|approved/i.test(text) ? "ok" : /fail|reject|stopped|interrupted/i.test(text) ? "bad" : /waiting/i.test(text) ? "wait" : ""; }
 
+// every step of the run, in flow order, with what it's doing right now; click one to see its agents
+function stepList(r) {
+  const order = r.flow.nodes.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+  return `<div class="runsteps">${order.map((n) => {
+    const st = r.nodes[n.id] || { status: "waiting", agents: [] }, running = (st.agents || []).find((a) => a.status === "running");
+    const took = st.started ? dur(((st.ended || Date.now() / 1000)) - st.started) : "";
+    const what = st.status === "running" ? (running && running.step) || (n.type === "checkpoint" ? "Merging reports" : "Starting up")
+      : st.status === "approval" ? "Needs you" : st.status === "failed" ? st.error || "Didn't finish"
+      : st.status === "done" ? (n.type === "cluster" ? `${(st.agents || []).length} agent${(st.agents || []).length === 1 ? "" : "s"} · done` : "Done")
+      : st.status === "waiting" ? "Waiting" : STATUS_WORD[st.status] || st.status;
+    return `<button type="button" data-step-node="${esc(n.id)}" class="${esc(st.status)}"><i class="rs-dot ${esc(st.status)}"></i>
+      <span class="rs-name"><b>${esc(n.name)}</b><small class="${st.status === "running" ? "live" : ""}">${esc(what)}</small></span><span class="rs-time">${st.status === "waiting" ? "" : took}</span></button>`;
+  }).join("")}</div>`;
+}
 function renderRunPanel() {
   $("insp").classList.add("padded");
   const box = $("insp"), r = run, m = runMeta(r), live = r.status === "running" || r.status === "waiting";
@@ -1942,7 +2096,7 @@ function renderRunPanel() {
     }
     if (!st.agents.length && st.output && n.type !== "done") html += `<details><summary class="hint">What it passed on</summary><div class="doc">${md(st.output)}</div></details>`;
     html += `</div>`;
-  } else html += `<p class="hint" style="margin:4px 2px 10px">Click any step on the canvas to see its agents and what they did.</p>`;
+  } else html += stepList(r);
 
   html += `<details class="quiet"${live ? " open" : ""}><summary>Task</summary><div class="task-text">${esc(r.task)}</div></details>
     <details class="quiet"><summary>Activity · ${r.log.length}</summary><ul class="timeline">${r.log.slice().reverse().map((l) =>
@@ -1958,6 +2112,7 @@ function renderRunPanel() {
   if (same) box.querySelectorAll("details").forEach((d, i) => { if (openNow[i] !== undefined) d.open = openNow[i]; });
   $("runClock").textContent = clock;
   if ($("openFinal")) $("openFinal").onclick = () => openSheet(r);
+  box.querySelectorAll("[data-step-node]").forEach((b) => b.onclick = () => { sel = { kind: "node", id: b.dataset.stepNode }; lastPanel = ""; renderAll(); followNode(b.dataset.stepNode); });
   if ($("copyFinal")) $("copyFinal").onclick = () => copyText(r.final);
   box.querySelectorAll("[data-decide]").forEach((b) => b.onclick = async () => {
     const nid = b.dataset.decide, note = ($("note-" + nid) || {}).value || "";
@@ -1991,7 +2146,7 @@ function openSheet(r) {
   const nReports = stages.reduce((n, g) => n + g.agents.length, 0);
   const nav = [], body = [];
   nav.push(`<h5>Result</h5><a href="#rp-result">Summary</a><div id="rpToc"></div>`);
-  body.push(`<section class="rp-sec" id="rp-result"><h3>✓ Result<span class="grow"></span><button id="sheetCopy">Copy</button></h3>
+  body.push(`<section class="rp-sec" id="rp-result"><h3>Result<span class="grow"></span><button id="sheetCopy">Copy</button></h3>
     <div class="doc">${md(r.final || "No result yet.")}</div></section>`);
   const lastItems = itemNodes(r).pop();
   if (lastItems) {
@@ -2018,16 +2173,11 @@ function openSheet(r) {
   $("sheet").innerHTML = `<div class="rp-top">
       <button id="sheetClose" title="Back to the flow (Esc)">← Back</button>
       <div class="badge-big${ok ? "" : " failed"}">${ok ? "✓" : "!"}</div>
-      <div class="who"><h2>${esc(r.flow_name)}</h2><div class="meta">${esc(STATUS_WORD[r.status] || r.status)} · ${new Date(r.started * 1000).toLocaleString()}</div></div>
+      <div class="who"><h2>${esc(r.flow_name)}</h2><div class="meta">${esc(STATUS_WORD[r.status] || r.status)} in ${dur(m.took)} · ${m.agents} agent${m.agents === 1 ? "" : "s"} · ${m.fin} of ${m.states.length} steps · ${new Date(r.started * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}${r.folder ? ` · <span class="mono" title="${esc(r.folder)}">${esc(r.folder.split(/[\\/]/).filter(Boolean).pop() || r.folder)}</span>` : ""}</div></div>
       <div class="tools"><button id="sheetDl" title="Save the result and every report as one Markdown file">Download .md</button><button class="primary" id="sheetCopyAll">Copy all</button></div>
     </div>
     <div class="rp-body"><nav class="rp-nav">${nav.join("")}</nav>
       <div class="rp-main"><div class="rp-col">
-        <div class="rp-stats"><div><small>Status</small><b>${esc(STATUS_WORD[r.status] || r.status)}</b></div>
-          <div><small>Took</small><b>${dur(m.took)}</b></div>
-          <div><small>Steps</small><b>${m.fin} of ${m.states.length}</b></div>
-          <div><small>Agents</small><b>${m.agents}</b></div>
-          ${r.folder ? `<div style="grid-column:span 2"><small>Folder</small><b class="path" title="${esc(r.folder)}">${esc(r.folder)}</b></div>` : ""}</div>
         ${body.join("")}
       </div></div></div>`;
 
@@ -2136,14 +2286,10 @@ window.addEventListener("pagehide", () => {   // last edits survive closing the 
 function drawIcons(t) {
   for (const [id, e] of Object.entries(els)) {
     const n = nodeById(id); if (!n) continue;
+    if (!e.cv) continue;
     const c = e.cv.getContext("2d"); c.clearRect(0, 0, e.cv.width, e.cv.height);
     const st = nodeState(id), state = st ? ({ running: "working", approval: "waiting", done: "idle" }[st.status] || "idle") : "idle";
-    if (n.type === "cluster") {
-      // up to three bots side by side; the card's text says the real count
-      const many = Math.min(n.count, 3), px = [0, 9, 5.4, 3.6][many], w = 12 * px, gap = (e.cv.width - many * w) / (many + 1);
-      for (let i = 0; i < many; i++) drawBot(c, { shape: n.shape, color: n.color }, gap + i * (w + gap), (e.cv.height - 8 * px) / 2 + 4, px, { state, t: t + i * 0.7 });
-    } else if (n.type === "master") drawClawd(c, 24, 26, 7, { state: st && st.status === "running" ? "working" : st && st.status === "done" ? "celebrate" : "idle", t, seed: 5 });
-    else drawIcon(c, n.type, 24, 21, 7, { state: st && st.status === "approval" ? "waiting" : st && st.status === "running" ? "working" : "idle", t });
+    if (n.type === "cluster") drawBot(c, { shape: n.shape, color: n.color }, 6, 7, 5, { state, t });   // the dots in the footer show how many
   }
   document.querySelectorAll(".pal canvas").forEach((cv, i) => {
     const c = cv.getContext("2d"); c.clearRect(0, 0, cv.width, cv.height);

@@ -119,7 +119,8 @@ if "--session-id" in flags:
 # Cues: a stage named SLOWSTAGE takes 4s, HANGSTAGE hangs for a minute, FAILSTAGE (or FAILME in the prompt) fails.
 if "--append-system-prompt" in flags:
     system = flags["--append-system-prompt"]
-    time.sleep(60 if "HANGSTAGE" in system else 4 if "SLOWSTAGE" in system else 1.0)   # long enough for side-by-side agents to overlap
+    time.sleep(60 if "HANGSTAGE" in system else 4 if "SLOWSTAGE" in system
+               else float(os.environ.get("CLAWD_MOCK_WAIT") or 1.0))   # side-by-side agents overlap; CLAWD_MOCK_WAIT slows demos
     if "flow designer for Lithnode" in system:   # the "describe a team" box: answer with a flow draft
         draft = {"name": "Bug sweep", "nodes": [
             {"id": "master", "type": "master", "mode": "pass"},
@@ -142,6 +143,12 @@ if "--append-system-prompt" in flags:
         sys.exit(1)
     stage = system.split('" stage of')[0].split('"')[-1] if '" stage of' in system else "lead"
     text = f"Working on it.\n\nREPORT: {stage} report from {session[:8]}."
+    if os.environ.get("CLAWD_MOCK_RICH"):   # a report shaped like a real one, for looking at the results page
+        text = (f"Done.\n\nREPORT: **{stage}** checked the change to the login flow.\n\n**Found**\n"
+                "- `session.ts` refreshes the token after it expires, so a slow request can log you out (line 88).\n"
+                "- The retry in `api.ts` has no limit, so a dead server means an endless loop.\n\n"
+                "**Fixed**\n- Refresh now runs 60 seconds before expiry.\n- Retries stop after 3 tries with a clear error.\n\n"
+                "**Next stage:** check both fixes on a slow network.")
     # A dropship team (the template's stage names): the scout lists products, checkers judge them, the uploader
     # lists the winners. CLAWD_MOCK_PACE slows the steps down so a run can be watched.
     pace = float(os.environ.get("CLAWD_MOCK_PACE") or 0)

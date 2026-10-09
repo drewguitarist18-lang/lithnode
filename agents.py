@@ -27,12 +27,15 @@ TOOLSETS = {
     "full": ["Read", "Glob", "Grep", "Edit", "Write", "Bash"],
 }
 WRITES = {"edit", "full"}          # agents at these levels never run side by side in one folder
+LOOKS = {"read", "research", "edit"}   # levels that also get lithnode-shot, to look at pages and HTML they make or check
 EFFORTS = ("low", "medium", "high", "xhigh", "max")   # what `claude --effort` accepts
 
 
 def build_args(command, *, model, effort, tools, system, session_id, max_turns=0, connectors=(), known=(), clis=()):
     names = list(TOOLSETS[tools])
     cli_rules = []
+    if tools in LOOKS:
+        clis = [*clis, "lithnode-shot"]
     if clis and "Bash" not in names:
         # The team's command-line tools: Bash, but only `<cli> ...` is allowed. Claude Code denies any other
         # command in a headless session (read-only ones like `ls` still run).

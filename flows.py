@@ -193,6 +193,7 @@ def clean_node(raw):
         except (TypeError, ValueError):
             count = 1
         node.update(count=max(1, min(MAX_AGENTS, count)),
+                    summary=_text(raw, "summary", 80),   # the one line on the team's card
                     focuses=_text(raw, "focuses", 2000),
                     shape=raw.get("shape") if raw.get("shape") in SHAPES else "crab",
                     color=raw.get("color") if COLOR_RE.match(str(raw.get("color") or "")) else "#D97757",
@@ -436,20 +437,20 @@ def _n(nid, kind, x, y, **kw):
 
 TEMPLATES = [
     {"id": "ship-it", "name": "Build, review, secure, ship",
-     "blurb": "Kev's chain: builders, then bug reviewers, then security, then a production check.",
+     "blurb": "A builder, then bug and security reviewers side by side, your sign-off, and a final production check.",
      "nodes": [
-         _n("master", "master", 40, 200, name="Start", model="claude-sonnet-5-5", mode="brief", tools="read",
+         _n("master", "master", 40, 200, name="Start", model="claude-sonnet-5-5", mode="pass", tools="read",
             instructions="Turn the task into a clear brief: goal, constraints, acceptance criteria, and what each stage should watch for."),
-         _n("build", "cluster", 300, 200, name="Builders", count=1, model="claude-opus-5-5", tools="edit", effort="medium",
+         _n("build", "cluster", 300, 200, name="Builders", summary='Build the change in your folder', count=1, model="claude-sonnet-5-5", tools="edit", effort="medium",
             shape="byte", color="#5b8def",
             instructions="You are the builder. Implement the task in this folder. Keep changes focused and readable."),
          _n("cp1", "checkpoint", 560, 200, name="Build done", mode="pass"),
-         _n("bugs", "cluster", 780, 80, name="Bug reviewers", count=3, model="claude-sonnet-5-5", tools="read",
+         _n("bugs", "cluster", 780, 80, name="Bug reviewers", summary='Hunt bugs in the new code', count=2, model="claude-sonnet-5-5", tools="read",
             shape="bug", color="#6cc070",
             instructions=("You review the builders' changes for bugs: logic errors, edge cases, broken flows. Verify each finding "
                           "by reading the actual code, and say how confident you are. Don't edit files."),
             focuses="Logic and edge cases\nError handling and failure paths\nData flow and state"),
-         _n("sec", "cluster", 780, 320, name="Security", count=2, model="claude-sonnet-5-5", tools="read",
+         _n("sec", "cluster", 780, 320, name="Security", summary='Check for security holes', count=1, model="claude-sonnet-5-5", tools="read",
             shape="guard", color="#e5566e",
             instructions=("You review the changes for security problems. Think like an attacker: injection, auth, secrets, "
                           "unsafe input, risky dependencies. Rate each finding critical, high, medium or low, with the file "
@@ -457,7 +458,7 @@ TEMPLATES = [
             focuses="Input handling and injection\nSecrets, auth and permissions"),
          _n("cp2", "checkpoint", 1060, 200, name="Reviews merged", mode="summarize", model="claude-haiku-4-5"),
          _n("ok", "approval", 1280, 200, name="Your call", message="Reviews are in. Approve to run the production check."),
-         _n("prod", "cluster", 1500, 200, name="Production check", count=1, model="claude-sonnet-5-5", tools="read",
+         _n("prod", "cluster", 1500, 200, name="Production check", summary="Says ship or don't ship", count=1, model="claude-sonnet-5-5", tools="read",
             shape="rocket", color="#bb9af7",
             instructions=("You give the final production-readiness verdict based on the code and the reviews: error handling, "
                           "config, performance, docs, anything that breaks on a clean machine. End with ship or don't ship.")),
@@ -469,7 +470,7 @@ TEMPLATES = [
      "blurb": "Three cheap read-only reviewers look at a folder, one summary comes back. No edits.",
      "nodes": [
          _n("master", "master", 60, 200, name="Start", mode="pass", model="claude-haiku-4-5", tools="read"),
-         _n("rev", "cluster", 320, 200, name="Reviewers", count=3, model="claude-haiku-4-5", tools="read",
+         _n("rev", "cluster", 320, 200, name="Reviewers", count=3, summary='Read the code for bugs and risks', model="claude-haiku-4-5", tools="read",
             shape="scout", color="#2fb5a0",
             instructions="Review the code in this folder for bugs and risky spots. Don't edit files.",
             focuses="Correctness\nSecurity\nReadability and structure"),
@@ -481,11 +482,11 @@ TEMPLATES = [
      "blurb": "Three workers split one big job and do their parts at once, then a checker verifies every part.",
      "nodes": [
          _n("master", "master", 60, 200, name="Start", mode="pass", model="claude-haiku-4-5", tools="none"),
-         _n("work", "cluster", 320, 200, name="Workers", count=3, model="claude-sonnet-5-5", tools="edit", split=True,
+         _n("work", "cluster", 320, 200, name="Workers", summary='Each cleans its own part', count=3, model="claude-haiku-4-5", tools="edit", split=True,
             clis=["python"], shape="byte", color="#5b8def",
             instructions=("Do the task on your part of the input. Use a script when the job is big or repetitive, and "
                           "write your results to a file named for your part, in the format the task asks for.")),
-         _n("check", "cluster", 580, 200, name="Checker", count=1, model="claude-sonnet-5-5", tools="read", clis=["python"],
+         _n("check", "cluster", 580, 200, name="Checker", count=1, model="claude-sonnet-5-5", summary='Verifies every part, flags gaps', tools="read", clis=["python"],
             shape="bug", color="#6cc070",
             instructions=("You check the workers' output, part by part. Count the records, and look for missing, duplicate or "
                           "malformed ones and for gaps or overlaps between parts. Don't fix anything: say exactly what's "
@@ -498,16 +499,16 @@ TEMPLATES = [
      "blurb": "A builder makes the change, two reviewers check it, you approve, a deployer ships it with git and Vercel.",
      "nodes": [
          _n("master", "master", 60, 200, name="Start", mode="pass", model="claude-haiku-4-5", tools="none"),
-         _n("build", "cluster", 320, 200, name="Builder", count=1, model="claude-sonnet-5-5", tools="edit", effort="medium",
+         _n("build", "cluster", 320, 200, name="Builder", summary='Makes the change', count=1, model="claude-sonnet-5-5", tools="edit", effort="medium",
             shape="byte", color="#5b8def",
             instructions="You are the builder. Make the change in this folder. Keep it focused and readable."),
-         _n("rev", "cluster", 580, 200, name="Reviewers", count=2, model="claude-haiku-4-5", tools="read", clis=["git"],
+         _n("rev", "cluster", 580, 200, name="Reviewers", count=2, summary='Check the diff before it ships', model="claude-haiku-4-5", tools="read", clis=["git"],
             shape="bug", color="#6cc070",
             instructions=("Review the builder's change (git diff shows it) for bugs and anything that would break in "
                           "production. Don't edit files. End with ship or don't ship."),
             focuses="Bugs and edge cases\nAnything that breaks the build or the deploy"),
          _n("ok", "approval", 840, 200, name="Ship it?", message="Reviews are in. Approve to commit and deploy."),
-         _n("ship", "cluster", 1100, 200, name="Deployer", count=1, model="claude-haiku-4-5", tools="read", clis=["git", "vercel"],
+         _n("ship", "cluster", 1100, 200, name="Deployer", summary='Commits and deploys to Vercel', count=1, model="claude-haiku-4-5", tools="read", clis=["git", "vercel"],
             shape="rocket", color="#bb9af7",
             instructions=("Commit the change with git (a short, clear message), then deploy with `vercel deploy --prod --yes`. "
                           "Report the commit and the live URL. If a step fails, stop and say why.")),
@@ -519,7 +520,7 @@ TEMPLATES = [
      "nodes": [
          _n("master", "master", 60, 200, name="Start", model="claude-sonnet-5-5", mode="brief", tools="none",
             instructions="Split the question into the angles worth researching and say what a great answer contains."),
-         _n("scouts", "cluster", 320, 200, name="Scouts", count=3, model="claude-sonnet-5-5", tools="web",
+         _n("scouts", "cluster", 320, 200, name="Scouts", summary='Search the web from different angles', count=3, model="claude-sonnet-5-5", tools="web",
             shape="scout", color="#2fb5a0",
             instructions="You are a research scout. Search, read, and report facts with their sources.",
             focuses="Latest news and announcements\nExpert and critical opinions\nNumbers, benchmarks and data"),
@@ -555,7 +556,8 @@ Node types:
 - master: exactly one, id "master". Fields: name, mode ("brief" = an agent writes a plan everyone reads, "pass" = free,
   the task goes straight on), model, tools, instructions. Use "pass" for small flows.
 - cluster: a group of agents with one role. Fields: id, name, count (1-15), model, tools, effort (low|medium|high),
-  instructions (the role, in second person), focuses (one line per agent so they split the work),
+  instructions (the role, in second person), summary (what the team does in plain words for its card, max 6 words,
+  like "Hunts bugs in the new code"), focuses (one line per agent so they split the work),
   bot (a bot id to base it on, or ""), split (true when the agents should divide one big job into equal parts and
   work side by side, e.g. processing 100,000 rows; then add a checker team after them), clis (command-line tools the
   team may run, from: <<CLIS>>; only the ones the job needs, e.g. ["gh"] to work with GitHub issues).
@@ -566,7 +568,9 @@ Node types:
 - done: the end. Fields: id, name.
 
 Tools: none, read, web, research (read files + web), edit (read and edit files), full (edit files + run commands).
-Models: <<MODELS>>. Use Haiku or Sonnet for reviewers and checks; Opus only for builders and planners.
+Models: <<MODELS>>. Every agent uses the person's plan, so spend carefully: pick the cheapest model that can do each job
+(Haiku for checks, merges and simple script work; Sonnet for building, reviewing and research; Opus only when the user
+asks for the strongest model), keep teams at 1-2 agents unless more angles clearly help, and use Start mode "pass".
 Bots you can base a cluster on (set "bot" and reuse their role): <<BOTS>>
 
 Rules: ids are short, lowercase, with dashes. Every node is reachable from master, and the last stage feeds a done node.
@@ -640,6 +644,8 @@ def build_design(raw, bots):
 
 
 WRAP = 5    # columns per row before a left-to-right flow wraps onto the next row
+COL_GAP, ROW_H, MAX_ROW_W = 84, 150, 2100   # gap between columns, spacing of side-by-side steps, widest row before wrapping
+TEAM_W, TEAM_H, PILL_W, PILL_H = 248, 97, 120, 38   # a team is a card, every other step a pill (static/flows.html)
 STACK = 3   # most nodes stacked in one column; a busier stage spreads into extra columns
 
 
@@ -681,18 +687,33 @@ def _layout(flow, direction="lr"):
         for i, n in enumerate(loose):
             n["x"], n["y"] = 60 + (i % WRAP) * 250, y + 60 + (i // WRAP) * 170
         return
+    size = lambda n: (TEAM_W, TEAM_H) if n["type"] == "cluster" else (PILL_W, PILL_H)   # noqa: E731
+    col_w = lambda stack: max(size(n)[0] for n in stack)   # noqa: E731   each column as wide as what's in it
+    rows, cur, width = [], [], 0
+    for stack in stacks:                              # wrap onto a new row once a row gets too wide
+        if cur and width + col_w(stack) > MAX_ROW_W:
+            rows.append(cur)
+            cur, width = [], 0
+        cur.append(stack)
+        width += col_w(stack) + COL_GAP
+    if cur:
+        rows.append(cur)
+    if len(rows) > 1 and len(rows[-1]) == 1:          # never leave one step alone on a new row
+        rows[-2].append(rows.pop()[0])
     top = 80
-    per_row = WRAP + 1 if len(stacks) == WRAP + 1 else WRAP   # never leave one step alone on a new row
-    for start in range(0, len(stacks), per_row):
-        row = stacks[start:start + per_row]
+    for row in rows:
         tallest = max(len(s) for s in row)
-        middle = top + (tallest - 1) * 170 / 2
-        for col, stack in enumerate(row):
-            for i, n in enumerate(stack):
-                n["x"], n["y"] = 60 + col * 270, round(middle + (i - (len(stack) - 1) / 2) * 170)
-        top += tallest * 170 + 90
+        middle, x = top + (tallest - 1) * ROW_H / 2, 60
+        for stack in row:
+            cw = col_w(stack)
+            for i, n in enumerate(stack):             # centered in its column and on its row
+                w, h = size(n)
+                n["x"] = round(x + (cw - w) / 2)
+                n["y"] = round(middle + (i - (len(stack) - 1) / 2) * ROW_H - h / 2)
+            x += cw + COL_GAP
+        top += tallest * ROW_H + 90
     for i, n in enumerate(loose):                     # not wired yet: a row underneath
-        n["x"], n["y"] = 60 + (i % WRAP) * 270, top + 40 + (i // WRAP) * 170
+        n["x"], n["y"] = 60 + (i % WRAP) * (TEAM_W + COL_GAP), top + 40 + (i // WRAP) * 170
 
 
 # --------------------------------------------------------------------- runs
@@ -927,6 +948,11 @@ class Run:
                f"If you write files, write only ones named for your part (for example part-{i}-of-{n}), so you never "
                "touch a teammate's work. Say in your report exactly which range you covered."]
               if node.get("split") and n > 1 else []),
+            *(["To look at a web page or HTML file (one you made or one you're checking), run `lithnode-shot <file or URL> "
+               "[seconds]`. It saves a screenshot and prints its path; read that image. For anything animated, look at "
+               "several moments (like 1, 4 and 8 seconds). Never call visual work good without looking at it: check "
+               "that nothing is cut off, overlapping or unreadable."]
+              if node.get("tools", "read") in ("read", "research", "edit", "full") else []),
             "Work economically: read only the files you need, prefer Grep and Glob over reading whole files, "
             "and skip exploratory detours.",
             "Do your stage's job only; other stages handle the rest.",
@@ -1084,7 +1110,8 @@ class Run:
             st["error"] = next((r["error"] for r in recs if r["error"]), "No agent finished.")
         else:
             st["items"] = merge_items([r.get("items") or [] for r in good])
-            st["output"] = "\n\n".join(f"### {r['name']}\n{r['report']}" for r in good)
+            # one agent's report needs no heading; several get their names, so the next stage can tell them apart
+            st["output"] = good[0]["report"] if len(recs) == 1 else "\n\n".join(f"### {r['name']}\n{r['report']}" for r in good)
             if st["items"]:
                 st["output"] += "\n\n" + items_block(st["items"])
             if len(good) < len(recs):

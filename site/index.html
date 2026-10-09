@@ -413,10 +413,10 @@ addEventListener("pointermove", (e) => { tmx = e.clientX / innerWidth - .5; tmy 
 const HW = 150, HH = 72, HGX = 30, HGY = 56;   // node size and gaps, in the app's own units
 const HN = [
   { kind: "start", name: "Start", kindLabel: "START", sub: "Your task goes in here", shape: "crab", color: "#D97757", w: HW, h: HH, col: 0, row: 0 },
-  { kind: "team", name: "Workers", kindLabel: "TEAM", sub: "3 × Sonnet 5.5 · split 3 ways", job: "Clean 100,000 rows", shape: "byte", color: "#5b8def", count: 3, w: HW, h: HH, col: 1, row: 0, step: "python clean.py" },
+  { kind: "team", name: "Workers", kindLabel: "TEAM", sub: "3 × Haiku 4.5 · split 3 ways", job: "Clean 100,000 rows", shape: "byte", color: "#5b8def", count: 3, w: HW, h: HH, col: 1, row: 0, step: "python clean.py" },
   { kind: "team", name: "Checker", kindLabel: "TEAM", sub: "1 × Haiku 4.5", job: "Checks every part", shape: "bug", color: "#6cc070", w: HW, h: HH, col: 2, row: 0, step: "Part 3 ✓" },
   { kind: "approval", name: "You", kindLabel: "APPROVAL", sub: "Pauses until you approve", shape: "hand", color: "#e0a23c", w: HW, h: HH, col: 0, row: 1 },
-  { kind: "team", name: "Publisher", kindLabel: "TEAM", sub: "1 × Haiku 4.5 · gh · Docs", job: "Ships it", shape: "rocket", color: "#bb9af7", w: HW, h: HH, col: 1, row: 1, step: "gh release create" },
+  { kind: "team", name: "Publisher", kindLabel: "TEAM", sub: "1 × Haiku 4.5", job: "Releases it with gh", shape: "rocket", color: "#bb9af7", w: HW, h: HH, col: 1, row: 1, step: "gh release create" },
   { kind: "done", name: "Done", kindLabel: "DONE", sub: "Final result lands here", shape: "trophy", color: "#e6b450", w: HW, h: HH, col: 2, row: 1 },
 ];
 const HPHASE = [0, .7, 2.6, 4.4, 5.8, 7.6, 8.0];   // when each node starts; the last is when Done finishes
@@ -434,13 +434,13 @@ function heroFrame(now) {
   const k = narrow ? Math.min(1.5, (w - 32) / flowW) : Math.min(1.75, room / flowW);
   const fx = narrow ? (w - flowW * k) / 2 : w - 40 - flowW * k, fy = (narrow ? h * .62 : h * .5) - flowH * k / 2;
   const L = (t % HLOOP);
-  const st = (i) => (L < HPHASE[i] ? "wait" : L < HPHASE[i + 1] ? (HN[i].kind === "approval" ? "ask" : "work") : "done");
+  const st = (i) => (L < HPHASE[i] ? "wait" : L < HPHASE[i + 1] ? (HN[i].kind === "approval" ? "ask" : HN[i].kind === "team" ? "work" : "done") : "done");
   g.save(); g.globalAlpha = narrow ? .22 : 1;
   g.translate(fx + mx * 16, fy + my * 12); g.scale(k, k);
   const P = HN.map((n) => [n.col * (HW + HGX), 40 + n.row * (HH + HGY)]);
   [[0, 1, false], [1, 2, false], [2, 3, true], [3, 4, false], [4, 5, false]].forEach(([a, b, wrapIt]) => {
     const s2 = st(b) === "work" || st(b) === "ask" ? "live" : st(b) === "done" ? "done" : "idle";
-    wire(g, P[a][0] + HW, P[a][1] + HH / 2, P[b][0], P[b][1] + HH / 2, 1, s2, t, wrapIt);
+    wire(g, P[a][0] + nodeW(g, HN[a]), P[a][1] + HH / 2, P[b][0], P[b][1] + HH / 2, 1, s2, t, wrapIt);
   });
   HN.forEach((n, i) => node(g, ...P[i], n, st(i), t));
   // the run pill, like the app's toolbar
@@ -457,35 +457,62 @@ function heroFrame(now) {
 // ---- the three step demos
 const demos = [...document.querySelectorAll("canvas[data-demo]")].map((cv) => ({ cv, kind: cv.dataset.demo, ...fit(cv), seen: 0, on: false }));
 addEventListener("resize", () => demos.forEach((d) => Object.assign(d, fit(d.cv))));
-// a node exactly as the app draws it: sprite, bold name, kind label, model line, job, status pill, agent dots
-const BADGE = { wait: ["WAITING", "#4a4a4a", "#d0d0d0"], work: ["RUNNING", "#D97757", "#170a05"], ask: ["NEEDS YOU", "#e0a23c", "#1a1205"], done: ["DONE", "#9ece6a", "#0f1a08"] };
+// a node exactly as the app draws it: a team is a card (icon tile, name, one line, then agents · how · model),
+// every other step is a pill
+const tint = (hex, a) => { const v = parseInt(hex.slice(1), 16); return `rgba(${v >> 16},${(v >> 8) & 255},${v & 255},${a})`; };
+const STATE = { work: "#D97757", ask: "#e0a23c", done: "#4fae6a", fail: "#e5566e" };
+function fitText(g, str, maxW) { if (g.measureText(str).width <= maxW) return str; while (str.length > 1 && g.measureText(str + "…").width > maxW) str = str.slice(0, -1); return str + "…"; }
+function pillW(g, n) { g.font = "600 8.5px Inter, sans-serif"; return Math.ceil(g.measureText(n.name).width + (n.kind === "approval" ? 66 : 34)); }
+function nodeW(g, n) { return n.kind === "team" ? n.w : pillW(g, n); }
+function glyph(g, kind, x, y, col) {   // the pill's little mark: play, flag, hand-raised dot
+  g.save(); g.fillStyle = col; g.strokeStyle = col; g.lineWidth = 1.3; g.lineJoin = "round"; g.lineCap = "round";
+  if (kind === "start") { g.beginPath(); g.moveTo(x - 2.5, y - 3.5); g.lineTo(x + 3.5, y); g.lineTo(x - 2.5, y + 3.5); g.closePath(); g.fill(); }
+  else if (kind === "done") { g.beginPath(); g.moveTo(x - 3, y + 4.5); g.lineTo(x - 3, y - 4); g.lineTo(x + 3.5, y - 4); g.lineTo(x + 2, y - 1.5); g.lineTo(x + 3.5, y + 1); g.lineTo(x - 3, y + 1); g.stroke(); }
+  else { g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill(); }
+  g.restore();
+}
 function node(g, x, y, n, st, t, p = 1) {
   const w = n.w, h = n.h;
   g.save();
   if (p !== 1) { g.translate(x + w / 2, y + h / 2); g.scale(p, p); g.translate(-x - w / 2, -y - h / 2); g.globalAlpha *= clamp(p); }
-  if (st === "work" || st === "ask") { g.shadowColor = st === "ask" ? "#e0a23c" : "#D97757"; g.shadowBlur = 18; }
+  const edge = STATE[st] || "#2a2a2a";
+  if (n.kind !== "team") {   // a pill, centered on the row
+    const pw = pillW(g, n), ph = 24, py = y + h / 2 - ph / 2;
+    if (st === "ask") { g.shadowColor = "#e0a23c"; g.shadowBlur = 14 + Math.sin(t * 5) * 5; }
+    rr(g, x, py, pw, ph, 12); g.fillStyle = "#171717"; g.fill(); g.shadowBlur = 0;
+    g.lineWidth = 1; g.strokeStyle = st && st !== "wait" ? edge : "#2e2e2e"; rr(g, x, py, pw, ph, 12); g.stroke();
+    glyph(g, n.kind, x + 12, y + h / 2, n.kind === "approval" ? "#e0a23c" : st === "done" ? "#4fae6a" : st === "work" ? "#D97757" : "#8d8d8d");
+    g.fillStyle = "#ededed"; g.font = "600 8.5px Inter, sans-serif"; g.fillText(n.name, x + 22, y + h / 2 + 3);
+    if (n.kind === "approval" && st === "ask") { g.fillStyle = "#e0a23c"; g.font = "600 7px Inter, sans-serif"; g.fillText("Needs you", x + 26 + g.measureText(n.name).width * 1.2, y + h / 2 + 2.6); }
+    for (const [px, show] of [[x, n.kind !== "start"], [x + pw, n.kind !== "done"]]) if (show) { g.fillStyle = "#0a0a0a"; g.strokeStyle = "#4a4a4a"; g.lineWidth = 1; g.beginPath(); g.arc(px, y + h / 2, 3, 0, 7); g.fill(); g.stroke(); }
+    g.restore(); return;
+  }
+  // a team card
+  if (st === "work") { g.shadowColor = "#D97757"; g.shadowBlur = 16; }
   rr(g, x, y, w, h, 9); g.fillStyle = "#171717"; g.fill(); g.shadowBlur = 0;
-  g.lineWidth = st === "wait" || !st ? 1 : 1.4;
-  g.strokeStyle = st === "work" ? "#D97757" : st === "ask" ? "#e0a23c" : st === "done" ? "#9ece6a" : "#2a2a2a"; rr(g, x, y, w, h, 9); g.stroke();
-  // ports
-  for (const [px, show] of [[x, n.kind !== "start"], [x + w, n.kind !== "done"]]) if (show) { g.fillStyle = "#0a0a0a"; g.strokeStyle = "#4a4a4a"; g.lineWidth = 1; g.beginPath(); g.arc(px, y + h / 2, 3.2, 0, 7); g.fill(); g.stroke(); }
-  const c = 1.45, sx = x + 8;
-  if (n.count > 1) for (let i = 0; i < n.count; i++) sprite(g, n.shape, n.color, sx + i * 15, y + 9, 1.1, st === "work" ? Math.abs(Math.sin(t * 9 + i)) * 1.5 : 0);
-  else sprite(g, n.shape, n.color, sx, y + 8, c, st === "work" ? Math.abs(Math.sin(t * 9)) * 1.5 : 0);
-  const tx = n.count > 1 ? sx + n.count * 15 + 3 : sx + 12 * c + 6;
-  g.fillStyle = "#ededed"; g.font = "700 10.5px Inter, sans-serif"; g.fillText(n.name, tx, y + 15);
-  g.fillStyle = "#8d8d8d"; g.font = "600 6.5px Inter, sans-serif"; g.fillText(n.kindLabel, tx, y + 24);
-  g.font = "400 7.5px Inter, sans-serif"; g.fillText(n.sub, x + 8, y + 38);
-  if (n.job) { g.fillStyle = "#dcdcdc"; g.font = "500 7.5px Inter, sans-serif"; g.fillText(n.job, x + 8, y + 49); }
-  if (st && st !== "idle") {   // status pill on the top edge
-    const [label, bg, fg] = BADGE[st]; g.font = "800 6.5px Inter, sans-serif";
-    const bw = g.measureText(label).width + 10; rr(g, x + w - bw - 6, y - 6, bw, 12, 6); g.fillStyle = bg; g.fill();
-    g.fillStyle = fg; g.fillText(label, x + w - bw + -1, y + 2.5);
+  g.lineWidth = st === "work" || st === "fail" ? 1.4 : 1; g.strokeStyle = st && st !== "wait" ? edge : "#2a2a2a"; rr(g, x, y, w, h, 9); g.stroke();
+  // icon tile with the team's bot
+  rr(g, x + 8, y + 8, 24, 24, 6.5); g.fillStyle = tint(n.color, .17); g.fill();
+  sprite(g, n.shape, n.color, x + 11, y + 14, 1.5, st === "work" ? Math.abs(Math.sin(t * 9)) * 1.2 : 0);
+  if (st === "done") { g.fillStyle = "#4fae6a"; g.beginPath(); g.arc(x + 31, y + 31, 4.6, 0, 7); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x + 29, y + 31.2); g.lineTo(x + 30.6, y + 32.7); g.lineTo(x + 33.2, y + 29.6); g.stroke(); }
+  // name, then one line: what it does, or what it's doing right now
+  g.fillStyle = "#ededed"; g.font = "700 9.5px Inter, sans-serif"; g.fillText(fitText(g, n.name, w - 46), x + 38, y + 18);
+  const live = st === "work" && n.step;
+  g.font = live ? "500 7px 'JetBrains Mono', monospace" : "400 7.4px Inter, sans-serif"; g.fillStyle = live ? "#D97757" : "#8d8d8d";
+  g.fillText(fitText(g, live ? n.step : n.job || "", w - 46), x + 38, y + 28.5);
+  // footer: one dot per agent, how they work, the model
+  g.fillStyle = "#262626"; g.fillRect(x + 1, y + 40, w - 2, 1);
+  const count = Math.min(n.count || 1, 4), fy = y + 40 + (h - 40) / 2;
+  for (let i = 0; i < count; i++) {
+    const on = st === "done" ? "#4fae6a" : st === "work" ? (i === 0 && n.count > 1 ? "#4fae6a" : "#D97757") : tint(n.color, .75);
+    g.fillStyle = "#171717"; g.beginPath(); g.arc(x + 12 + i * 5.2, fy, 3.8, 0, 7); g.fill();
+    g.fillStyle = on; g.beginPath(); g.arc(x + 12 + i * 5.2, fy, 2.9, 0, 7); g.fill();
   }
-  if (n.kind === "team" && st && st !== "idle") {   // one square per agent, then the live step
-    for (let i = 0; i < (n.count || 1); i++) { rr(g, x + 8 + i * 9, y + h - 13, 6, 6, 1.5); g.fillStyle = st === "done" ? "#9ece6a" : st === "work" ? "#D97757" : "#3a3a3a"; g.fill(); }
-    if (st === "work" && n.step) { g.fillStyle = "#cfcfcf"; g.font = "500 7.5px Inter, sans-serif"; g.fillText(n.step, x + 10 + (n.count || 1) * 9, y + h - 7.5); }
-  }
+  const model = (String(n.sub || "").split(" × ")[1] || "").split(" · ")[0];
+  const how = st === "work" ? (n.count > 1 ? `1 of ${n.count} done` : "Working") : st === "done" ? "Done" : (String(n.sub || "").split(" · ").slice(1).join(" · ") || (n.count > 1 ? `${n.count} · side by side` : "1 agent"));
+  g.font = "500 6.8px Inter, sans-serif"; g.fillStyle = "#8d8d8d"; g.fillText(fitText(g, how, w - 70), x + 16 + count * 5.2, fy + 2.4);
+  if (model) { g.font = "600 6.4px Inter, sans-serif"; const mw = g.measureText(model).width + 9; rr(g, x + w - mw - 7, fy - 5.5, mw, 11, 3); g.fillStyle = "#222"; g.fill(); g.fillStyle = "#9a9a9a"; g.fillText(model, x + w - mw - 2.5, fy + 2.3); }
+  for (const [px, show] of [[x, true], [x + w, true]]) if (show) { g.fillStyle = "#0a0a0a"; g.strokeStyle = "#4a4a4a"; g.lineWidth = 1; g.beginPath(); g.arc(px, y + h / 2, 3.2, 0, 7); g.fill(); g.stroke(); }
   g.restore();
 }
 // wires like the app: grey idle, dashed orange while the next step works, green once it's done
@@ -519,7 +546,7 @@ function demoFrame(d, now) {
     const drag = ease(clamp((L - 1.6) / .9)), dropX = P[3][0] + (1 - drag) * 70, dropY = P[3][1] + (1 - drag) * 40;
     const wires = [[0, 1, false], [1, 2, true], [2, 3, false]];
     wires.forEach(([a, b, wrapIt], i) => { const pa = i === 2 ? P[a] : P[a], pb = b === 3 ? [dropX, dropY] : P[b];
-      wire(g, pa[0] + nw, pa[1] + nh / 2, pb[0], pb[1] + nh / 2, ease(clamp((L - (b === 3 ? 2.6 : .6 + i * .4)) / .6)), "idle", t, wrapIt); });
+      wire(g, pa[0] + nodeW(g, N[a]), pa[1] + nh / 2, pb[0], pb[1] + nh / 2, ease(clamp((L - (b === 3 ? 2.6 : .6 + i * .4)) / .6)), "idle", t, wrapIt); });
     [0, 1, 2].forEach((i) => node(g, ...P[i], N[i], "idle", t, back(clamp((L - i * .25) / .45))));
     if (L > 1.5) node(g, dropX, dropY, N[3], "idle", t, L < 2.6 ? .96 : 1);
     if (L > 1.4 && L < 3) {   // the cursor carrying it
@@ -543,7 +570,7 @@ function demoFrame(d, now) {
     const P = [[xL, y1], [xR, y1], [xL, y2], [xR, y2]];
     [[0, 1, false], [1, 2, true], [2, 3, false]].forEach(([a, b, wrapIt]) => {
       const s = st(b) === "work" ? "live" : st(b) === "done" ? "done" : "idle";
-      wire(g, P[a][0] + nw, P[a][1] + nh / 2, P[b][0], P[b][1] + nh / 2, 1, s, t, wrapIt);
+      wire(g, P[a][0] + nodeW(g, N[a]), P[a][1] + nh / 2, P[b][0], P[b][1] + nh / 2, 1, s, t, wrapIt);
     });
     N.forEach((n, i) => node(g, ...P[i], n, st(i), t));
     // the run pill at the top, like the app's

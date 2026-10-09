@@ -42,6 +42,10 @@ for _old_home in (Path.home() / ".relay", Path.home() / ".clawd-hq"):   # the ap
         except OSError:
             pass
 HQ_STORE = flows.Store(os.environ.get("LITHNODE_HOME") or _home)
+try:
+    claude_code.setup_tools(os.environ.get("LITHNODE_HOME") or _home)   # lithnode-shot, for agents to look at what they make
+except OSError:
+    pass
 RUNNER = flows.Runner(HQ_STORE)
 
 

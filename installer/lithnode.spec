@@ -10,7 +10,7 @@ a = Analysis(
     [str(HERE / "lithnode_main.py")],
     pathex=[str(ROOT), str(PET)],
     datas=[(str(ROOT / "static"), "static"), (str(PET / "office.html"), ".")],
-    hiddenimports=["hq", "flows", "agents", "claude_code", "office_feed",
+    hiddenimports=["hq", "flows", "agents", "claude_code", "office_feed", "shot",
                    "hook", "pet", "office", "shared", "tkinter", "tkinter.filedialog", "winsound"],
     excludes=["test", "unittest", "pydoc_data"],
 )
