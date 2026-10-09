@@ -27,6 +27,9 @@ if engine == "cursor" and args[:1] == ["status"]:
     sys.exit(0)
 
 prompt = sys.stdin.read()
+if os.environ.get("MOCK_ENGINE_PACE"):   # slow down, so a run can be watched
+    import time
+    time.sleep(float(os.environ["MOCK_ENGINE_PACE"]))
 with LOG.open("a", encoding="utf-8") as f:
     f.write(json.dumps({"engine": engine, "args": args, "prompt": prompt, "cwd": os.getcwd(),
                         "agent_env": os.environ.get("LITHNODE_AGENT")}) + "\n")

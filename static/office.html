@@ -103,7 +103,7 @@
     <div id="empty"><div>
       <canvas id="emptyClawd" width="360" height="240"></canvas>
       <div><b>The office is empty</b></div>
-      <div>Start a Claude Code session or run a flow, and a bot will clock in.</div>
+      <div>Start a Claude Code session or run a flow on Claude Code, Codex or Cursor, and a bot will clock in.</div>
     </div></div>
   </div>
   <div id="detail"><p class="hint">Click a bot to see details.</p></div>
@@ -209,13 +209,21 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
     }
   }
 
-  // name tag
+  // name tag: the bot's name, and for a Codex or Cursor agent, that engine's icon and name
   ctx.font = "600 12px system-ui, sans-serif";
-  const label = clip(ctx, s.project, 150), lw = ctx.measureText(label).width + 30;
-  const tagX = ox + 70 - lw / 2, tagY = oy + 22;
+  const eng = !isSub && s.engine && s.engine !== "claude" ? s.engine : null, img = eng && ENGINE_IMG[eng];
+  const label = clip(ctx, s.project, eng ? 110 : 150), lw0 = ctx.measureText(label).width;
+  ctx.font = "500 11px system-ui, sans-serif";
+  const suffix = eng ? ` · ${ENGINE_NAME[eng] || eng}` : "", sufW = suffix ? ctx.measureText(suffix).width : 0;
+  const lw = lw0 + sufW + 30, tagX = ox + 70 - lw / 2, tagY = oy + 22;
   ctx.fillStyle = "#1f1f1f"; roundRect(ctx, tagX, tagY, lw, 22, 11); ctx.fill();
-  ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(tagX + 12, tagY + 11, 4, 0, 7); ctx.fill();
-  ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(label, tagX + 22, tagY + 11.5);
+  if (img && img.complete && img.naturalWidth) {
+    ctx.fillStyle = "#2b2b2b"; roundRect(ctx, tagX + 5, tagY + 4, 14, 14, 3.5); ctx.fill();
+    const k = eng === "codex" ? 10 : 14; ctx.drawImage(img, tagX + 5 + (14 - k) / 2, tagY + 4 + (14 - k) / 2, k, k);
+  } else { ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(tagX + 12, tagY + 11, 4, 0, 7); ctx.fill(); }
+  ctx.textBaseline = "middle";
+  ctx.font = "600 12px system-ui, sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(label, tagX + 22, tagY + 11.5);
+  if (suffix) { ctx.font = "500 11px system-ui, sans-serif"; ctx.fillStyle = "#a8a8a8"; ctx.fillText(suffix, tagX + 22 + lw0, tagY + 11.5); }
 
   // sprite behind desk
   if (!isSub && s.bot) drawBot(ctx, s.bot, ox + 28, oy + 74, 7, { state: st, t });
@@ -277,6 +285,10 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
   }
 }
 
+// which agent CLI a desk runs on: Claude Code (the default, unlabeled), Codex or Cursor
+const ENGINE_NAME = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" };
+const ENGINE_IMG = Object.fromEntries(["codex", "cursor"].map((e) => { const i = new Image(); i.src = `/static/engine-${e}.png`; return [e, i]; }));
+
 // -------------------------------------------------------------------- stage
 const stage = $("stage"), sctx = stage.getContext("2d");
 // The stage size is cached (updated by a ResizeObserver) so we never force a reflow per frame.
@@ -329,7 +341,7 @@ function renderSide() {
     return `<div class="${cls}" data-id="${esc(id)}">
       <canvas class="av" width="120" height="90"></canvas>
       <div><div class="name">${esc(s.project)}</div>
-      <div class="sub" style="color:${stColor(st)}">${esc(statusText(s, st))}</div>
+      <div class="sub" style="color:${stColor(st)}">${s.engine && s.engine !== "claude" ? esc(ENGINE_NAME[s.engine] || s.engine) + " · " : ""}${esc(statusText(s, st))}</div>
       <div class="bar"><b style="width:${Math.round((1 - f) * 100)}%;background:${energyColor(1 - f)}"></b></div></div></div>`;
   }).join("");
   if (html !== lastSideHtml) { list.innerHTML = html; lastSideHtml = html; }  // skip no-op rebuilds
@@ -357,12 +369,13 @@ function renderDetail() {
   const s = x.s, st = effState(s), f = fill(s);
   const subs = s.subagents.length
     ? "<ul>" + s.subagents.map((a) => `<li>${esc(a.type)}</li>`).join("") + "</ul>" : "<span class='hint'>none</span>";
-  box.innerHTML = `<h2>Session</h2><div class="big">${esc(s.project)}</div>
+  box.innerHTML = `<h2>${s.engine && s.engine !== "claude" ? esc(ENGINE_NAME[s.engine] || s.engine) + " agent" : "Session"}</h2><div class="big">${esc(s.project)}</div>
     <p class="hint" style="margin:0 0 14px;color:${stColor(st)}">${esc(statusText(s, st))}</p>
     <dl>
+      <dt>Runs on</dt><dd>${esc(ENGINE_NAME[s.engine || "claude"] || s.engine)}</dd>
       ${s.flow ? `<dt>Flow</dt><dd>${esc(s.flow.name)} · ${esc(s.flow.stage)}</dd>` : ""}
       <dt>Folder</dt><dd class="mono">${esc(s.cwd || "—")}</dd>
-      <dt>Context</dt><dd>${s.tokens.toLocaleString()} / ${s.window.toLocaleString()} tokens (${Math.round(f * 100)}%)</dd>
+      ${s.window ? `<dt>Context</dt><dd>${s.tokens.toLocaleString()} / ${s.window.toLocaleString()} tokens (${Math.round(f * 100)}%)</dd>` : ""}
       <dt>Tools used</dt><dd>${s.tools}</dd>
       <dt>Tasks done</dt><dd>${s.done}</dd>
       <dt>Open for</dt><dd>${dur(nowS() - s.started)}</dd>

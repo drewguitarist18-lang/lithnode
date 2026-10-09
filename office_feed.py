@@ -64,6 +64,7 @@ def flow_agents(runner):
                     "tokens": 0, "window": 0, "tools": len(a["steps"]), "done": 0,
                     "started": a["started"], "last": time.time(), "subagents": [],
                     "flow": {"run": snap["id"], "name": snap["flow_name"], "stage": node["name"]},
+                    "engine": a.get("engine") or "claude",
                 }
             if st["status"] == "approval":
                 out[f"approval-{snap['id']}-{nid}"] = {
@@ -88,14 +89,14 @@ def snapshot(runner=None):
             "status_ts": s.get("status_ts", s.get("started", time.time())), "detail": s.get("detail", ""),
             "tokens": s.get("tokens", 0), "window": s.get("window", 0), "tools": s.get("tools", 0),
             "done": s.get("done", 0), "started": s.get("started", time.time()), "last": s.get("ts", 0),
-            "flow": None,
+            "flow": None, "engine": "claude",   # hook sessions come from Claude Code
             "subagents": [{"id": k, "type": v.get("type", "agent"), "detail": v.get("detail", ""),
                            "tools": v.get("tools", 0), "started": v.get("ts", time.time())}
                           for k, v in (s.get("subagents") or {}).items()],
         }
         mine = agents.pop(sid, None)
         if mine:   # the hook saw a flow agent: keep its live numbers, but draw it as the agent
-            entry.update(bot=mine["bot"], flow=mine["flow"], detail=entry["detail"] or mine["detail"])
+            entry.update(bot=mine["bot"], flow=mine["flow"], engine=mine.get("engine", "claude"), detail=entry["detail"] or mine["detail"])
         entry["project"] = (entry["bot"] or {}).get("name") or s.get("project") or "session"
         sessions.append(entry)
     sessions += agents.values()
