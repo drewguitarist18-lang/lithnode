@@ -333,6 +333,9 @@ try:
           and cx[0]["args"][:2] == ["exec", "--json"] and cx[0]["args"][cx[0]["args"].index("--sandbox") + 1] == "workspace-write"
           and cx[0]["args"][-1] == "-" and cx[0]["prompt"].startswith("# Your instructions") and "# Task\nFix the bug" in cx[0]["prompt"]
           and cx[0]["agent_env"] == "1", (run["status"], cx))
+    check("Codex teams that may use the web get web search; others don't", "--search" not in cx[0]["args"])
+    check("Codex and Cursor agents count their turns", nodes_turns := all(a["turns"] > 0 for nid in ("cx", "cu") for a in run["nodes"][nid]["agents"]),
+          {nid: [a["turns"] for a in run["nodes"][nid]["agents"]] for nid in ("cx", "cu")})
     check("the Cursor team runs in print mode, read-only (no --force), with its model", len(cu) == 1
           and cu[0]["args"][:3] == ["-p", "--output-format", "stream-json"] and "--force" not in cu[0]["args"]
           and cu[0]["args"][-2:] == ["--model", "gpt-5"], cu)

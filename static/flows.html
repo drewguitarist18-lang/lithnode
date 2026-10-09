@@ -229,6 +229,8 @@
   .item .row { display: flex; gap: 8px; align-items: baseline; margin-top: 3px; font-size: 12px; }
   .item .price { font-weight: 700; }
   .item .rate { color: var(--approval); font-size: 11px; font-weight: 600; }
+  .item .swatches { display: flex; gap: 3px; margin-top: 5px; flex-wrap: wrap; }
+  .item .swatches i { width: 15px; height: 15px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
   .item .facts { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
   .item .stamp { position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
                  font-size: 12px; font-weight: 900; color: #0a0a0a; box-shadow: 0 2px 8px var(--shadow); }
@@ -1737,12 +1739,15 @@ function itemCard(it, key, opts = {}) {
   const stampFresh = it.verdict && !seenVerdicts.has(vid);
   if (opts.mark !== false) { seenItems.add(id); if (it.verdict) seenVerdicts.add(vid); }
   const facts = Object.entries(it.facts || {}).slice(0, 3).map(([k, v]) => `${k} ${v}`).join(" · ") || it.subtitle || "";
+  // a palette (facts that are colors) shows its colors, not their hex codes
+  const colors = Object.entries(it.facts || {}).filter(([, v]) => /^#[0-9a-f]{6}$/i.test(String(v).trim()));
   const tag = it.url ? "a" : "div", href = it.url ? ` href="${esc(it.url)}" target="_blank" rel="noopener" title="Open ${esc(it.title)}"` : "";
   return `<${tag} class="item${it.image ? "" : " noimg"}${it.verdict ? " v-" + it.verdict : ""}${fresh && opts.animate !== false ? " new" : ""}${opts.scan ? " scan" : ""}"${href} style="--h:${hueOf(it.title)};--d:${(opts.i || 0) * .15}s">
     ${it.image ? `<span class="thumb"><img src="${esc(it.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('.item').classList.add('noimg'); this.parentNode.remove()"></span>` : ""}
     <span class="info"><span class="t">${esc(it.title)}</span>
       <span class="row">${it.price ? `<span class="price">${esc(/^\d/.test(it.price) ? "$" + it.price : it.price)}</span>` : ""}${it.rating != null ? `<span class="rate">★ ${esc(it.rating)}</span>` : ""}</span>
-      ${facts ? `<span class="facts" title="${esc(facts)}">${esc(facts)}</span>` : ""}</span>
+      ${colors.length >= 2 ? `<span class="swatches">${colors.map(([k, v]) => `<i style="background:${esc(v.trim())}" title="${esc(k)} ${esc(v.trim())}"></i>`).join("")}</span>`
+        : facts ? `<span class="facts" title="${esc(facts)}">${esc(facts)}</span>` : ""}</span>
     ${it.verdict ? `<span class="stamp${stampFresh ? " fresh" : ""}">${it.verdict === "pass" ? "✓" : "✕"}</span>` : ""}
     ${it.verdict && it.reason ? `<span class="why" title="${esc(it.reason)}">${esc(it.reason)}</span>` : ""}
   </${tag}>`;

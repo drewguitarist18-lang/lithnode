@@ -309,6 +309,7 @@ class Agent:
             if proc.poll() is None:
                 kill_tree(proc)
         tail = "".join(stderr_tail).strip()
+        self.turns = out.get("turns", 0)
         if out["error"]:
             self.error = out["error"]
         elif out["final"] is not None:

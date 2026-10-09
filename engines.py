@@ -148,7 +148,8 @@ def codex_sandbox(tools):
 
 def build_args(engine, command, *, tools, model=""):
     if engine == "codex":
-        args = [*command, "exec", "--json", "--skip-git-repo-check", "--ephemeral", "--sandbox", codex_sandbox(tools)]
+        search = ["--search"] if tools in ("web", "research") else []   # a top-level option: before `exec`
+        args = [*command, *search, "exec", "--json", "--skip-git-repo-check", "--ephemeral", "--sandbox", codex_sandbox(tools)]
         if model:
             args += ["--model", model]
         return args + ["-"]          # the prompt comes on stdin
@@ -177,6 +178,9 @@ def codex_event(obj, out):
     kind = obj.get("type")
     item = obj.get("item") or {}
     itype = item.get("type") or item.get("item_type")
+    if kind == "item.completed" and itype in ("agent_message", "assistant_message", "command_execution", "file_change",
+                                               "mcp_tool_call", "web_search"):
+        out["turns"] = out.get("turns", 0) + 1
     if kind == "item.started":
         if itype == "command_execution":
             cmd = str(item.get("command", ""))
@@ -186,7 +190,8 @@ def codex_event(obj, out):
         if itype == "mcp_tool_call":
             return f"{item.get('server', 'tool')}: {str(item.get('tool', '')).replace('_', ' ')}"
         if itype == "web_search":
-            return f"Searching the web: {item.get('query', '')}"[:80]
+            query = item.get("query") or (item.get("action") or {}).get("query") or ""
+            return f"Searching the web: {query}"[:80] if query else "Searching the web"
     elif kind == "item.completed":
         if itype in ("agent_message", "assistant_message"):
             out["texts"].append(item.get("text", ""))
@@ -212,6 +217,7 @@ def cursor_event(obj, out):
     """Same as codex_event, for Cursor's stream-json (shaped much like Claude Code's)."""
     kind = obj.get("type")
     if kind == "assistant":
+        out["turns"] = out.get("turns", 0) + 1
         parts = (obj.get("message") or {}).get("content") or []
         said = "".join(p.get("text", "") for p in parts if isinstance(p, dict) and p.get("type") == "text")
         if said:

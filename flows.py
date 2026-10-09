@@ -360,7 +360,7 @@ def clean_item(raw):
             item[key] = url
     facts = raw.get("facts")
     if isinstance(facts, dict):
-        item["facts"] = {str(k).strip()[:30]: str(v).strip()[:60] for k, v in list(facts.items())[:5] if str(k).strip() and str(v).strip()}
+        item["facts"] = {str(k).strip()[:30]: str(v).strip()[:60] for k, v in list(facts.items())[:10] if str(k).strip() and str(v).strip()}
     verdict = VERDICTS.get(str(raw.get("verdict") or "").strip().lower())
     if verdict:
         item["verdict"] = verdict
@@ -931,8 +931,10 @@ class Run:
             "and skip exploratory detours.",
             "Do your stage's job only; other stages handle the rest.",
             ITEMS_NOTE,
-            'Finish with a section starting with "REPORT:" (under 250 words): what you did, what you found, '
-            "and what the next stage must know. Only that report is passed on.",
+            'Finish with a section starting with "REPORT:" (under 250 words, plus any list your job produces): what you '
+            "did, what you found, and what the next stage must know. Only that report is passed on, and it's what the "
+            "user reads: put your actual results in it (the ideas, the answer, the findings, the list), not a "
+            "sentence saying you made them. Say plainly what you didn't do, and never describe planned work as done.",
             f"Today's date: {date.today().isoformat()}.",
         ]
         return "\n".join(lines)
