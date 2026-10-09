@@ -1463,15 +1463,21 @@ function engineCards(n) {
 }
 
 // a team's command-line tools: it may run only commands that start with one of these
+// Commands: none, only the tools switched on, or anything. "Anything" is the Edit + run code access level.
+const cmdMode = (n) => (n.tools === "full" ? "any" : (n.clis || []).length || n._cmds === "some" ? "some" : "none");
 function cliRows(n) {
-  if (n.tools === "full") return `<p class="hint" style="margin:0">This team can already run any command (Access: Edit + run code). Pick a lower access level to allow only certain tools.</p>`;
-  if (!clis) return `<p class="hint" style="margin:0">Checking which tools are installed…</p>`;
+  const mode = cmdMode(n);
+  const pick = `<div class="seg" data-cmds style="margin-bottom:10px">${[["none", "No commands"], ["some", "Only these"], ["any", "Any command"]]
+    .map(([v, l]) => `<button type="button" data-v="${v}" class="${v === mode ? "on" : ""}">${l}</button>`).join("")}</div>`;
+  if (mode === "any") return pick + `<p class="hint" style="margin:0">This team can run any command on this computer, like you could in a terminal: git, npm, python, scripts, anything.</p>`;
+  if (mode === "none") return pick + `<p class="hint" style="margin:0">This team doesn't run commands. Pick <b>Only these</b> to allow a few tools, or <b>Any command</b> for everything.</p>`;
+  if (!clis) return pick + `<p class="hint" style="margin:0">Checking which tools are installed…</p>`;
   const on = n.clis || [];
   const list = clis.map((c) => ({ ...c }));
   on.filter((id) => !list.some((c) => c.id === id)).forEach((id) => list.push({ id, name: id, blurb: "" }));
   const rows = list.map((c) => `<label class="switch conn">${cliIcon(c.id)}<span><b>${esc(c.name)} <code style="font-size:11px;color:var(--muted)">${esc(c.id)}</code></b><small>${on.includes(c.id) ? `On: can run ${esc(c.id)} commands` : esc(c.blurb || "Off")}</small></span>
       <input type="checkbox" data-cli="${esc(c.id)}"${on.includes(c.id) ? " checked" : ""}></label>`).join("");
-  return (rows || `<p class="hint" style="margin:0">None of the common tools (git, gh, vercel, npm…) are installed. Add one by name below.</p>`)
+  return pick + (rows || `<p class="hint" style="margin:0">None of the common tools (git, gh, vercel, npm…) are installed. Add one by name below.</p>`)
     + `<div class="cliadd"><input id="cliNew" maxlength="40" placeholder="Another command, e.g. stripe" aria-label="Command name"><button type="button" id="cliAdd">Add</button></div>
       <div class="sub" style="margin-top:6px">The team can run only commands that start with these. Everything else is blocked.</div>`;
 }
@@ -1568,7 +1574,7 @@ function renderInspector() {
           <div class="sub">Leave empty to use ${ENGINE_NAME[engineOf(n)]}'s default. Usage comes from your ${engineOf(n) === "codex" ? "ChatGPT" : "Cursor"} plan.</div></div>`}
       <div class="isec"><h4>Access</h4>${chips("tools", ACCESS, n.tools)}<div class="sub">${esc(n.split && n.count > 1 && n.tools === "edit" ? "Can change files. With Split the job on, they work side by side and each writes only its own part." : ACCESS_NOTE[n.tools] || "")}</div></div>
       ${engineOf(n) === "claude" ? `<div class="isec"><h4>Connectors</h4>${connectorRows(n)}</div>
-      <div class="isec"><h4>Command-line tools</h4>${cliRows(n)}</div>`
+      <div class="isec"><h4>Commands</h4>${cliRows(n)}</div>`
         : `<div class="isec"><h4>Connectors and command-line tools</h4><p class="hint" style="margin:0">These are Claude Code features. A ${ENGINE_NAME[engineOf(n)]} team uses its own tools: it can run commands when its access allows.</p></div>`}
       <div class="isec">${more(`<div class="field"><label>Focus per agent</label><textarea data-k="focuses" rows="3" placeholder="One line per agent, e.g.&#10;Logic and edge cases&#10;Error handling">${esc(n.focuses || "")}</textarea>
           <div class="sub">Agent 1 gets line 1, and so on, so they don't all check the same thing.</div></div>
@@ -1645,6 +1651,15 @@ function renderInspector() {
   drawEngineIcons(box);
   box.querySelectorAll("[data-engine]").forEach((b) => b.addEventListener("click", () => { n.engine = b.dataset.engine; changed(false); renderInspector(); }));
   if ($("engRefresh")) $("engRefresh").onclick = (e) => { e.preventDefault(); engines = null; renderInspector(); loadEngines(true); };
+  box.querySelectorAll("[data-cmds] button").forEach((b) => b.addEventListener("click", () => {
+    const v = b.dataset.v;
+    if (v === "any") { n.tools = "full"; delete n._cmds; }
+    else {
+      if (n.tools === "full") n.tools = "edit";   // keep file editing, drop "anything"
+      if (v === "none") { n.clis = []; delete n._cmds; } else n._cmds = "some";
+    }
+    changed(false); renderInspector();
+  }));
   if ($("splitSw")) $("splitSw").onchange = (e) => { n.split = e.target.checked; changed(false); renderInspector(); };
 }
 
