@@ -158,8 +158,11 @@ Agents are real Claude Code sessions working in the folder you choose. Read this
   - Your Claude sign-in stays inside Claude Code, and Lithnode never sees it.
   - Lithnode has no telemetry.
 - **Webhooks** on approval nodes send the flow name and message to the URL you enter. Only use your own.
-- **Your account, your usage.** Agents run on your own Claude plan, under Anthropic's
-  terms for your account. Don't run Lithnode as a service for other people on your subscription.
+- **Your account, your usage.** Every agent is a real session on your own Claude, ChatGPT (Codex) or Cursor
+  plan, under that company's terms for your account, and big flows can use a lot of it or hit your limits.
+  Lithnode is free and never charges you, so it can't refund usage. The Run menu shows how many agents a run
+  will start, and on which plan, before anything runs. Don't run Lithnode as a service for other people on
+  your subscription.
 
 ### Disclaimer
 

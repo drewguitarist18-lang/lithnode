@@ -526,7 +526,14 @@
   .recent button { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px 16px; border-top: 1px solid var(--line); margin-top: 10px; flex-wrap: wrap; }
   .rfoot .acts { margin: 0; }
-  .rfoot .hint { flex: 1; min-width: 200px; font-size: 12px; }
+  .rfoot .hint { flex: 1; min-width: 200px; font-size: 12px; line-height: 1.45; }
+  .rfoot .hint b { color: var(--ink); font-weight: 600; }
+  .rfoot .hint .bigrun { color: var(--approval); }
+  dialog.usagedlg { width: min(460px, 94vw); padding: 22px 22px 18px; }
+  .usagedlg h2 { margin: 0 0 10px; font-size: 17px; }
+  .usagedlg p { margin: 0 0 10px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+  .usagedlg p b { color: var(--ink); font-weight: 600; }
+  .usagedlg .acts { margin-top: 16px; }
   .go { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; }
   .go kbd { font: 600 10.5px system-ui; padding: 1px 6px; border-radius: 5px; background: rgba(0, 0, 0, .18); }
   .steps { display: grid; gap: 10px; margin: 12px 0 16px; }
@@ -740,6 +747,13 @@
   </div>
   <footer class="rfoot"><span id="runEst" class="hint"></span>
     <div class="acts"><button data-close>Cancel</button><button class="primary go" id="goBtn">▶ Start run <kbd>Ctrl ↵</kbd></button></div></footer>
+</dialog>
+
+<dialog id="usageDlg" class="usagedlg">
+  <h2>Lithnode runs on your own plan</h2>
+  <p>Every agent is a real Claude Code, Codex or Cursor session, signed in with <b>your</b> account. Each one uses your Claude, ChatGPT or Cursor plan, and big flows can use a lot of it or hit your limits.</p>
+  <p>Lithnode is free and never charges you, so it can't refund usage. Before each run, the Run menu shows how many agents it will start.</p>
+  <div class="acts"><button class="primary" id="usageOk">Got it</button></div>
 </dialog>
 
 <dialog id="runsDlg">
@@ -1842,7 +1856,7 @@ $("runBtn").onclick = () => {
     $("recentChips").innerHTML = recentFolders.slice(0, 4).map((f) => `<button type="button" data-folder="${esc(f)}" title="${esc(f)}">${esc(f.split(/[\\/]/).filter(Boolean).pop() || f)}</button>`).join("");
   });
   const writers = flow.nodes.filter((n) => n.type === "cluster" && (n.tools === "edit" || n.tools === "full"));
-  $("runEst").textContent = est ? `${est.sessions} agent session${est.sessions === 1 ? "" : "s"} on your Claude plan` : "";
+  $("runEst").innerHTML = usageLine(est);
   renderRunTeam();
   $("taskIdeas").innerHTML = TASK_IDEAS.map((t) => `<button type="button" data-idea="${esc(t)}">${esc(t)}</button>`).join("");
   $("runWarn").textContent = problems.join(" ");
@@ -1865,6 +1879,17 @@ $("runBtn").onclick = () => {
   $("riskOk").onchange = ready; ready();
   $("runDlg").showModal(); $("taskIn").focus(); $("taskIn").select();
 };
+// whose plan this run uses, so nobody is surprised by their usage
+const PLAN_NAME = { claude: "Claude", codex: "ChatGPT (Codex)", cursor: "Cursor" };
+const BIG_RUN = 8;
+function usageLine(e) {
+  if (!e || !e.sessions) return "";
+  const per = e.per_engine || { claude: e.sessions };
+  const parts = Object.keys(PLAN_NAME).filter((k) => per[k]).map((k) => `${per[k]} on your ${PLAN_NAME[k]} plan`);
+  const big = e.sessions >= BIG_RUN || flow.nodes.some((n) => n.type === "cluster" && n.split && n.count > 2);
+  return `<b>${e.sessions} agent session${e.sessions === 1 ? "" : "s"}</b>: ${esc(parts.join(", "))}.` +
+    (big ? ` <span class="bigrun">This is a big run and can use a lot of your plan.</span>` : "");
+}
 const TASK_IDEAS = ["Review this project for bugs", "Fix the failing tests", "Clean up every row in data.csv", "Triage my open GitHub issues"];
 $("taskIdeas").addEventListener("click", (e) => { const b = e.target.closest("[data-idea]"); if (b) { $("taskIn").value = b.dataset.idea; $("taskIn").focus(); } });
 $("recentChips").addEventListener("click", (e) => { const b = e.target.closest("[data-folder]"); if (b) $("folderIn").value = b.dataset.folder; });
@@ -2305,6 +2330,13 @@ async function deleteFlow() {
   if (flows.length) openFlow(flows[0].id); else createFlow("ship-it");
 };
 document.querySelectorAll("dialog [data-close]").forEach((b) => b.onclick = () => b.closest("dialog").close());
+// once, on first launch: agents use the person's own plan
+(() => {
+  let seen = false; try { seen = localStorage.getItem("hq-usage-ok") === "1"; } catch (e) {}
+  if (seen) return;
+  $("usageOk").onclick = () => { try { localStorage.setItem("hq-usage-ok", "1"); } catch (e) {} $("usageDlg").close(); };
+  $("usageDlg").showModal();
+})();
 window.addEventListener("pagehide", () => {   // last edits survive closing the window mid-debounce
   if (dirty && flow) navigator.sendBeacon("/api/flows/" + flow.id, new Blob([JSON.stringify(flow)], { type: "application/json" }));
 });

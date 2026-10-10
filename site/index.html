@@ -166,6 +166,8 @@
   .how span { color: #c8c8c8; font-size: 15px; }
   .reqs { margin-top: 26px; font: 500 13px var(--mono); color: var(--dim); position: relative; }
   .reqs a { color: var(--muted); }
+  .reqs.usage { margin: 10px auto 0; max-width: 560px; font: 400 13px/1.55 var(--sans, Inter, system-ui, sans-serif); }
+  .reqs.usage b { color: var(--muted); font-weight: 600; }
 
 
   /* ---- after you press Download: a panel that drops from the top-right, right under the browser's downloads icon */
@@ -323,6 +325,7 @@
     <p class="rv">One installer. It sets up Lithnode, adds it to your Start menu and opens it. Tick <b>Claude Pet</b> and a little Clawd lives on your desktop, showing what Claude Code is doing.</p>
     <a class="btn primary rv" id="dlBtn" href="download/LithnodeSetup.exe" download data-dl><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Download for Windows</a>
     <div class="reqs rv">Version 0.1.0 · Windows 10 or 11 · needs <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a> and a Claude plan</div>
+    <div class="reqs rv usage">Agents run on <b>your own</b> Claude, ChatGPT or Cursor plan and use its usage, and big flows can use a lot. Lithnode never charges you, so it can't refund usage.</div>
     <div class="how">
       <div class="rv"><b>01 · Download</b><span>Run LithnodeSetup.exe. No admin rights needed. If Windows says it protected your PC, click More info, then Run anyway.</span></div>
       <div class="rv" style="--d:.1s"><b>02 · Sign in</b><span>Click Sign in at the top right. It uses Claude Code's own login.</span></div>
