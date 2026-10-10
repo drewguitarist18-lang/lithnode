@@ -8,8 +8,8 @@ agents, have another team check their work, and sign off before anything ships.
   nodes for you, or drag them in yourself. Then press Run.
 - **Office**: every open Claude Code session and every running flow agent, each at its own desk.
 
-Windows, Python 3, and [Claude Code](https://claude.com/claude-code). Every agent is a real Claude Code
-session (`claude -p`) on your own sign-in. No API keys, and nothing to install beyond Python.
+Windows, Mac or Linux, and [Claude Code](https://claude.com/claude-code) (or Codex or Cursor). Every agent is a
+real session (`claude -p`) on your own sign-in. No API keys.
 Nothing goes through anyone else's server.
 
 ## Flows
@@ -132,9 +132,21 @@ A team with connectors can change things in those apps for real, so the Run menu
    claude auth login
    ```
 2. Then either:
-   - **Install it:** download the Windows installer from [lithnode.com](https://lithnode.com). It's a standalone
-     app, with Claude Pet as an optional extra.
-   - **Run from source:** double-click **Lithnode.bat**. The first run creates a `.venv`.
+   - **Windows:** download the installer from [lithnode.com](https://lithnode.com). It's a standalone app, with
+     Claude Pet as an optional extra.
+   - **Mac (Apple silicon):** download `Lithnode-mac-arm64.dmg` from the
+     [latest release](https://github.com/drewguitarist18-lang/lithnode/releases/latest) and drag Lithnode to
+     Applications. It isn't notarized yet, so the first time open *System Settings → Privacy & Security* and click
+     *Open Anyway*.
+   - **Linux (any distro):** download `Lithnode.flatpak` from the
+     [latest release](https://github.com/drewguitarist18-lang/lithnode/releases/latest), then
+     `flatpak install --user Lithnode.flatpak` and open Lithnode from your app menu. The Flatpak runs `claude`,
+     `codex`, `cursor-agent` and your other tools on your system (through `flatpak-spawn --host`), so it isn't
+     sandboxed away from your files: that's its whole job.
+   - **Run from source:** `python3 hq.py` (Windows: double-click **Lithnode.bat**). Python 3 only, no packages.
+
+   Builds for Mac and Linux come from GitHub Actions (`.github/workflows/build.yml`), which also runs a whole flow
+   through each built app before publishing it.
 
 The top bar shows whether Claude Code is signed in, plus badges for runs, approvals waiting for you,
 and agents at work. The **◐** button switches between dark, light and auto themes.
@@ -198,6 +210,9 @@ reports are kept.
   - shared: `sprites.js` (pixel art) and `ui.js` (styled dialogs and right-click menus)
 - `installer/`: the Windows build. `build.ps1` runs PyInstaller (the engine), Electron (the window) and
   Inno Setup (the installer) and writes `dist\LithnodeSetup.exe`.
+- `packaging/`: the Mac and Linux builds. `build.sh` builds the engine and the window; `linux/` holds the
+  Flatpak manifest and desktop files; `check_installed.py` runs a whole flow through a built app.
+- `.github/workflows/build.yml`: tests on Linux and Mac, builds the Flatpak and the Mac app, and publishes releases.
 - `site/`: lithnode.com, a static page deployed on Vercel.
 - `marketing/`: the ad animations (HTML, rendered to MP4).
 
@@ -208,5 +223,6 @@ reports are kept.
 .venv\Scripts\python tests\smoke.py        # the window, bots and locking, sign-in, localhost checks
 ```
 
+On Mac and Linux, use `python3 tests/flows_test.py` and `python3 tests/smoke.py`; CI runs both there on every push.
 Both suites run the real server against `tests/mock_claude.py`, a stand-in `claude` CLI, so they cost
 nothing. Real runs have been tested against Claude Code 2.1.289 with the *Quick code review* template.
