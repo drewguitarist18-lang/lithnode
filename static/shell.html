@@ -160,7 +160,9 @@ poll(); setInterval(poll, 2000);
 $("signinBtn").onclick = async () => {
   const b = $("signinBtn"); b.disabled = true; b.textContent = "Finish in your browser…";
   try { await fetch("/api/signin", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) {}
-  setTimeout(() => { b.disabled = false; b.textContent = "Sign in"; }, 60000);
+  // no browser yet (Mac and Linux have no console window to run it in): say how to do it by hand
+  setTimeout(() => { if (!b.hidden) b.textContent = "No browser? Run: claude auth login"; }, 20000);
+  setTimeout(() => { b.disabled = false; b.textContent = "Sign in"; }, 90000);
 };
 $("quitBtn").onclick = async () => {
   const ok = await ui.confirm({ title: "Quit Lithnode?", text: "This closes the app and stops any running flows.", ok: "Quit", danger: true });
