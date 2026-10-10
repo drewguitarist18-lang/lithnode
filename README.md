@@ -172,7 +172,8 @@ Agents are real Claude Code sessions working in the folder you choose. Read this
 - **Webhooks** on approval nodes send the flow name and message to the URL you enter. Only use your own.
 - **Your account, your usage.** Every agent is a real session on your own Claude, ChatGPT (Codex) or Cursor
   plan, under that company's terms for your account, and big flows can use a lot of it or hit your limits.
-  Lithnode is free and never charges you, so it can't refund usage. The Run menu shows how many agents a run
+  Lithnode is free and never charges you, so it can't refund usage. It's provided as is, with no warranty (see
+  LICENSE): use it at your own risk. The Run menu shows how many agents a run
   will start, and on which plan, before anything runs. Don't run Lithnode as a service for other people on
   your subscription.
 

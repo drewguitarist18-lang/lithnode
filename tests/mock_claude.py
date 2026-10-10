@@ -122,7 +122,12 @@ if "--resume" in flags and flags["--resume"] not in known:
 if "--session-id" in flags:   # written whole, then swapped in, so a reader never sees half a file
     tmp = SESSIONS.with_name(f"{SESSIONS.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(read_known() + [flags["--session-id"]]))
-    os.replace(tmp, SESSIONS)
+    for _ in range(50):   # Windows refuses the swap while another agent is reading the file: try again
+        try:
+            os.replace(tmp, SESSIONS)
+            break
+        except PermissionError:
+            time.sleep(0.02)
 
 # Lithnode pipeline agents append to Claude Code's system prompt and don't stream partial messages.
 # Cues: a stage named SLOWSTAGE takes 4s, HANGSTAGE hangs for a minute, FAILSTAGE (or FAILME in the prompt) fails.

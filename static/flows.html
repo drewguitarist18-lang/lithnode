@@ -774,6 +774,7 @@
   <h2>Lithnode runs on your own plan</h2>
   <p>Every agent is a real Claude Code, Codex or Cursor session, signed in with <b>your</b> account. Each one uses your Claude, ChatGPT or Cursor plan, and big flows can use a lot of it or hit your limits.</p>
   <p>Lithnode is free and never charges you, so it can't refund usage. Before each run, the Run menu shows how many agents it will start.</p>
+  <p><b>Use it at your own risk.</b> Lithnode is provided as is, with no warranty. You're responsible for what your agents do in your folders and for the usage they spend.</p>
   <div class="acts"><button class="primary" id="usageOk">Got it</button></div>
 </dialog>
 
@@ -2366,9 +2367,9 @@ async function deleteFlow() {
 document.querySelectorAll("dialog [data-close]").forEach((b) => b.onclick = () => b.closest("dialog").close());
 // once, on first launch: agents use the person's own plan
 (() => {
-  let seen = false; try { seen = localStorage.getItem("hq-usage-ok") === "1"; } catch (e) {}
+  let seen = false; try { seen = localStorage.getItem("hq-usage-ok-2") === "1"; } catch (e) {}
   if (seen) return;
-  $("usageOk").onclick = () => { try { localStorage.setItem("hq-usage-ok", "1"); } catch (e) {} $("usageDlg").close(); };
+  $("usageOk").onclick = () => { try { localStorage.setItem("hq-usage-ok-2", "1"); } catch (e) {} $("usageDlg").close(); };
   $("usageDlg").showModal();
 })();
 window.addEventListener("pagehide", () => {   // last edits survive closing the window mid-debounce
