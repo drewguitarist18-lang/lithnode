@@ -76,7 +76,7 @@ jobs:
       - name: Run a whole flow through the built app
         run: python3 packaging/check_installed.py '["dist/Lithnode-darwin-${{ matrix.arch }}/Lithnode.app/Contents/Resources/server/lithnode-server"]'
       - uses: actions/upload-artifact@v4
-        with: { name: mac-${{ matrix.arch }}, path: "dist/Lithnode-mac-${{ matrix.arch }}.dmg" }
+        with: { name: "mac-${{ matrix.arch }}", path: "dist/Lithnode-mac-${{ matrix.arch }}.dmg" }
 
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.release != ''
