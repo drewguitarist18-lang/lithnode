@@ -1550,7 +1550,8 @@ function wireFolder(id, onChange) {
   document.querySelector(`[data-browse="${id}"]`).onclick = async (e) => {
     const b = e.currentTarget; b.disabled = true; b.textContent = "Choose…";
     try {
-      const { folder } = await api("/api/pick-folder", { method: "POST", body: {} });
+      const app = window.top.lithnodeApp;   // Lithnode's own window: the system's folder picker
+      const { folder } = app && app.pickFolder ? { folder: await app.pickFolder() } : await api("/api/pick-folder", { method: "POST", body: {} });
       if (folder) { inp.value = folder; onChange(folder); }
     } catch (err) { toast(err.message); }
     b.disabled = false; b.textContent = "Browse…";

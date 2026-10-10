@@ -20,7 +20,7 @@ SETTINGS = Path.home() / ".claude" / "settings.json"
 
 
 def _cli():
-    return Path(sys.executable).with_name("lithnode-cli.exe")
+    return Path(sys.executable).with_name("lithnode-cli" + (".exe" if os.name == "nt" else ""))
 
 
 def _is_pet_hook(command, source_too):

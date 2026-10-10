@@ -13,7 +13,106 @@ import threading
 import time
 from pathlib import Path
 
-NO_WINDOW = 0x08000000  # CREATE_NO_WINDOW: don't flash a console when run from pythonw
+WINDOWS = os.name == "nt"
+NO_WINDOW = 0x08000000 if WINDOWS else 0   # CREATE_NO_WINDOW: don't flash a console (Windows only; 0 elsewhere)
+NEW_GROUP = {} if WINDOWS else {"start_new_session": True}   # so stopping an agent can stop what it started
+
+
+def own_exe(name):
+    """One of the installed app's own programs (lithnode-cli), next to the running one."""
+    import sys
+    return str(Path(sys.executable).with_name(name + (".exe" if WINDOWS else "")))
+
+
+# Folders the CLIs usually live in. An app opened from the Dock or an app menu doesn't get your terminal's PATH.
+COMMON_BINS = ["~/.local/bin", "~/.claude/local", "~/.npm-global/bin", "~/.bun/bin", "~/.volta/bin",
+               "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+
+
+# Inside the Linux Flatpak, Lithnode is sandboxed: Claude Code, Codex, Cursor and your CLIs live outside it, on
+# your system. Every one of them is started there with `flatpak-spawn --host` (see host), and found there (which).
+FLATPAK = bool(os.environ.get("FLATPAK_ID")) and not WINDOWS
+HOST_PATH = ""   # your system's PATH, under Flatpak
+
+
+def _login_path(prefix=()):
+    """The PATH your login shell sets up (nvm, Homebrew, ~/.local/bin, ...), or ""."""
+    try:
+        done = subprocess.run([*prefix, "sh", "-c", 'exec "${SHELL:-/bin/sh}" -ilc \'printf "\\n%s" "$PATH"\''],
+                              capture_output=True, text=True, timeout=10, stdin=subprocess.DEVNULL)
+        lines = (done.stdout or "").strip().splitlines()
+        line = lines[-1].strip() if lines else ""
+        return line.replace(" ", ":") if ":" not in line else line   # fish prints its PATH list with spaces
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def _merge(*paths):
+    seen, out = set(), []
+    for p in os.pathsep.join(filter(None, paths)).split(os.pathsep):
+        if p and p not in seen:
+            seen.add(p)
+            out.append(p)
+    return os.pathsep.join(out)
+
+
+def fix_path():
+    """Mac and Linux: add your login shell's PATH and the usual install folders, so `claude`, `codex`, `node` and
+    your own CLIs are found even when Lithnode wasn't started from a terminal."""
+    global HOST_PATH
+    if WINDOWS:
+        return
+    common = os.pathsep.join(os.path.expanduser(p) for p in COMMON_BINS)
+    if FLATPAK:
+        HOST_PATH = _merge(_login_path(["flatpak-spawn", "--host"]), common)
+    else:
+        os.environ["PATH"] = _merge(os.environ.get("PATH", ""), _login_path(), common)
+
+
+def which(name):
+    """Where a command is: on this computer, or under Flatpak on your system outside the sandbox."""
+    if not FLATPAK:
+        return shutil.which(name)
+    if name not in _which_cache:
+        try:
+            done = subprocess.run(["flatpak-spawn", "--host", "--env=PATH=" + (HOST_PATH or "/usr/local/bin:/usr/bin:/bin"),
+                                   "sh", "-c", 'command -v "$1"', "sh", name],
+                                  capture_output=True, text=True, timeout=10, stdin=subprocess.DEVNULL)
+            found = (done.stdout or "").strip().splitlines()
+            _which_cache[name] = found[-1] if done.returncode == 0 and found and found[-1].startswith("/") else None
+        except (OSError, subprocess.TimeoutExpired):
+            _which_cache[name] = None
+    return _which_cache[name]
+
+
+_which_cache = {}
+
+
+def shared_tmp():
+    """A temp folder both Lithnode and the programs it starts can see (the sandbox has its own /tmp)."""
+    if not FLATPAK:
+        return None
+    d = Path.home() / ".lithnode" / "tmp"
+    d.mkdir(parents=True, exist_ok=True)
+    return str(d)
+PASS_ON = ("ENABLE_CLAUDEAI_MCP_SERVERS", "ENABLE_TOOL_SEARCH", "LITHNODE_AGENT")
+
+
+def host(args, env=None, cwd=None):
+    """`args` as it should be started: unchanged, or under Flatpak run on your system with Lithnode's own settings
+    (the env keys it sets, its tools on the PATH) and the working folder passed along. When this process ends,
+    flatpak-spawn ends what it started (--watch-bus)."""
+    if not FLATPAK:
+        return list(args)
+    out = ["flatpak-spawn", "--host", "--watch-bus"]
+    if cwd:
+        out.append(f"--directory={cwd}")
+    env = os.environ if env is None else env
+    for k, v in env.items():
+        if k in PASS_ON or k.startswith(("CLAWD_", "LITHNODE_")) and k != "LITHNODE_CLIS":
+            out.append(f"--env={k}={v}")
+    out.append("--env=PATH=" + _merge(TOOLS_BIN or "", HOST_PATH or "/usr/local/bin:/usr/bin:/bin"))
+    return out + list(args)
 # Keep MCP servers and claude.ai connectors (Vercel, Notion, ...) out of these sessions. Their tool lists
 # can add ~200k tokens to every request: more than Haiku's whole window, and costly on any model.
 NO_CONNECTORS_ENV = {"ENABLE_CLAUDEAI_MCP_SERVERS": "false"}
@@ -31,7 +130,8 @@ def setup_tools(home):
     import shot
     import sys
     frozen = getattr(sys, "frozen", False)
-    command = [str(Path(sys.executable).with_name("lithnode-cli.exe")), "shot"] if frozen else [sys.executable, str(Path(shot.__file__).resolve())]
+    command = (["flatpak", "run", "--command=" + own_exe("lithnode-cli"), os.environ["FLATPAK_ID"], "shot"] if frozen and FLATPAK
+               else [own_exe("lithnode-cli"), "shot"]) if frozen else [sys.executable, str(Path(shot.__file__).resolve())]
     TOOLS_BIN = str(shot.bin_dir(home, command))
     return TOOLS_BIN
 
@@ -83,11 +183,12 @@ def list_connectors(force=False):
         if not command:
             value["error"] = "Claude Code isn't installed on this computer."
         else:
-            fd, log = tempfile.mkstemp(prefix="lithnode-probe-", suffix=".txt")
+            fd, log = tempfile.mkstemp(prefix="lithnode-probe-", suffix=".txt", dir=shared_tmp())
             os.close(fd)
             try:
-                subprocess.run([*command, "-p", "--model", PROBE_MODEL, "--output-format", "json", "--tools", "ToolSearch",
-                                "--disable-slash-commands", "--debug-file", log], input="hi", capture_output=True,
+                subprocess.run(host([*command, "-p", "--model", PROBE_MODEL, "--output-format", "json", "--tools", "ToolSearch",
+                                     "--disable-slash-commands", "--debug-file", log], connectors_env(), str(Path.home())),
+                               input="hi", capture_output=True,
                                text=True, timeout=90, creationflags=NO_WINDOW, env=connectors_env(), cwd=str(Path.home()))
                 seen, live = [], set()
                 for line in Path(log).read_text(encoding="utf-8", errors="replace").splitlines():
@@ -134,7 +235,7 @@ def cli_installed(name):
     if not CLI_RE.match(name or ""):
         return False
     fake = os.environ.get("LITHNODE_CLIS")
-    return name in fake.split(",") if fake is not None else shutil.which(name) is not None
+    return name in fake.split(",") if fake is not None else which(name) is not None
 
 
 def list_clis():
@@ -144,7 +245,7 @@ def list_clis():
     if fake is not None:
         have = set(filter(None, fake.split(",")))
         return [{"id": c, "name": n, "blurb": b} for c, n, b in KNOWN_CLIS if c in have]
-    return [{"id": c, "name": n, "blurb": b} for c, n, b in KNOWN_CLIS if shutil.which(c)]
+    return [{"id": c, "name": n, "blurb": b} for c, n, b in KNOWN_CLIS if which(c)]
 
 
 STATUS_TTL = 15
@@ -161,7 +262,7 @@ def find_command():
     override = os.environ.get("CLAWD_BOT_CLAUDE_CMD")
     if override:
         return json.loads(override)
-    exe = shutil.which("claude")
+    exe = which("claude")
     shim = exe if exe and Path(exe).suffix.lower() in (".cmd", ".bat") else None
     if exe and not shim:
         return [exe]
@@ -212,7 +313,7 @@ def auth_status(force=False):
     if command:
         value["available"] = True
         try:
-            done = subprocess.run([*command, "auth", "status"], capture_output=True, text=True,
+            done = subprocess.run(host([*command, "auth", "status"]), capture_output=True, text=True,
                                   timeout=20, creationflags=NO_WINDOW)
             data = json.loads(done.stdout or "{}")
             value["logged_in"] = bool(data.get("loggedIn"))
@@ -228,10 +329,11 @@ def start_login():
     command = find_command()
     if not command:
         return False
-    # The tests swap in a mock CLI; don't pop a console for that.
-    flags = NO_WINDOW if os.environ.get("CLAWD_BOT_CLAUDE_CMD") else 0x00000010   # CREATE_NEW_CONSOLE
+    # The tests swap in a mock CLI; don't pop a console for that. On Mac and Linux it opens your browser itself.
+    flags = NO_WINDOW if os.environ.get("CLAWD_BOT_CLAUDE_CMD") or not WINDOWS else 0x00000010   # CREATE_NEW_CONSOLE
     try:
-        subprocess.Popen([*command, "auth", "login", "--claudeai"], cwd=str(Path.home()), creationflags=flags)
+        subprocess.Popen(host([*command, "auth", "login", "--claudeai"]), cwd=str(Path.home()), creationflags=flags,
+                         stdin=subprocess.DEVNULL, **NEW_GROUP)
     except OSError:
         return False
     _status_cache["value"] = None   # so the next status check really asks

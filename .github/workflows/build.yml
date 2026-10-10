@@ -1,0 +1,95 @@
+# Tests Lithnode on Linux and Mac, builds the Linux Flatpak and the Mac apps, checks each built app for real,
+# and (when started by hand with a version) publishes them as a GitHub release.
+# Windows is built on Windows itself: installer/build.ps1.
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish a release with this version (like 0.1.1). Leave empty to only build."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python tests/flows_test.py
+      - run: python tests/smoke.py
+
+  flatpak:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Build the engine and the window
+        run: packaging/build.sh linux
+      - name: Tools for Flatpak
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq flatpak flatpak-builder dbus-x11
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Build the Flatpak
+        run: |
+          cd packaging/linux
+          flatpak-builder --user --install-deps-from=flathub --force-clean --repo=repo build com.lithnode.Lithnode.yml
+          flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo repo ../../dist/Lithnode.flatpak com.lithnode.Lithnode
+          ls -la ../../dist/Lithnode.flatpak
+      - name: Install it and run a whole flow through it
+        run: |
+          flatpak install --user -y --noninteractive dist/Lithnode.flatpak
+          dbus-run-session -- python3 packaging/check_installed.py \
+            '["flatpak", "run", "--command=/app/lithnode/server/lithnode-server", "com.lithnode.Lithnode"]'
+      - uses: actions/upload-artifact@v4
+        with: { name: linux, path: dist/Lithnode.flatpak }
+
+  mac:   # Apple silicon (M1 and newer)
+    strategy:
+      matrix:
+        include:
+          - { runner: macos-14, arch: arm64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Build Lithnode.app
+        run: packaging/build.sh mac ${{ matrix.arch }}
+      - name: Run a whole flow through the built app
+        run: python3 packaging/check_installed.py '["dist/Lithnode-darwin-${{ matrix.arch }}/Lithnode.app/Contents/Resources/server/lithnode-server"]'
+      - uses: actions/upload-artifact@v4
+        with: { name: mac-${{ matrix.arch }}, path: "dist/Lithnode-mac-${{ matrix.arch }}.dmg" }
+
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.release != ''
+    needs: [test, flatpak, mac]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out, merge-multiple: true }
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.release }}
+        run: |
+          ls -la out
+          gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --title "Lithnode $VERSION" \
+            --notes "Linux: Lithnode.flatpak (any distro). Mac: the .dmg (Apple silicon). Windows: lithnode.com."

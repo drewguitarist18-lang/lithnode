@@ -15,3 +15,8 @@ installer/app/lithnode.ico
 # render outputs (the HTML sources are kept)
 marketing/*.mp4
 marketing/relay-ad.*
+packaging/linux/stage/
+packaging/linux/build/
+packaging/linux/repo/
+packaging/linux/.flatpak-builder/
+installer/app/lithnode.png

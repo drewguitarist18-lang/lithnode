@@ -16,19 +16,27 @@ import tempfile
 import time
 from pathlib import Path
 
-NO_WINDOW = 0x08000000
+NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 BROWSERS = [r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe", r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe",
-            r"%ProgramFiles%\Google\Chrome\Application\chrome.exe", r"%LocalAppData%\Google\Chrome\Application\chrome.exe"]
+            r"%ProgramFiles%\Google\Chrome\Application\chrome.exe", r"%LocalAppData%\Google\Chrome\Application\chrome.exe",
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium", "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"]
+FLATPAK = bool(os.environ.get("FLATPAK_ID")) and os.name != "nt"
+NAMES = ("msedge", "chrome", "google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "microsoft-edge", "brave-browser")
 FREEZE = ("<script>addEventListener('load',function(){var t=%d;setTimeout(function(){document.getAnimations().forEach("
           "function(a){try{a.pause();a.currentTime=t}catch(e){}})},0)})</script>")
 
 
 def browser():
+    if FLATPAK:   # the Linux Flatpak: use the browser on your system, outside the sandbox
+        import claude_code
+        claude_code.fix_path()
+        return next(filter(None, map(claude_code.which, NAMES)), None)
     for b in BROWSERS:
         path = os.path.expandvars(b)
-        if os.path.exists(path):
+        if "%" not in path and os.path.exists(path):
             return path
-    for name in ("msedge", "chrome", "chromium", "google-chrome"):
+    for name in NAMES:
         found = shutil.which(name)
         if found:
             return found
@@ -39,7 +47,7 @@ def shot(target, seconds=2.0, size="1280x800", out_dir=None):
     """Returns the PNG's path. Raises RuntimeError with a plain reason if it can't."""
     exe = browser()
     if not exe:
-        raise RuntimeError("No Edge or Chrome on this computer to take the screenshot with.")
+        raise RuntimeError("No Chrome, Edge or Chromium on this computer to take the screenshot with.")
     if not re.fullmatch(r"\d{2,4}x\d{2,4}", size):
         raise RuntimeError("Size must look like 1280x800.")
     out_dir = Path(out_dir or Path.cwd() / ".lithnode-shots")
@@ -68,11 +76,15 @@ def shot(target, seconds=2.0, size="1280x800", out_dir=None):
     out = out_dir / f"{name}-{seconds:g}s.png"
     out.unlink(missing_ok=True)   # so an old picture is never mistaken for this one
     w, h = size.split("x")
-    profile = tempfile.mkdtemp(prefix="lithnode-shot-")
+    host = (lambda a: a)
+    if FLATPAK:
+        import claude_code
+        host = claude_code.host
+    profile = tempfile.mkdtemp(prefix="lithnode-shot-", dir=claude_code.shared_tmp() if FLATPAK else None)
     try:
-        subprocess.run([exe, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--no-default-browser-check",
+        subprocess.run(host([exe, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--no-default-browser-check",
                         f"--user-data-dir={profile}", f"--window-size={w},{h}", f"--virtual-time-budget={int(seconds * 1000) + 800}",
-                        f"--screenshot={out}", url], capture_output=True, timeout=60, creationflags=NO_WINDOW if os.name == "nt" else 0)
+                        f"--screenshot={out}", url]), capture_output=True, timeout=60, creationflags=NO_WINDOW)
         # Edge hands the work to a background process and returns at once: wait for the picture to land
         deadline = time.time() + seconds + 30
         while time.time() < deadline and not (out.exists() and out.stat().st_size > 0):
@@ -123,7 +135,9 @@ def bin_dir(home, command):
     folder = Path(home) / "bin"
     folder.mkdir(parents=True, exist_ok=True)
     posix = " ".join(f'"{Path(c).as_posix()}"' if i == 0 or c.endswith(".py") else c for i, c in enumerate(command))
-    (folder / "lithnode-shot").write_text(f'#!/bin/sh\nexec {posix} "$@"\n', encoding="utf-8", newline="\n")
+    sh = folder / "lithnode-shot"
+    sh.write_text(f'#!/bin/sh\nexec {posix} "$@"\n', encoding="utf-8", newline="\n")
+    sh.chmod(0o755)
     win = " ".join(f'"{c}"' if i == 0 or c.endswith(".py") else c for i, c in enumerate(command))
     (folder / "lithnode-shot.cmd").write_text(f"@echo off\r\n{win} %*\r\n", encoding="utf-8", newline="")
     return folder

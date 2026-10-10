@@ -64,6 +64,7 @@
                        padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 150px)) + 8px); }
   html.native header :is(a, button, canvas) { -webkit-app-region: no-drag; }
   html.native .quit { display: none; }
+  html.native.mac header { padding-left: 84px; padding-right: 16px; }   /* the Mac's own window buttons sit top left */
 </style>
 </head>
 <body>
@@ -120,7 +121,7 @@ function applyAll() {
   $("barColor").content = bar;
   if (window.lithnodeApp) window.lithnodeApp.setBar(bar, css.getPropertyValue("--muted").trim() || "#8d8d8d");   // own window: recolor its title bar
 }
-if (window.lithnodeApp) document.documentElement.classList.add("native");
+if (window.lithnodeApp) document.documentElement.classList.add("native", ...(window.lithnodeApp.platform === "darwin" ? ["mac"] : []));
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themeMode === "system") applyAll(); });
 $("themeBtn").onclick = () => {
   const order = Object.keys(THEMES);

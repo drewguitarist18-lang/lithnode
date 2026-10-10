@@ -1,5 +1,6 @@
-// Lithnode's own window. It starts the Lithnode engine (server\lithnode-server.exe, built by PyInstaller)
+// Lithnode's own window. It starts the Lithnode engine (server/lithnode-server, built by PyInstaller)
 // hidden in the background, then shows the app in a window with Lithnode's own dark title bar.
+// Windows and Linux: the engine sits in server/ next to this program. Mac: in the app's Resources folder.
 // Closing the window stops the engine and any runs, like Quit does.
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { spawn } = require("child_process");
@@ -7,7 +8,10 @@ const http = require("http");
 const path = require("path");
 
 const URL = "http://127.0.0.1:8790/";
-const SERVER = path.join(path.dirname(process.execPath), "server", "lithnode-server.exe");
+const MAC = process.platform === "darwin";
+const SERVER = process.platform === "win32" ? path.join(path.dirname(process.execPath), "server", "lithnode-server.exe")
+  : MAC ? path.join(process.resourcesPath, "server", "lithnode-server")
+  : path.join(path.dirname(process.execPath), "server", "lithnode-server");
 const BAR = { color: "#111111", symbolColor: "#8d8d8d", height: 48 };   // matches the app's top bar
 let win = null;
 let server = null;
@@ -41,8 +45,9 @@ async function startEngine() {
 function createWindow() {
   win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 960, minHeight: 600, show: false,
-    title: "Lithnode", backgroundColor: "#0a0a0a", icon: path.join(__dirname, "lithnode.ico"),
-    titleBarStyle: "hidden", titleBarOverlay: BAR,
+    title: "Lithnode", backgroundColor: "#0a0a0a", icon: path.join(__dirname, MAC ? "lithnode.png" : process.platform === "win32" ? "lithnode.ico" : "lithnode.png"),
+    // Mac keeps its own traffic lights (top left, over the bar); Windows and Linux draw ours at the right
+    ...(MAC ? { titleBarStyle: "hiddenInset" } : { titleBarStyle: "hidden", titleBarOverlay: BAR }),
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
   });
   win.removeMenu();
@@ -66,7 +71,13 @@ function createWindow() {
 // the page's theme switch recolors the title bar and its buttons
 ipcMain.on("bar", (_e, colors) => {
   if (!win || !colors) return;
+  if (MAC) return;
   try { win.setTitleBarOverlay({ color: String(colors.color), symbolColor: String(colors.symbol) }); } catch (e) { /* older Windows */ }
+});
+// the system's own folder picker, on every platform (and inside the Linux sandbox, through its portal)
+ipcMain.handle("pick-folder", async () => {
+  const r = await dialog.showOpenDialog(win, { title: "Pick the folder your agents work in", properties: ["openDirectory", "createDirectory"] });
+  return r.canceled || !r.filePaths.length ? "" : r.filePaths[0];
 });
 
 app.whenReady().then(async () => {
@@ -81,6 +92,6 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (server) server.kill();
+  if (server) server.kill();   // the engine stops its agents as it goes
   app.quit();
 });

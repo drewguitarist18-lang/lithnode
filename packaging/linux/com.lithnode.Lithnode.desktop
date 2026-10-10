@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Lithnode
+Comment=Draw a team of coding agents (Claude Code, Codex, Cursor) and run it
+Exec=lithnode %U
+Icon=com.lithnode.Lithnode
+Categories=Development;
+Terminal=false
+StartupWMClass=Lithnode

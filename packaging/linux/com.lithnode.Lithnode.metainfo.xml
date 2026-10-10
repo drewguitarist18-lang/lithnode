@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.lithnode.Lithnode</id>
+  <name>Lithnode</name>
+  <summary>Draw a team of coding agents and run it</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>Lithnode runs teams of coding-agent sessions (Claude Code, Codex and Cursor) as a graph you draw. Give each
+    team a job, its command-line tools and connectors, split big jobs across agents, and have others check the work.</p>
+    <p>Every agent runs on your own sign-in and plan. Lithnode is free and never charges you.</p>
+  </description>
+  <launchable type="desktop-id">com.lithnode.Lithnode.desktop</launchable>
+  <url type="homepage">https://lithnode.com</url>
+  <url type="vcs-browser">https://github.com/drewguitarist18-lang/lithnode</url>
+  <developer id="com.lithnode"><name>Lithnode</name></developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.1" date="2026-10-10"/>
+  </releases>
+</component>

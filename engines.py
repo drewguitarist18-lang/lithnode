@@ -27,7 +27,7 @@ def codex_command():
     override = os.environ.get("LITHNODE_CODEX_CMD")
     if override:
         return json.loads(override)
-    found = shutil.which("codex")
+    found = claude_code.which("codex")
     return [found] if found else None
 
 
@@ -43,7 +43,7 @@ def cursor_command():
             node = version / "node.exe"
             if node.exists():
                 return [str(node), str(version / "index.js")]
-    found = shutil.which("cursor-agent")
+    found = claude_code.which("cursor-agent") or claude_code.which("agent")   # newer installs name it `agent`
     return [found] if found else None
 
 
@@ -55,7 +55,7 @@ _status_lock = threading.Lock()
 
 def _run(cmd, *args, timeout=40):
     try:
-        out = subprocess.run([*cmd, *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
+        out = subprocess.run(claude_code.host([*cmd, *args]), capture_output=True, text=True, encoding="utf-8", errors="replace",
                              timeout=timeout, creationflags=NO_WINDOW, stdin=subprocess.DEVNULL, cwd=str(Path.home()))
         return out.returncode, (out.stdout or "") + (out.stderr or "")
     except (OSError, subprocess.TimeoutExpired) as exc:

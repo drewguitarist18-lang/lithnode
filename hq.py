@@ -444,7 +444,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"folder": os.environ["LITHNODE_PICKER"]})
         script = ("import tkinter as tk; from tkinter import filedialog; r = tk.Tk(); r.withdraw(); "
                   "r.attributes('-topmost', True); print(filedialog.askdirectory(title='Pick the folder your agents work in') or '')")
-        command = ([str(Path(sys.executable).with_name("lithnode-cli.exe")), "pick-folder"]   # the installed app
+        command = ([claude_code.own_exe("lithnode-cli"), "pick-folder"]   # the installed app
                    if getattr(sys, "frozen", False) else [sys.executable, "-c", script])
         try:
             done = subprocess.run(command, capture_output=True, text=True, timeout=600, creationflags=claude_code.NO_WINDOW)
@@ -533,7 +533,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def app_window_command():
     """Edge or Chrome in app mode (no tabs or address bar), like a desktop program."""
-    candidates = [shutil.which("msedge"), shutil.which("chrome")]
+    candidates = [shutil.which(n) for n in ("msedge", "chrome", "google-chrome", "google-chrome-stable", "chromium", "chromium-browser")]
+    candidates += ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"]
     for root in filter(None, (os.environ.get("ProgramFiles(x86)"), os.environ.get("ProgramFiles"),
                               os.environ.get("LOCALAPPDATA"))):
         candidates += [
@@ -567,6 +568,7 @@ def already_running():
 
 
 def main():
+    claude_code.fix_path()
     if already_running():
         if "--no-open" not in sys.argv:
             open_window()

@@ -113,6 +113,7 @@ for img, s in zip(images, sizes):
     entries += struct.pack("<BBBBHHII", s % 256, s % 256, 0, 0, 1, 32, len(img), offset)
     offset += len(img)
 (HERE / "lithnode.ico").write_bytes(struct.pack("<HHH", 0, 1, len(images)) + entries + b"".join(images))
+(HERE / "lithnode.png").write_bytes(icon_png(512))   # Mac and Linux
 for scale in (1, 2):
     (HERE / f"wizard-{scale}x.bmp").write_bytes(side_panel(scale))
     (HERE / f"wizard-small-{scale}x.bmp").write_bytes(corner(scale))

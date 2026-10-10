@@ -1,0 +1,32 @@
+# Lithnode as a Flatpak, for any Linux (Arch, Fedora, Ubuntu, ...). Built by packaging/linux/build.sh.
+# The sandbox is opened up on purpose: Lithnode's whole job is running Claude Code, Codex, Cursor and your own
+# command-line tools in your project folders, and those live on your system. It starts them there with
+# `flatpak-spawn --host` (that's what org.freedesktop.Flatpak is for) and needs your folders (--filesystem=host).
+app-id: com.lithnode.Lithnode
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '24.08'
+command: lithnode
+separate-locales: false
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=x11
+  - --device=dri
+  - --filesystem=host
+  - --talk-name=org.freedesktop.Flatpak
+  - --talk-name=org.freedesktop.Notifications
+modules:
+  - name: lithnode
+    buildsystem: simple
+    build-commands:
+      - cp -a app /app/lithnode
+      - install -Dm755 lithnode.sh /app/bin/lithnode
+      - install -Dm644 com.lithnode.Lithnode.desktop /app/share/applications/com.lithnode.Lithnode.desktop
+      - install -Dm644 lithnode.png /app/share/icons/hicolor/512x512/apps/com.lithnode.Lithnode.png
+      - install -Dm644 com.lithnode.Lithnode.metainfo.xml /app/share/metainfo/com.lithnode.Lithnode.metainfo.xml
+    sources:
+      - type: dir
+        path: stage

@@ -6,6 +6,7 @@ show what it is doing right now, then keep only its final report and cost.
 """
 import json
 import os
+import signal
 import subprocess
 import threading
 import uuid
@@ -106,8 +107,19 @@ def report_of(text, limit):
 
 
 def kill_tree(proc):
-    """Kill a session and everything it started: on Windows its Bash commands outlive a plain kill()."""
-    if os.name == "nt":
+    """Kill a session and everything it started: its Bash commands outlive a plain kill()."""
+    if not claude_code.WINDOWS:   # Mac and Linux: each agent leads its own process group (NEW_GROUP)
+        try:
+            if claude_code.FLATPAK:   # flatpak-spawn hands SIGTERM on to what it started outside the sandbox
+                os.killpg(proc.pid, signal.SIGTERM)
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    pass
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (OSError, AttributeError):
+            pass
+    else:
         try:
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True,
                            timeout=15, creationflags=claude_code.NO_WINDOW)
@@ -187,11 +199,11 @@ class Agent:
             if self.stopped:
                 return False
             try:
+                env = claude_code.connectors_env() if self.connectors else claude_code.lean_env()
                 self.proc = subprocess.Popen(
-                    args, cwd=str(self.cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    claude_code.host(args, env, str(self.cwd)), cwd=str(self.cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
-                    creationflags=claude_code.NO_WINDOW,
-                    env=claude_code.connectors_env() if self.connectors else claude_code.lean_env())
+                    creationflags=claude_code.NO_WINDOW, **claude_code.NEW_GROUP, env=env)
             except OSError as exc:
                 self.error = f"Couldn't start Claude Code: {exc}"
                 return False
@@ -277,9 +289,10 @@ class Agent:
             if self.stopped:
                 return False
             try:
-                self.proc = subprocess.Popen(args, cwd=str(self.cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                env = claude_code.lean_env()
+                self.proc = subprocess.Popen(claude_code.host(args, env, str(self.cwd)), cwd=str(self.cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                              stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
-                                             creationflags=claude_code.NO_WINDOW, env=claude_code.lean_env())
+                                             creationflags=claude_code.NO_WINDOW, **claude_code.NEW_GROUP, env=env)
             except OSError as exc:
                 self.error = f"Couldn't start {name}: {exc}"
                 return False
