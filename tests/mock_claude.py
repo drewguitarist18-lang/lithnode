@@ -96,7 +96,14 @@ session = flags.get("--session-id") or flags.get("--resume") or str(uuid.uuid4()
 log({"flags": {k: v for k, v in flags.items()}, "prompt": prompt, "via": via, "cwd": os.getcwd(), "t": time.time(),
      "connectors": os.environ.get("ENABLE_CLAUDEAI_MCP_SERVERS"), "toolsearch": os.environ.get("ENABLE_TOOL_SEARCH")})
 
-known = json.loads(SESSIONS.read_text()) if SESSIONS.exists() else []
+def read_known():   # side-by-side agents share this file: never trust a half-written read
+    try:
+        return json.loads(SESSIONS.read_text())
+    except (OSError, ValueError):
+        return []
+
+
+known = read_known()
 base = {"session_id": session}
 out({"type": "system", "subtype": "init", "cwd": os.getcwd(), "session_id": session, "tools": [], "model": flags.get("--model", "?")})
 
@@ -112,8 +119,10 @@ if "--resume" in flags and flags["--resume"] not in known:
     out({"type": "result", "subtype": "error_during_execution", "is_error": True,
          "result": f"No conversation found with session ID: {flags['--resume']}", **base})
     sys.exit(1)
-if "--session-id" in flags:
-    SESSIONS.write_text(json.dumps(known + [flags["--session-id"]]))
+if "--session-id" in flags:   # written whole, then swapped in, so a reader never sees half a file
+    tmp = SESSIONS.with_name(f"{SESSIONS.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(read_known() + [flags["--session-id"]]))
+    os.replace(tmp, SESSIONS)
 
 # Lithnode pipeline agents append to Claude Code's system prompt and don't stream partial messages.
 # Cues: a stage named SLOWSTAGE takes 4s, HANGSTAGE hangs for a minute, FAILSTAGE (or FAILME in the prompt) fails.

@@ -40,14 +40,31 @@
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
   /* toolbar */
-  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  .bar select { width: auto; max-width: 220px; }
-  .bar #flowName { width: 220px; font-weight: 600; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; min-height: 52px; }
+  .bar button { height: 34px; display: inline-flex; align-items: center; gap: 6px; }
+  .bar .ib { width: 34px; padding: 0; justify-content: center; color: var(--muted); background: transparent; border-color: transparent; }
+  .bar .ib:hover { color: var(--ink); background: var(--hover); }
+  .bar .ib[aria-pressed="false"] { color: color-mix(in srgb, var(--muted) 70%, transparent); }
+  .bar .ib svg { width: 18px; height: 18px; }
+  .bar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 2px; }
+  /* the flow's name is the title; the small switch beside it opens your other flows */
+  .fswitch { position: relative; width: 28px; height: 34px; flex: none; border-radius: 8px; color: var(--muted); display: grid; place-items: center; }
+  .fswitch:hover { background: var(--hover); color: var(--ink); }
+  .fswitch svg { width: 16px; height: 16px; pointer-events: none; }
+  .fswitch select { position: absolute; inset: 0; opacity: 0; cursor: pointer; padding: 0; }
+  .fswitch select option { color: var(--ink); background: var(--panel); }
+  .bar #flowName { width: auto; min-width: 120px; max-width: 340px; field-sizing: content; font-size: 15px; font-weight: 650; letter-spacing: -.01em;
+                   background: transparent; border-color: transparent; padding: 5px 8px; margin-left: -2px; margin-right: -6px; }
+  .bar #flowName:hover:not(:focus) { border-color: var(--line); }
+  .bar #flowName:focus { background: var(--pad); }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
           background: var(--pad); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
   .chip.warn { color: var(--failed); border-color: color-mix(in srgb, var(--failed) 40%, var(--line)); }
   .grow { flex: 1; }
-  #saved { color: var(--muted); font-size: 12px; min-width: 56px; }
+  #saved { color: var(--muted); font-size: 12px; min-width: 56px; opacity: .8; }
+  main.hideL { grid-template-columns: 0 1fr 350px; } main.hideL #palette { visibility: hidden; }
+  main.hideR { grid-template-columns: 240px 1fr 0; } main.hideR #insp { visibility: hidden; }
+  main.hideL.hideR, main.running.hideR { grid-template-columns: 0 1fr 0; }
 
   main { display: grid; grid-template-columns: 240px 1fr 350px; min-height: 0; transition: grid-template-columns .25s ease; }
   main.running { grid-template-columns: 0 1fr 350px; }   /* building blocks aren't needed while a run goes */
@@ -492,7 +509,7 @@
   .pill { font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: #fff; text-transform: uppercase; background: var(--waiting); }
   .pill.running { background: var(--running); } .pill.done { background: var(--done); } .pill.failed { background: var(--failed); }
   .pill.approval { background: var(--approval); }
-  .out { white-space: pre-wrap; word-break: break-word; background: var(--pad); border: 1px solid var(--line); border-radius: 10px;
+  .out:not(.port) { white-space: pre-wrap; word-break: break-word; background: var(--pad); border: 1px solid var(--line); border-radius: 10px;
          padding: 10px 12px; font-size: 12.5px; max-height: 420px; overflow-y: auto; }
   .out h4 { margin: 8px 0 2px; font-size: 13px; }
   .log { font-size: 12px; color: var(--muted); max-height: 220px; overflow-y: auto; }
@@ -671,16 +688,20 @@
 </head>
 <body>
 <div class="bar">
-  <select id="flowPick" title="Your flows"></select>
-  <button id="newBtn">+ New</button>
-  <input id="flowName" maxlength="60" aria-label="Flow name">
-  <span id="saved"></span>
+  <button class="ib" id="paneL" title="Show or hide the building blocks" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>
+  <span class="sep"></span>
+  <input id="flowName" maxlength="60" aria-label="Flow name" title="Rename this flow" spellcheck="false">
+  <span class="fswitch" title="Switch flow"><select id="flowPick" aria-label="Switch flow"></select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></span>
   <span class="chip" id="estChip" title="How many agents this flow will start."></span>
   <span class="chip warn" id="probChip" hidden></span>
+  <span id="saved"></span>
   <span class="grow"></span>
+  <button id="newBtn" title="A new blank flow">+ New</button>
   <button id="runsBtn">Runs</button>
-  <button id="delBtn" title="More actions">⋯</button>
+  <button class="ib" id="delBtn" title="More actions">⋯</button>
   <button id="runBtn" class="primary">▶ Run</button>
+  <span class="sep"></span>
+  <button class="ib" id="paneR" title="Show or hide the side panel" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></svg></button>
 </div>
 <div id="sheet" role="dialog" aria-label="Result"></div>
 <main>
@@ -1112,12 +1133,13 @@ function fit() {
   const nodes = shown().nodes, r = $("canvas").getBoundingClientRect();
   if (r.width < 60 || r.height < 60) return;   // hidden tab: fit when it's shown again
   if (!nodes.length) { view.x = 40; view.y = 20; view.k = 1; return applyView(); }
-  const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
-  const minX = Math.min(...xs) - 30, minY = Math.min(...ys) - 40, maxX = Math.max(...xs) + 330, maxY = Math.max(...ys) + 170;   // right: node width + room for wires that loop to the next row
+  const box = nodes.map((n) => ({ n, ...nodeSize(n) }));
+  const minX = Math.min(...box.map((b) => b.n.x)) - 40, minY = Math.min(...box.map((b) => b.n.y)) - 40;
+  const maxX = Math.max(...box.map((b) => b.n.x + b.w)) + 40, maxY = Math.max(...box.map((b) => b.n.y + b.h)) + 40;
   const tray = $("tray"), trayH = tray.classList.contains("show") ? tray.offsetHeight + 12 : 0;
   const top = 64, bottom = 44 + trayH;   // room for the describe box (or the run banner), the zoom buttons and the items tray
   const h = r.height - top - bottom;
-  view.k = Math.min(1.1, Math.max(0.3, Math.min(r.width / (maxX - minX), h / (maxY - minY))));
+  view.k = Math.min(1, Math.max(0.3, Math.min(r.width / (maxX - minX), h / (maxY - minY))));
   view.x = (r.width - (maxX - minX) * view.k) / 2 - minX * view.k;
   view.y = top + (h - (maxY - minY) * view.k) / 2 - minY * view.k;
   applyView();
@@ -1129,6 +1151,16 @@ $("canvas").addEventListener("mousedown", () => { autoFit = false; }, true);
 $("zIn").onclick = () => { const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k * 1.2); };
 $("zOut").onclick = () => { const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k / 1.2); };
 $("zFit").onclick = fit;
+// Hide either side panel for more room to see the flow; the choice is remembered.
+function setPanes(l, r) {
+  $("paneL").setAttribute("aria-pressed", String(l)); $("paneR").setAttribute("aria-pressed", String(r));
+  document.querySelector("main").classList.toggle("hideL", !l); document.querySelector("main").classList.toggle("hideR", !r);
+  try { localStorage.setItem("hq-panes", JSON.stringify([l, r])); } catch (e) {}
+  autoFit = true;   // the canvas changes size: keep the flow in view
+}
+(() => { let p = [true, true]; try { p = JSON.parse(localStorage.getItem("hq-panes")) || p; } catch (e) {} setPanes(!!p[0], !!p[1]); })();
+$("paneL").onclick = () => setPanes($("paneL").getAttribute("aria-pressed") !== "true", $("paneR").getAttribute("aria-pressed") === "true");
+$("paneR").onclick = () => setPanes($("paneL").getAttribute("aria-pressed") === "true", $("paneR").getAttribute("aria-pressed") !== "true");
 // Tidy: line the flow up by stage, top to bottom or left to right (same rules as the server's layout)
 function tidy(direction) {   // arrange now and keep auto-arranging
   if (locked()) return;
@@ -1373,7 +1405,8 @@ function renderChips() {
   $("estChip").hidden = !e;
   if (e) {
     const per = Object.entries(e.per_model).map(([m, c]) => `${c}× ${modelLabel(m)}`).join(", ");
-    $("estChip").textContent = `${e.sessions} agent${e.sessions === 1 ? "" : "s"}`;
+    const steps = flow.nodes.filter((n) => n.type !== "done" && n.type !== "master").length;
+    $("estChip").textContent = `${e.sessions} agent${e.sessions === 1 ? "" : "s"} · ${steps} step${steps === 1 ? "" : "s"}`;
     $("estChip").title = per ? per + "." : "";
   }
   $("probChip").hidden = run || !problems.length;

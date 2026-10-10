@@ -608,8 +608,9 @@ try:
                                          'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  '
                                          '"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*\r\n')
     unwrapped = cc_mod.unwrap_shim(shim_dir / "claude.cmd")
-    check("npm's claude.cmd is run as node + cli.js, not through cmd.exe",
-          unwrapped and [Path(p).resolve() for p in unwrapped] == [(shim_dir / "node.exe").resolve(), js.resolve()], unwrapped)
+    if os.name == "nt":   # npm's .cmd shims are a Windows thing
+        check("npm's claude.cmd is run as node + cli.js, not through cmd.exe",
+              unwrapped and [Path(p).resolve() for p in unwrapped] == [(shim_dir / "node.exe").resolve(), js.resolve()], unwrapped)
     shutil.rmtree(shim_dir, ignore_errors=True)
 
     # ---- describe a team -> a new flow ------------------------------------------------------------

@@ -43,7 +43,7 @@ jobs:
       - name: Tools for Flatpak
         run: |
           sudo apt-get update -q
-          sudo apt-get install -yq flatpak flatpak-builder dbus-x11
+          sudo apt-get install -yq flatpak flatpak-builder appstream-util dbus-x11
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
       - name: Build the Flatpak
         run: |
