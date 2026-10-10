@@ -30,8 +30,8 @@ jobs:
       - run: python tests/flows_test.py
       - run: python tests/smoke.py
 
-  flatpak:
-    runs-on: ubuntu-22.04
+  flatpak:   # the engine runs on the Flatpak's own runtime (freedesktop 24.08), so any recent Ubuntu builds it
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,7 +43,7 @@ jobs:
       - name: Tools for Flatpak
         run: |
           sudo apt-get update -q
-          sudo apt-get install -yq flatpak flatpak-builder appstream-util dbus-x11
+          sudo apt-get install -yq flatpak flatpak-builder dbus-x11
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
       - name: Build the Flatpak
         run: |
@@ -56,6 +56,15 @@ jobs:
           flatpak install --user -y --noninteractive dist/Lithnode.flatpak
           dbus-run-session -- python3 packaging/check_installed.py \
             '["flatpak", "run", "--command=/app/lithnode/server/lithnode-server", "com.lithnode.Lithnode"]'
+      - name: Open the window and take a screenshot
+        run: |
+          sudo apt-get install -yq xvfb x11-apps imagemagick
+          Xvfb :99 -screen 0 1440x900x24 & sleep 2
+          export DISPLAY=:99
+          dbus-run-session -- sh -c 'flatpak run com.lithnode.Lithnode > dist/linux-window.log 2>&1 & sleep 30; import -window root dist/linux-window.png' || true
+          tail -20 dist/linux-window.log || true
+      - uses: actions/upload-artifact@v4
+        with: { name: linux-window, path: "dist/linux-window.*" }
       - uses: actions/upload-artifact@v4
         with: { name: linux, path: dist/Lithnode.flatpak }
 
@@ -75,6 +84,14 @@ jobs:
         run: packaging/build.sh mac ${{ matrix.arch }}
       - name: Run a whole flow through the built app
         run: python3 packaging/check_installed.py '["dist/Lithnode-darwin-${{ matrix.arch }}/Lithnode.app/Contents/Resources/server/lithnode-server"]'
+      - name: Open the window and take a screenshot
+        run: |
+          open "dist/Lithnode-darwin-${{ matrix.arch }}/Lithnode.app"
+          sleep 25
+          screencapture -x dist/mac-window.png
+          osascript -e 'quit app "Lithnode"' || true
+      - uses: actions/upload-artifact@v4
+        with: { name: mac-window, path: dist/mac-window.png }
       - uses: actions/upload-artifact@v4
         with: { name: "mac-${{ matrix.arch }}", path: "dist/Lithnode-mac-${{ matrix.arch }}.dmg" }
 
@@ -84,7 +101,9 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/download-artifact@v4
-        with: { path: out, merge-multiple: true }
+        with: { name: linux, path: out }
+      - uses: actions/download-artifact@v4
+        with: { name: mac-arm64, path: out }
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}

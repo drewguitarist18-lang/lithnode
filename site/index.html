@@ -218,6 +218,14 @@
   .smart .row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
   .smart .bt { padding: 4px 10px; border-radius: 4px; background: rgba(255,255,255,.14); font-size: 12px; }
   .dlo li.on .smart .hl { box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(217,119,87,.7); }
+  .dlo code { font: 500 12px var(--mono); color: var(--ink); background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 6px; padding: 1px 5px; }
+  .dlo code.cmd { display: block; margin: 6px 0; padding: 7px 9px; white-space: nowrap; overflow-x: auto; user-select: all; }
+  .hero .meta a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #444; }
+  .hero .meta a:hover { color: var(--ink); }
+  .ospick { display: inline-flex; gap: 4px; margin-top: 14px; padding: 4px; border: 1px solid #262626; border-radius: 999px; background: #121212; }
+  .ospick button { font: 600 12.5px var(--body); color: var(--dim); background: transparent; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  .ospick button:hover { color: var(--ink); }
+  .ospick button[aria-selected="true"] { color: var(--ink); background: #232323; }
   .dlo .again { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid #222; color: var(--dim); font-size: 12.5px; }
   .dlo .again a { color: var(--muted); }
   @media (max-width: 600px) {   /* phones: a bottom sheet instead */
@@ -256,7 +264,7 @@
       <a class="btn" href="#film"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Watch the film</a>
       <a class="btn" href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a>
     </div>
-    <div class="meta">Free and open source · Windows 10 and 11 · no API keys · 99 MB</div>
+    <div class="meta">Free and open source · no API keys · <span class="oses">Also for <a href="#download" data-os-pick="win">Windows</a>, <a href="#download" data-os-pick="mac">Mac</a> and <a href="#download" data-os-pick="linux">Linux</a></span></div>
   </div>
   <div class="scrollcue" aria-hidden="true"></div>
 </header>
@@ -322,12 +330,15 @@
   <div class="wrap">
     <div class="eyebrow rv">Free download</div>
     <h2 class="rv" style="margin-top:16px">Your team is<br>waiting.</h2>
-    <p class="rv">One installer. It sets up Lithnode, adds it to your Start menu and opens it. Tick <b>Claude Pet</b> and a little Clawd lives on your desktop, showing what Claude Code is doing.</p>
+    <p class="rv" data-os-text="win">One installer. It sets up Lithnode, adds it to your Start menu and opens it. Tick <b>Claude Pet</b> and a little Clawd lives on your desktop, showing what Claude Code is doing.</p>
+    <p class="rv" data-os-text="mac" hidden>One app. Drag it to Applications and open it. It finds Claude Code, Codex and Cursor on your Mac by itself.</p>
+    <p class="rv" data-os-text="linux" hidden>One Flatpak, for any distro: Arch, Fedora, Ubuntu and the rest. It runs Claude Code, Codex, Cursor and your own tools right on your system.</p>
     <a class="btn primary rv" id="dlBtn" href="download/LithnodeSetup.exe" download data-dl><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Download for Windows</a>
-    <div class="reqs rv">Version 0.1.0 · Windows 10 or 11 · needs <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a> and a Claude plan</div>
+    <div class="reqs rv"><span id="osReq">Windows 10 or 11</span> · needs <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a> (or Codex or Cursor)</div>
+    <div class="ospick rv" role="tablist" aria-label="Your computer"><button type="button" data-os-pick="win">Windows</button><button type="button" data-os-pick="mac">Mac</button><button type="button" data-os-pick="linux">Linux</button></div>
     <div class="reqs rv usage">Agents run on <b>your own</b> Claude, ChatGPT or Cursor plan and use its usage, and big flows can use a lot. Lithnode never charges you, so it can't refund usage.</div>
     <div class="how">
-      <div class="rv"><b>01 · Download</b><span>Run LithnodeSetup.exe. No admin rights needed. If Windows says it protected your PC, click More info, then Run anyway.</span></div>
+      <div class="rv"><b>01 · Download</b><span id="howDl">Run LithnodeSetup.exe. No admin rights needed. If Windows says it protected your PC, click More info, then Run anyway.</span></div>
       <div class="rv" style="--d:.1s"><b>02 · Sign in</b><span>Click Sign in at the top right. It uses Claude Code's own login.</span></div>
       <div class="rv" style="--d:.2s"><b>03 · Run a team</b><span>Pick a template or describe one, choose a folder, press Run.</span></div>
     </div>
@@ -344,10 +355,10 @@
     <button class="x" data-close aria-label="Close">✕</button>
     <div class="head">
       <span class="file"><canvas data-sprite="crab" data-color="#D97757" width="12" height="8"></canvas></span>
-      <div><b id="dloTitle">LithnodeSetup.exe</b><small>99 MB · saving to your downloads</small></div>
+      <div><b id="dloTitle">LithnodeSetup.exe</b><small id="dloSize">99 MB · saving to your downloads</small></div>
     </div>
     <div class="bar" aria-hidden="true"></div>
-    <ol id="dloSteps">
+    <ol class="dsteps" data-os-text="win">
       <li><i>1</i><div><h4>Open it</h4><p>Click the <em>downloads icon</em> at the top right of your browser, then <em>LithnodeSetup.exe</em>.</p></div></li>
       <li><i>2</i><div><h4>Let Windows run it</h4><p>Lithnode is new, so Windows may warn you. Click <em>More info</em>, then <em>Run anyway</em>.</p>
         <div class="smart"><strong>Windows protected your PC</strong>Microsoft Defender SmartScreen prevented an unrecognized app from starting. <u class="hl">More info</u>
@@ -355,7 +366,17 @@
       <li><i>3</i><div><h4>Install</h4><p>Click <em>Next</em>. Keep <em>Claude Pet</em> ticked for a little Clawd on your desktop. No admin rights needed.</p></div></li>
       <li><i>4</i><div><h4>Sign in</h4><p>Lithnode opens. Click <em>Sign in</em> at the top right to use your Claude Code account, then build your first team.</p></div></li>
     </ol>
-    <p class="again">Didn't start? <a href="download/LithnodeSetup.exe" download>Download again</a> · Get an engine: <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>, <a href="https://developers.openai.com/codex" target="_blank" rel="noopener">Codex</a> or <a href="https://cursor.com/cli" target="_blank" rel="noopener">Cursor</a></p>
+    <ol class="dsteps" data-os-text="mac" hidden>
+      <li><i>1</i><div><h4>Open it</h4><p>Open <em>Lithnode-mac-arm64.dmg</em> from your downloads and drag <em>Lithnode</em> into <em>Applications</em>.</p></div></li>
+      <li><i>2</i><div><h4>Let your Mac open it</h4><p>Lithnode is new, so the first time macOS says it can't check it. Open <em>System Settings → Privacy &amp; Security</em>, scroll down and click <em>Open Anyway</em>.</p></div></li>
+      <li><i>3</i><div><h4>Sign in</h4><p>Click <em>Sign in</em> at the top right to use your Claude Code account, then build your first team.</p></div></li>
+    </ol>
+    <ol class="dsteps" data-os-text="linux" hidden>
+      <li><i>1</i><div><h4>Install it</h4><p>In a terminal, from your downloads folder:</p><code class="cmd">flatpak install --user Lithnode.flatpak</code><p>It fetches what it needs from Flathub the first time.</p></div></li>
+      <li><i>2</i><div><h4>Open it</h4><p>Find <em>Lithnode</em> in your app menu, or run <code>flatpak run com.lithnode.Lithnode</code>.</p></div></li>
+      <li><i>3</i><div><h4>Sign in</h4><p>Click <em>Sign in</em> at the top right. Lithnode uses the <em>claude</em>, <em>codex</em> and <em>cursor-agent</em> installed on your system.</p></div></li>
+    </ol>
+    <p class="again">Didn't start? <a id="dloAgain" href="download/LithnodeSetup.exe" download>Download again</a> · Get an engine: <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>, <a href="https://developers.openai.com/codex" target="_blank" rel="noopener">Codex</a> or <a href="https://cursor.com/cli" target="_blank" rel="noopener">Cursor</a></p>
   </div>
 </div>
 <footer>
@@ -637,7 +658,41 @@ if (!reduce) setInterval(() => { const a = apps[Math.floor(Math.random() * apps.
 document.querySelectorAll(".card").forEach((c) => c.addEventListener("pointermove", (e) => { const r = c.getBoundingClientRect(); c.style.setProperty("--mx", e.clientX - r.left + "px"); c.style.setProperty("--my", e.clientY - r.top + "px"); }));
 
 // ---- after Download: the browser keeps the file; point at where it went and walk through the next steps
-const dlo = document.getElementById("dlo"), dloSteps = [...document.querySelectorAll("#dloSteps li")];
+// Windows, Mac or Linux: guessed from the browser, and changeable with the picker under the download button
+const REL = "https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/";
+const OS = {
+  win: { name: "Windows", file: "LithnodeSetup.exe", href: "download/LithnodeSetup.exe", size: "99 MB", req: "Windows 10 or 11",
+         how: "Run LithnodeSetup.exe. No admin rights needed. If Windows says it protected your PC, click More info, then Run anyway." },
+  mac: { name: "Mac", file: "Lithnode-mac-arm64.dmg", href: REL + "Lithnode-mac-arm64.dmg", size: "153 MB", req: "Mac with Apple silicon (M1 or newer)",
+         how: "Open the .dmg and drag Lithnode to Applications. The first time, allow it in System Settings, Privacy & Security." },
+  linux: { name: "Linux", file: "Lithnode.flatpak", href: REL + "Lithnode.flatpak", size: "Flatpak", req: "Any Linux with Flatpak",
+           how: "flatpak install --user Lithnode.flatpak, then open Lithnode from your app menu." },
+};
+const guessOS = () => {
+  const p = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "").toLowerCase();
+  return /mac/.test(p) && !("ontouchend" in document) ? "mac" : /linux|x11/.test(p) && !/android/.test(navigator.userAgent.toLowerCase()) ? "linux" : "win";
+};
+let os = guessOS();
+function setOS(k) {
+  os = k; const o = OS[k];
+  document.querySelectorAll("[data-dl]").forEach((a) => {
+    a.href = o.href;
+    a.lastChild.textContent = "Download for " + o.name;
+  });
+  document.querySelectorAll("[data-os-text]").forEach((el) => { el.hidden = el.dataset.osText !== k; });
+  document.querySelectorAll(".ospick [data-os-pick]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.osPick === k)));
+  const others = Object.keys(OS).filter((x) => x !== k);
+  document.querySelector(".oses").innerHTML = "Also for " + others.map((x) => `<a href="#download" data-os-pick="${x}">${OS[x].name}</a>`).join(" and ");
+  document.getElementById("osReq").textContent = o.req;
+  document.getElementById("howDl").textContent = o.how;
+  document.getElementById("dloTitle").textContent = o.file;
+  document.getElementById("dloSize").textContent = o.size + " · saving to your downloads";
+  document.getElementById("dloAgain").href = o.href;
+  dloSteps = [...document.querySelectorAll(`.dsteps[data-os-text="${k}"] li`)];
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-os-pick]"); if (b) setOS(b.dataset.osPick); });
+const dlo = document.getElementById("dlo");
+let dloSteps = [...document.querySelectorAll('.dsteps[data-os-text="win"] li')];
 let stepTimer = 0;
 function lightStep(i) { dloSteps.forEach((li, j) => { li.classList.toggle("on", j === i); li.classList.toggle("done", j < i); }); }
 function showDownloadHelp() {
@@ -649,7 +704,8 @@ function showDownloadHelp() {
   dlo.querySelector(".x").focus({ preventScroll: true });
 }
 function hideDownloadHelp() { clearInterval(stepTimer); dlo.classList.remove("show"); setTimeout(() => { dlo.hidden = true; }, 400); }
-dloSteps.forEach((li, j) => li.addEventListener("mouseenter", () => { clearInterval(stepTimer); lightStep(j); }));
+document.querySelectorAll(".dsteps").forEach((ol) => [...ol.children].forEach((li, j) => li.addEventListener("mouseenter", () => { clearInterval(stepTimer); lightStep(j); })));
+setOS(os);
 document.querySelectorAll("[data-dl]").forEach((a) => a.addEventListener("click", () => setTimeout(showDownloadHelp, 250)));
 dlo.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) hideDownloadHelp(); });
 addEventListener("keydown", (e) => { if (e.key === "Escape" && !dlo.hidden) hideDownloadHelp(); });
