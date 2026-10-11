@@ -1,0 +1,39 @@
+/* Lithnode's look, shared by every page of the app (and matching lithnode.com): black and white, one mono face,
+   pixel type for names and titles. Loaded after each page's own styles, so these tokens win.
+   Status colors keep their meaning: green done, red failed, amber waiting for you. */
+@font-face { font-family: "Geist Mono"; src: url("/static/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Silkscreen"; src: url("/static/fonts/silkscreen-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Silkscreen"; src: url("/static/fonts/silkscreen-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+:root {
+  --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+  --pixel: "Silkscreen", "Geist Mono", ui-monospace, monospace;
+  /* light: the same idea, inverted */
+  --bg: #f3f3f0; --bar: #f3f3f0; --panel: #fafaf8; --pad: #ffffff; --line: #e1e0db; --hover: #ecebe7;
+  --ink: #121214; --muted: #66655f; --accent: #121214; --on-accent: #fafaf8;
+  --grid: #e4e3de; --wire: #a9a8a2; --running: #121214; --working: #121214;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #08080a; --bar: #08080a; --panel: #0d0d10; --pad: #141417; --line: #24242a; --hover: #1b1b1f;
+    --ink: #ecebe6; --muted: #a3a29c; --accent: #ecebe6; --on-accent: #08080a;
+    --grid: #17171b; --wire: #4c4c52; --running: #ecebe6; --working: #ecebe6; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #08080a; --bar: #08080a; --panel: #0d0d10; --pad: #141417; --line: #24242a; --hover: #1b1b1f;
+  --ink: #ecebe6; --muted: #a3a29c; --accent: #ecebe6; --on-accent: #08080a;
+  --grid: #17171b; --wire: #4c4c52; --running: #ecebe6; --working: #ecebe6; color-scheme: dark;
+}
+
+/* one mono face everywhere (pages set families in shorthands, so this has to reach every element) */
+html body, html body * { font-family: var(--mono); }
+html body svg, html body svg * { font-family: inherit; }
+/* pixel type for names and titles */
+html body :is(h1, h2, .brand > span, .psec > h3, .isec > h4, .gs-top h4, .rp-sec > h3, dialog h2, .ui-pop h3,
+               .ihead input.title, .bar #flowName, .insp .big) { font-family: var(--pixel); letter-spacing: .01em; }
+html body .brand small, html body .psec > h3 * { font-family: var(--mono); }
+
+/* white (or black, in light mode) is the action color: its text sits on it in the opposite tone */
+html body :is(button.primary, .signin, .ui-btn.go, .badge) { color: var(--on-accent); }
+html body button.primary:hover { filter: none; background: color-mix(in srgb, var(--accent) 88%, var(--bg)); }

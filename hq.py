@@ -33,7 +33,7 @@ URL = f"http://{HOST}:{PORT}"
 STATIC = Path(__file__).with_name("static")
 PAGES = {"/": "shell.html", "/flows": "flows.html", "/office": "office.html"}
 STATIC_TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-                ".html": "text/html; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml"}
+                ".html": "text/html; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2"}
 _home = Path.home() / ".lithnode"
 for _old_home in (Path.home() / ".relay", Path.home() / ".clawd-hq"):   # the app used to be Relay, and Clawd HQ before
     if not os.environ.get("LITHNODE_HOME") and _old_home.is_dir() and not _home.exists():
@@ -311,7 +311,7 @@ class Handler(BaseHTTPRequestHandler):
     # -- pages and settings --------------------------------------------------
     def send_static(self, name):
         path = (STATIC / name).resolve()
-        if path.parent != STATIC.resolve() or path.suffix not in STATIC_TYPES or not path.is_file():
+        if path.parent not in (STATIC.resolve(), STATIC.resolve() / "fonts") or path.suffix not in STATIC_TYPES or not path.is_file():
             return self.send_json({"error": "not found"}, 404)
         body = path.read_bytes()
         self.send_response(200)
