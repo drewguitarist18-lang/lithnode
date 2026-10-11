@@ -166,6 +166,8 @@
   .how span { color: #c8c8c8; font-size: 15px; }
   .reqs { margin-top: 26px; font: 500 13px var(--mono); color: var(--dim); position: relative; }
   .reqs a { color: var(--muted); }
+  .dl p code { font: 500 .82em var(--mono); color: var(--ink); background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; padding: 2px 6px; overflow-wrap: anywhere; }
+  .dlo .again + code.cmd { margin-top: 6px; }
   .reqs.usage { margin: 10px auto 0; max-width: 560px; font: 400 13px/1.55 var(--sans, Inter, system-ui, sans-serif); }
   .reqs.usage b { color: var(--muted); font-weight: 600; }
 
@@ -332,7 +334,7 @@
     <h2 class="rv" style="margin-top:16px">Your team is<br>waiting.</h2>
     <p class="rv" data-os-text="win">One installer. It sets up Lithnode, adds it to your Start menu and opens it. Tick <b>Claude Pet</b> and a little Clawd lives on your desktop, showing what Claude Code is doing.</p>
     <p class="rv" data-os-text="mac" hidden>One app. Drag it to Applications and open it. It finds Claude Code, Codex and Cursor on your Mac by itself.</p>
-    <p class="rv" data-os-text="linux" hidden>One Flatpak, for any distro: Arch, Fedora, Ubuntu and the rest. It runs Claude Code, Codex, Cursor and your own tools right on your system.</p>
+    <p class="rv" data-os-text="linux" hidden>One Flatpak, for any distro: Arch, Fedora, Ubuntu and the rest. It runs Claude Code, Codex, Cursor and your own tools right on your system. Or skip the Flatpak and run it from source: <code>git clone https://github.com/drewguitarist18-lang/lithnode &amp;&amp; python3 lithnode/hq.py</code> (plain Python, no packages).</p>
     <a class="btn primary rv" id="dlBtn" href="download/LithnodeSetup.exe" download data-dl><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Download for Windows</a>
     <div class="reqs rv"><span id="osReq">Windows 10 or 11</span> · needs <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a> (or Codex or Cursor)</div>
     <div class="ospick rv" role="tablist" aria-label="Your computer"><button type="button" data-os-pick="win">Windows</button><button type="button" data-os-pick="mac">Mac</button><button type="button" data-os-pick="linux">Linux</button></div>
@@ -376,6 +378,8 @@
       <li><i>2</i><div><h4>Open it</h4><p>Find <em>Lithnode</em> in your app menu, or run <code>flatpak run com.lithnode.Lithnode</code>.</p></div></li>
       <li><i>3</i><div><h4>Sign in</h4><p>Click <em>Sign in</em> at the top right. Lithnode uses the <em>claude</em>, <em>codex</em> and <em>cursor-agent</em> installed on your system.</p></div></li>
     </ol>
+    <p class="again" data-os-text="linux" hidden>Rather not trust a Flatpak that runs things on your system? Run it from source instead. It's plain Python with no packages, so you can read every line first:</p>
+    <code class="cmd" data-os-text="linux" hidden>git clone https://github.com/drewguitarist18-lang/lithnode &amp;&amp; python3 lithnode/hq.py</code>
     <p class="again">Didn't start? <a id="dloAgain" href="download/LithnodeSetup.exe" download>Download again</a> · Get an engine: <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>, <a href="https://developers.openai.com/codex" target="_blank" rel="noopener">Codex</a> or <a href="https://cursor.com/cli" target="_blank" rel="noopener">Cursor</a></p>
   </div>
 </div>

@@ -142,8 +142,12 @@ A team with connectors can change things in those apps for real, so the Run menu
      [latest release](https://github.com/drewguitarist18-lang/lithnode/releases/latest), then
      `flatpak install --user Lithnode.flatpak` and open Lithnode from your app menu. The Flatpak runs `claude`,
      `codex`, `cursor-agent` and your other tools on your system (through `flatpak-spawn --host`), so it isn't
-     sandboxed away from your files: that's its whole job.
-   - **Run from source:** `python3 hq.py` (Windows: double-click **Lithnode.bat**). Python 3 only, no packages.
+     sandboxed away from your files: that's its whole job. That's why it asks for `--filesystem=host` and
+     `org.freedesktop.Flatpak` (which lets it start programs outside the sandbox). If you'd rather not grant that,
+     run it from source instead (below): it's the same app, and you can read all of it first.
+   - **Run from source** (any system): `git clone https://github.com/drewguitarist18-lang/lithnode && python3 lithnode/hq.py`
+     (Windows: double-click **Lithnode.bat**). Python 3's standard library only: no packages, no binaries. It opens in
+     Chrome, Edge or Chromium as an app window, or your normal browser.
 
    Builds for Mac and Linux come from GitHub Actions (`.github/workflows/build.yml`), which also runs a whole flow
    through each built app before publishing it.
