@@ -222,8 +222,11 @@
   .dlo li.on .smart .hl { box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(217,119,87,.7); }
   .dlo code { font: 500 12px var(--mono); color: var(--ink); background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 6px; padding: 1px 5px; }
   .dlo code.cmd { display: block; margin: 6px 0; padding: 7px 9px; white-space: nowrap; overflow-x: auto; user-select: all; }
-  .hero .meta a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #444; }
-  .hero .meta a:hover { color: var(--ink); }
+  .hero .oses { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .hero .oses a { color: var(--ink); text-decoration: none; font: 600 12px var(--body); padding: 4px 11px; border-radius: 999px;
+                  border: 1px solid #2c2c2c; background: #141414; transition: border-color .15s, background .15s; }
+  .hero .oses a::before { content: "↓ "; color: var(--accent); }
+  .hero .oses a:hover { border-color: var(--accent); background: #1b1512; }
   .ospick { display: inline-flex; gap: 4px; margin-top: 14px; padding: 4px; border: 1px solid #262626; border-radius: 999px; background: #121212; }
   .ospick button { font: 600 12.5px var(--body); color: var(--dim); background: transparent; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
   .ospick button:hover { color: var(--ink); }
@@ -273,7 +276,7 @@
       var a = document.querySelector(".hero [data-dl]");
       if (a && os !== "win") a.lastChild.textContent = "Download for " + (os === "mac" ? "Mac" : "Linux");
     })();</script>
-    <div class="meta">Free and open source · no API keys · <span class="oses">Also for <a href="#download" data-os-pick="win">Windows</a>, <a href="#download" data-os-pick="mac">Mac</a> and <a href="#download" data-os-pick="linux">Linux</a></span></div>
+    <div class="meta">Free and open source · no API keys · <span class="oses">Also for <a href="download/LithnodeSetup.exe" download data-dl data-os-pick="win">Windows</a> <a href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/Lithnode-mac-arm64.dmg" data-dl data-os-pick="mac">Mac</a> <a href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/Lithnode.flatpak" data-dl data-os-pick="linux">Linux</a></span></div>
   </div>
   <div class="scrollcue" aria-hidden="true"></div>
 </header>
@@ -686,14 +689,16 @@ const guessOS = () => {
 let os = document.documentElement.dataset.os || guessOS();
 function setOS(k) {
   os = k; const o = OS[k];
-  document.querySelectorAll("[data-dl]").forEach((a) => {
+  document.querySelectorAll("[data-dl]:not(.oses a)").forEach((a) => {
     a.href = o.href;
     a.lastChild.textContent = "Download for " + o.name;
   });
   document.querySelectorAll("[data-os-text]").forEach((el) => { el.hidden = el.dataset.osText !== k; });
   document.querySelectorAll(".ospick [data-os-pick]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.osPick === k)));
   const others = Object.keys(OS).filter((x) => x !== k);
-  document.querySelector(".oses").innerHTML = "Also for " + others.map((x) => `<a href="#download" data-os-pick="${x}">${OS[x].name}</a>`).join(" and ");
+  setTimeout(() => {   // after the click: the link you clicked still starts its download
+    document.querySelector(".oses").innerHTML = "Also for " + others.map((x) => `<a href="${OS[x].href}"${x === "win" ? " download" : ""} data-dl data-os-pick="${x}">${OS[x].name}</a>`).join(" ");
+  }, 0);
   document.getElementById("osReq").textContent = o.req;
   document.getElementById("howDl").textContent = o.how;
   document.getElementById("dloTitle").textContent = o.file;
@@ -717,7 +722,7 @@ function showDownloadHelp() {
 function hideDownloadHelp() { clearInterval(stepTimer); dlo.classList.remove("show"); setTimeout(() => { dlo.hidden = true; }, 400); }
 document.querySelectorAll(".dsteps").forEach((ol) => [...ol.children].forEach((li, j) => li.addEventListener("mouseenter", () => { clearInterval(stepTimer); lightStep(j); })));
 setOS(os);
-document.querySelectorAll("[data-dl]").forEach((a) => a.addEventListener("click", () => setTimeout(showDownloadHelp, 250)));
+document.addEventListener("click", (e) => { if (e.target.closest("[data-dl]")) setTimeout(showDownloadHelp, 250); });
 dlo.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) hideDownloadHelp(); });
 addEventListener("keydown", (e) => { if (e.key === "Escape" && !dlo.hidden) hideDownloadHelp(); });
 </script>
