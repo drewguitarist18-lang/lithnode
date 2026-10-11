@@ -88,7 +88,7 @@ BOT_ID_RE = re.compile(r"^[a-z0-9-]{1,32}$")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 STARTER_BOTS = [
-    {"id": "clawd", "name": "Lith", "tagline": "All-rounder", "shape": "crab", "color": "#D97757",
+    {"id": "clawd", "name": "Lith", "tagline": "All-rounder", "shape": "crab", "color": "#ecebe6",
      "instructions": PERSONA, "model": "", "web_search": True, "think": False,
      "starters": ["What's in the news today?", "Explain how async/await works, with a short example.",
                   "Brainstorm five side projects I could build with LLMs."]},

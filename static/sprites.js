@@ -1,13 +1,6 @@
-// Pixel sprites shared by the Office and Flows pages: Lithnode's crab plus the bots' shapes. Everything is drawn in
-// black and white: a bot's color only picks how light its grey is.
+// Pixel sprites shared by the Office and Flows pages: Lithnode's crab plus the bots' shapes.
 "use strict";
 const BODY = "#ecebe6";
-function mono(color) {
-  if (!/^#[0-9a-f]{6}$/i.test(color || "")) return color;
-  const n = parseInt(color.slice(1), 16), lum = (.299 * (n >> 16) + .587 * ((n >> 8) & 255) + .114 * (n & 255)) / 255;
-  const v = Math.round(Math.min(236, 120 + lum * 116));
-  return `rgb(${v},${v},${Math.max(0, v - 3)})`;
-}
 const LOGO = [".##..........##.", "#.#..........#.#", "###..........###", ".#............#.", ".#............#.", ".##.########.##.", "..############..", "..##.######.##..", "..############..", "...##########...", "...#.#....#.#...", "...#.#....#.#...", "..##.##..##.##.."];
 // the logo, drawn at (x, y) with c pixels per cell
 function drawLogo(ctx, x, y, c, color = BODY) {
@@ -32,7 +25,7 @@ const CRAB = [
   ".##.#..#.##.",
 ];
 function drawClawd(ctx, x, y, c, o) {
-  const { state: st, t, tired = 0, look = 0, seed = 0 } = o, body = mono(o.body || BODY);
+  const { state: st, t, tired = 0, look = 0, seed = 0 } = o, body = o.body || BODY;
   let bob = 0;
   if (st === "waiting") bob = Math.abs(Math.sin(t * 4)) * 0.5;
   else if (st === "celebrate") bob = Math.abs(Math.sin(t * 7)) * 2;
@@ -86,7 +79,6 @@ const BOT_SHAPES = {
 };
 function drawBot(ctx, bot, x, y, c, o) {
   const { state = "idle", t = 0 } = o, rows = BOT_SHAPES[bot.shape] || BOT_SHAPES.crab;
-  bot = { ...bot, color: mono(bot.color) };
   const n = parseInt(bot.color.slice(1), 16), mix = (m, p) => `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (m - v) * p)).join(",")})`;
   const dark = mix(0, 0.4), bob = state === "working" ? Math.abs(Math.sin(t * 6)) * 0.35 : state === "waiting" ? Math.abs(Math.sin(t * 4)) * 0.5 : 0;
   const closed = state === "sleeping" || t % 4.5 < 0.15, Y = y - bob * c;
@@ -113,7 +105,7 @@ const NODE_ICONS = {
 function drawIcon(ctx, kind, x, y, c, o = {}) {
   const icon = NODE_ICONS[kind]; if (!icon) return;
   const { state = "idle", t = 0 } = o;
-  const body = mono(icon.color), g = parseInt(body.match(/\d+/)[0], 10), dark = `rgb(${[g, g, g].map((v) => Math.round(v * 0.6)).join(",")})`;
+  const body = icon.color, n = parseInt(body.slice(1), 16), dark = `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * 0.6)).join(",")})`;
   const bob = state === "working" || state === "waiting" ? Math.abs(Math.sin(t * 4)) * 0.4 : 0, Y = y - bob * c;
   icon.rows.forEach((row, ry) => [...row].forEach((ch, cx) => {
     if (ch === ".") return;

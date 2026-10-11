@@ -103,11 +103,11 @@
   .blk b { white-space: nowrap; }
   .bteam { padding: 10px; border-radius: 12px; }
   .bteam .bt { width: 34px; height: 34px; border-radius: 9px; flex: none; display: grid; place-items: center;
-               background: color-mix(in srgb, var(--ink) 9%, var(--pad)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent); }
+               background: color-mix(in srgb, #5b8def 17%, var(--pad)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #5b8def 24%, transparent); }
   .bteam .bt canvas { width: 26px; height: 19.5px; image-rendering: pixelated; }
   .bteam .bx { display: grid; min-width: 0; flex: 1; }
   .bteam .bdots { display: flex; flex: none; }
-  .bteam .bdots i { width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 70%, var(--pad)); box-shadow: 0 0 0 2px var(--pad); }
+  .bteam .bdots i { width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, #5b8def 70%, var(--pad)); box-shadow: 0 0 0 2px var(--pad); }
   .bteam .bdots i + i { margin-left: -3px; }
   .bstep { height: 34px; padding: 0 14px 0 10px; border-radius: 999px; }
   .bstep .bi { width: 17px; height: 17px; flex: none; color: var(--muted); display: grid; place-items: center; }
@@ -172,7 +172,7 @@
          color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
   .can.edit { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
   .can.full { color: var(--failed); border-color: color-mix(in srgb, var(--failed) 45%, var(--line)); }
-  .can.web { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 35%, var(--line)); }
+  .can.web { color: #7aa2f7; border-color: color-mix(in srgb, #7aa2f7 45%, var(--line)); }
   .tip { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.45; color: var(--muted);
          border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; margin-top: auto; }
   .tip b { color: var(--ink); font-weight: 600; }
@@ -711,7 +711,7 @@
       <h3>Building blocks</h3>
       <div class="blocks">
         <div class="pal blk bteam" draggable="true" tabindex="0" data-type="cluster" title="A team of agents with one job. Pick how many, what they do, their engine and what they can touch. The bots below are ready-made teams.">
-          <span class="bt"><canvas width="96" height="72" data-shape="byte" data-color="#ecebe6"></canvas></span>
+          <span class="bt"><canvas width="96" height="72" data-shape="byte" data-color="#5b8def"></canvas></span>
           <span class="bx"><b>Team</b><small>Agents with one job</small></span>
           <span class="bdots"><i></i><i></i><i></i></span></div>
         <div class="pal blk bstep" draggable="true" tabindex="0" data-type="approval" title="Pauses the run until you say go">
@@ -961,7 +961,7 @@ function renderBotPalette() {
   $("botCount").textContent = all.length;
   const row = (b) => {
     const [label, cls] = CAN[b.tools] || CAN.read;
-    return `<div class="pal bot" draggable="true" tabindex="0" data-type="cluster" data-bot="${esc(b.id)}" title="${esc(b.name)}: ${esc(b.tagline || "")}" style="--c:${mono(b.color)}">
+    return `<div class="pal bot" draggable="true" tabindex="0" data-type="cluster" data-bot="${esc(b.id)}" title="${esc(b.name)}: ${esc(b.tagline || "")}" style="--c:${esc(b.color)}">
       <span class="ava"><canvas width="96" height="72" data-shape="${esc(b.shape)}" data-color="${esc(b.color)}"></canvas></span>
       <div style="min-width:0"><div class="top"><b>${esc(b.name)}</b><span class="can ${cls}">${label}</span></div><small>${esc(b.tagline || "")}</small></div>
       <button type="button" class="edit" data-edit-bot="${esc(b.id)}" title="${b.builtin ? "Rename" : "Edit"} ${esc(b.name)}" aria-label="Edit ${esc(b.name)}"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg></button>
@@ -976,7 +976,7 @@ function renderBotPalette() {
 }
 $("botFind").addEventListener("input", renderBotPalette);
 // ---- the bot editor: make your own bots, or rename a built-in one
-const SWATCHES = ["#ecebe6", "#d4d3ce", "#bdbcb7", "#a6a5a0", "#8f8e89", "#787772", "#62615d", "#4c4b48"];   // greys: every bot is black and white
+const SWATCHES = ["#ecebe6", "#e0823d", "#e6b450", "#6cc070", "#2fb5a0", "#7aa2f7", "#5b8def", "#a77be6", "#bb9af7", "#e5566e"];
 let botDraft = null;
 function openBotEditor(bot) {
   const isNew = !bot;
@@ -1075,7 +1075,7 @@ function addNode(type, x, y, botId) {
   if (existing) { select({ kind: "node", id: existing.id }); return toast("A flow has one Done step. Wire your last steps into this one."); }
   const n = { id: newId(type), type, x: Math.round(x), y: Math.round(y), name: { cluster: "Team", checkpoint: "Checkpoint", approval: "Approval", done: "Done" }[type] };
   if (type === "cluster") {
-    Object.assign(n, { count: 1, model: "claude-sonnet-5-5", tools: "read", effort: "low", instructions: "", focuses: "", shape: "crab", color: "#D97757", max_turns: 0 });
+    Object.assign(n, { count: 1, model: "claude-sonnet-5-5", tools: "read", effort: "low", instructions: "", focuses: "", shape: "crab", color: "#ecebe6", max_turns: 0 });
     const b = bots.find((x) => x.id === botId);
     if (b) applyBot(n, b);
   }
@@ -1342,7 +1342,7 @@ function renderNodes() {
     e.el.style.left = n.x + "px"; e.el.style.top = n.y + "px";
     const st = nodeState(n.id);
     if (team) {
-      e.el.style.setProperty("--tc", mono(n.color || "#ecebe6"));
+      e.el.style.setProperty("--tc", n.color || "#ecebe6");
       const [tt, ft] = teamText(n);
       if (tt !== e.tt) { e.el.querySelector(".tt").innerHTML = tt; e.tt = tt; }
       if (ft !== e.ft) { e.el.querySelector(".ft").innerHTML = ft; e.ft = ft; }
@@ -1618,7 +1618,7 @@ function getStarted() {
     <div class="gs-bar${count === 3 ? " all" : ""}"><i style="width:${Math.max(4, count / 3 * 100)}%"></i></div>
     <div class="gs">${steps.map((st, i) => {
       const cls = done[i] ? "did" : i === now ? "now" : "next";
-      return `<div class="gs-step ${cls}" style="--c:${mono(st.color)}">
+      return `<div class="gs-step ${cls}" style="--c:${st.color}">
         <span class="ic"><canvas width="96" height="72" data-shape="${st.shape}" data-color="${st.color}"></canvas>${done[i] ? '<span class="tick" aria-label="done">✓</span>' : ""}</span>
         <div><b>${st.title}</b><p>${st.text}</p>
           ${i === now ? `<button type="button" class="primary" data-gs="${st.act}">${st.label}</button>` : ""}
@@ -1644,7 +1644,7 @@ const engineIcon = (id) => id === "claude"
 function drawEngineIcons(root) {
   root.querySelectorAll("canvas[data-engine-crab]").forEach((cv) => {
     const g = cv.getContext("2d"); g.clearRect(0, 0, cv.width, cv.height);
-    drawBot(g, { shape: "crab", color: "#D97757" }, 0, 1, 2, { state: "idle", t: 0 });
+    drawBot(g, { shape: "crab", color: "#ecebe6" }, 0, 1, 2, { state: "idle", t: 0 });
   });
 }
 
@@ -1761,7 +1761,7 @@ function renderInspector() {
   const ACCESS_NOTE = { none: "No tools: works only from what it's given.", read: "Can read the project, can't change anything.", web: "Can search and read the web.",
                         research: "Can read the project and the web.", edit: "Can change files. Editing agents take turns.", full: "Can change files and run commands on this computer." };
 
-  let html = `<div class="ihead" style="--c:${mono(look.color)}">
+  let html = `<div class="ihead" style="--c:${esc(look.color)}">
       <span class="ava"><canvas id="iAva" width="96" height="72"></canvas></span>
       <div class="who"><input class="title" id="iName" data-k="name" maxlength="40" value="${esc(n.name)}" aria-label="Name">
         <div class="kind">${esc(kind)}</div></div>
@@ -1935,7 +1935,7 @@ function renderRunTeam() {   // the team in running order, as little avatars
   const steps = flow.nodes.filter((n) => n.type !== "done").length;
   $("runTeam").innerHTML = members.map((n, i) => {
     const look = n.type === "cluster" ? { shape: n.shape, color: n.color } : n.type === "master" ? { shape: "owl", color: "#7aa2f7" } : { icon: "approval", color: "#e0a23c" };
-    return (i ? '<span class="arrow">›</span>' : "") + `<span class="m" title="${esc(n.name)}" style="--c:${mono(look.color)}"><canvas width="96" height="72" ${look.icon ? `data-icon="${look.icon}"` : `data-shape="${esc(look.shape)}" data-color="${esc(look.color)}"`}></canvas>${n.count > 1 ? `<i>×${n.count}</i>` : ""}</span>`;
+    return (i ? '<span class="arrow">›</span>' : "") + `<span class="m" title="${esc(n.name)}" style="--c:${esc(look.color)}"><canvas width="96" height="72" ${look.icon ? `data-icon="${look.icon}"` : `data-shape="${esc(look.shape)}" data-color="${esc(look.color)}"`}></canvas>${n.count > 1 ? `<i>×${n.count}</i>` : ""}</span>`;
   }).join("") + `<span class="sum">${est ? est.sessions : 0} agents · ${steps} steps</span>`;
   $("runTeam").querySelectorAll("canvas").forEach((cv) => {
     const c = cv.getContext("2d");
@@ -1997,7 +1997,7 @@ function renderTray() {
   // a team working on these items right now (the next one down the wires) gets a scanning shimmer
   const judging = node.id === auto.id && run.flow.edges.some((e) => e.from === node.id && nodeState(e.to).status === "running")
     ? nodeById(run.flow.edges.find((e) => e.from === node.id && nodeState(e.to).status === "running").to) : null;
-  const look = { shape: node.shape || "crab", color: node.color || "#D97757" };
+  const look = { shape: node.shape || "crab", color: node.color || "#ecebe6" };
   // redraw only when what's shown changes (not on every poll, which would replay the animations)
   const sig = JSON.stringify([node.id, items, judging && judging.id, trayMin, srcs.map((n) => n.id + run.nodes[n.id].items.length)]);
   if (sig === lastTray) return;
@@ -2389,7 +2389,7 @@ function drawIcons(t) {
   document.querySelectorAll(".pal canvas").forEach((cv, i) => {
     const c = cv.getContext("2d"); c.clearRect(0, 0, cv.width, cv.height);
     if (cv.dataset.icon) drawIcon(c, cv.dataset.icon, 6, 8, 7, { t });
-    else drawBot(c, { shape: cv.dataset.shape || "crab", color: cv.dataset.color || "#D97757" }, 6, 8, 7, { state: "idle", t: t + i });
+    else drawBot(c, { shape: cv.dataset.shape || "crab", color: cv.dataset.color || "#ecebe6" }, 6, 8, 7, { state: "idle", t: t + i });
   });
 }
 let lastFrame = 0;
