@@ -31,15 +31,14 @@
   body { margin: 0; color: var(--ink); font: 15px/1.65 var(--mono); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   a { color: inherit; }
   /* the black hole: rendered once, ahead of time, by the same light-bending ray tracer at very high quality, then
-     shipped as an image. Sharp, instant, and no work for your computer. It lives at the top of the page, drifts very
-     slowly, shifts a touch with the mouse, and fades into the page at the bottom. */
+     shipped as an image. Sharp, instant, and no work for your computer. It lives at the top of the page, shifts a touch
+     with the mouse, and fades into the page at the bottom. */
   .sky { position: absolute; top: 0; left: 0; width: 100%; height: 100svh; z-index: 0; overflow: hidden; background: var(--void);
          -webkit-mask-image: linear-gradient(#000 72%, transparent); mask-image: linear-gradient(#000 72%, transparent); }
   .sky picture { position: absolute; inset: -14px; display: block; transform: translate(var(--px, 0px), var(--py, 0px));
                  transition: transform 1.4s cubic-bezier(.16,1,.3,1); }
-  .sky img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .92; animation: drift 46s ease-in-out infinite alternate; }
-  @keyframes drift { from { transform: scale(1); } to { transform: scale(1.04); } }
-  @media (prefers-reduced-motion: reduce) { .sky img { animation: none; } .sky picture { transition: none; } }
+  .sky img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .92; }
+  @media (prefers-reduced-motion: reduce) { .sky picture { transition: none; } }
   main, nav, footer { position: relative; z-index: 1; }
   .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
 
@@ -76,9 +75,8 @@
 
   /* hero: centered, the black hole sits behind it */
   .hero { min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 76px 0 20vh; }   /* sits a little above the middle */
-  .hero .wrap > * { text-shadow: 0 1px 10px rgba(8,8,10,.7), 0 0 2px rgba(8,8,10,.5); }   /* readable over the bright disk */
-  #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block;
-          transform: translateX(var(--lx, 0px)) rotate(var(--lean, 0deg)); transition: transform .5s cubic-bezier(.16,1,.3,1); }
+  .hero .wrap > * { text-shadow: 0 1px 2px rgba(8,8,10,.8); }   /* readable over the bright disk */
+  #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block; }
   h1 { font: 700 clamp(40px, 7.4vw, 92px)/1.02 var(--pixel); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
   h1 .dim { color: #c9c8c2; font-weight: 400; }
   .sub { color: var(--soft); max-width: 46ch; margin: 24px auto 32px; font-size: clamp(15px, 1.5vw, 17px); }
@@ -327,8 +325,8 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 if (!reduce) {
   const sky = document.getElementById("sky");
   addEventListener("pointermove", (e) => {
-    sky.style.setProperty("--px", ((e.clientX / innerWidth - .5) * -14).toFixed(1) + "px");
-    sky.style.setProperty("--py", ((e.clientY / innerHeight - .5) * -9).toFixed(1) + "px");
+    sky.style.setProperty("--px", Math.round((e.clientX / innerWidth - .5) * -14) + "px");   // whole pixels: the image never resamples soft
+    sky.style.setProperty("--py", Math.round((e.clientY / innerHeight - .5) * -9) + "px");
   }, { passive: true });
 }
 
@@ -348,16 +346,13 @@ function paint(cv, rows) {
 }
 document.querySelectorAll("canvas[data-sprite]").forEach((cv) => paint(cv, SPRITES[cv.dataset.sprite]));
 
-// the mascot: a pixel crab standing up, bobbing, blinking, waving one claw and stepping
+// the mascot: a pixel crab that stands still and watches you. Its eyes and claws follow the cursor; it blinks now and then.
 (() => {
-  const cv = document.getElementById("crab");
+  const cv = document.getElementById("crab"), g = cv.getContext("2d");
+  // each claw is three columns, rows 0-5: resting, or lifted toward the cursor
+  const LEFT  = { rest: ["...", "...", ".##", "#.#", "###", ".#."], up: [".##", "#.#", "###", ".#.", ".#.", ".#."] };
+  const RIGHT = { rest: ["...", "...", "##.", "#.#", "###", ".#."], up: ["##.", "#.#", "###", ".#.", ".#.", ".#."] };
   const BODY = [
-    "................",
-    ".##..........##.",
-    "#.#..........#.#",
-    "###..........###",
-    ".#............#.",
-    ".#............#.",
     ".##.########.##.",
     "..############..",
     "..############..",
@@ -366,39 +361,36 @@ document.querySelectorAll("canvas[data-sprite]").forEach((cv) => paint(cv, SPRIT
     "...#.#....#.#...",
     "...#.#....#.#...",
     "..##.##..##.##..",
-    "................",
-    "................",
   ];
-  let f = 0, look = [0, 0];   // where the eyes point: x -1..1, y -1 (up) or 0
-  // the crab watches your cursor: pupils move toward it and the body leans a little
-  addEventListener("pointermove", (e) => {
-    const r = cv.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-    const nx = Math.abs(dx) < 60 ? 0 : Math.sign(dx), ny = dy < -40 ? -1 : 0;
-    cv.style.setProperty("--lean", Math.max(-8, Math.min(8, dx / 60)).toFixed(1) + "deg");
-    cv.style.setProperty("--lx", Math.max(-10, Math.min(10, dx / 40)).toFixed(1) + "px");
-    if (nx !== look[0] || ny !== look[1]) { look = [nx, ny]; f--; draw(); }
-  }, { passive: true });
+  let look = [0, 0], lift = [false, false], blink = false;
   function draw() {
-    const rows = BODY.map((r) => r);
-    const blink = f % 28 === 0 || f % 28 === 1;
+    const rows = [];
+    for (let y = 0; y < 6; y++) rows.push(LEFT[lift[0] ? "up" : "rest"][y] + "..........", RIGHT[lift[1] ? "up" : "rest"][y]);
+    const top = []; for (let y = 0; y < 6; y++) top.push(rows[y * 2] + rows[y * 2 + 1]);
+    const all = [...top, ...BODY.map((r) => r)];
     if (!blink) for (const ex of [4, 11]) {   // one dark pupil per eye, shifted toward the cursor
       const x = ex + look[0], y = 8 + look[1];
-      rows[y] = rows[y].slice(0, x) + "e" + rows[y].slice(x + 1);
+      all[y] = all[y].slice(0, x) + "e" + all[y].slice(x + 1);
     }
-    const wave = Math.floor(f / 3) % 4;                        // the right claw lifts and drops
-    if (wave === 1 || wave === 2) { rows[0] = ".............##."; rows[1] = ".##.........#.#."; rows[2] = "#.#.........###."; rows[3] = "###..........#.."; rows[4] = ".#...........#.."; }
-    if (Math.floor(f / 4) % 2) { rows[11] = "....#.#..#.#...."; rows[12] = "...#.#....#.#..."; rows[13] = "..##.##..##.##.."; }
-    const g = cv.getContext("2d"); g.clearRect(0, 0, 16, 16);
-    const bob = Math.floor(f / 4) % 2;
-    rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    g.clearRect(0, 0, 16, 16);
+    all.forEach((row, y) => [...row].forEach((ch, x) => {
       if (ch === ".") return;
       g.fillStyle = ch === "e" ? "#08080a" : "#ecebe6";
-      g.fillRect(x, y + bob - 1, 1, 1);
+      g.fillRect(x, y + 1, 1, 1);
     }));
-    f++;
   }
+  addEventListener("pointermove", (e) => {
+    const r = cv.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const nx = Math.abs(dx) < 60 ? 0 : Math.sign(dx), up = dy < -40;
+    const nl = [up || nx < 0, up || nx > 0];
+    if (nx !== look[0] || (up ? -1 : 0) !== look[1] || nl[0] !== lift[0] || nl[1] !== lift[1]) {
+      look = [nx, up ? -1 : 0]; lift = nl; draw();
+    }
+  }, { passive: true });
   draw();
-  if (!reduce) setInterval(draw, 160);
+  if (!reduce) (function blinkSoon() {
+    setTimeout(() => { blink = true; draw(); setTimeout(() => { blink = false; draw(); blinkSoon(); }, 140); }, 2600 + Math.random() * 3400);
+  })();
 })();
 
 // ---------------------------------------------------------------- Discord: the button appears once there's an invite link
