@@ -18,7 +18,7 @@
 <style>
   /* Space, black and white. One accent: white. One radius: 14px soft glass. */
   :root {
-    --void: #08080a; --ink: #ecebe6; --soft: #a3a29c; --faint: #5e5d59;
+    --void: #08080a; --ink: #ecebe6; --soft: #b1b0aa; --faint: #74736e;
     --glass: rgba(236, 235, 230, .045); --glass-hi: rgba(236, 235, 230, .085); --edge: rgba(236, 235, 230, .13);
     --r: 14px;
     --pixel: "Silkscreen", "Geist Mono", ui-monospace, monospace;
@@ -28,7 +28,7 @@
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html { background: var(--void); }
-  body { margin: 0; color: var(--ink); font: 15px/1.65 var(--mono); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  body { margin: 0; color: var(--ink); font: 430 15.4px/1.66 var(--mono); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   a { color: inherit; }
   /* the black hole: rendered once, ahead of time, by the same light-bending ray tracer at very high quality, then
      shipped as an image. Sharp, instant, and no work for your computer. It lives at the top of the page, shifts a touch
@@ -83,9 +83,9 @@
   #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block; }
   h1 { font: 700 clamp(40px, 7.4vw, 92px)/1.02 var(--pixel); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
   h1 .dim { color: #c9c8c2; font-weight: 400; }
-  .sub { color: #c4c3bd; max-width: 46ch; margin: 24px auto 32px; font-size: clamp(15px, 1.5vw, 17px); }
+  .sub { color: #c4c3bd; max-width: 46ch; margin: 24px auto 32px; font-size: clamp(15.4px, 1.55vw, 17.5px); }
   .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  .fine { margin-top: 18px; color: var(--faint); font-size: 13px; }
+  .fine { margin-top: 18px; color: var(--faint); font-size: 13.4px; }
   .fine a { color: var(--soft); }
 
   /* sections */
@@ -148,7 +148,7 @@
   .cell { padding: 26px; min-width: 0; display: flex; flex-direction: column; }
   .cell canvas { width: 54px; height: 45px; image-rendering: pixelated; margin-bottom: 16px; }
   .cell h3 { font: 700 17px var(--pixel); margin: 0 0 8px; }
-  .cell p { margin: 0; color: var(--soft); font-size: 14px; }
+  .cell p { margin: 0; color: var(--soft); font-size: 14.4px; }
   .cell.wide { grid-row: span 2; justify-content: space-between; background: linear-gradient(180deg, rgba(236,235,230,.02), rgba(236,235,230,.075)); }
   .cell.wide .parts { display: grid; gap: 26px; margin: 10px 0 30px; font-size: 13px; }
   .cell.wide .part { display: grid; grid-template-columns: 74px 1fr auto; gap: 12px; align-items: center; font-size: 12.5px; color: var(--soft); }
@@ -165,14 +165,14 @@
              text-decoration: none; transition: background .25s; }
   .dl a.os:hover { background: var(--glass-hi); }
   .dl a.os b { font: 700 15px var(--pixel); }
-  .dl a.os span { color: var(--soft); font-size: 13.5px; overflow-wrap: anywhere; }
+  .dl a.os span { color: var(--soft); font-size: 13.9px; overflow-wrap: anywhere; }
   .dl a.os em { font-style: normal; font-size: 13px; color: var(--ink); }
   .dl a.os.you em::after { content: " (yours)"; color: var(--soft); }
   .dl .src { padding: 18px; color: var(--soft); font-size: 13.5px; border-top: 1px solid var(--edge); margin-top: 6px; }
   .dl code { display: block; margin-top: 8px; color: var(--ink); font: 500 13px var(--mono); overflow-wrap: anywhere; user-select: all; }
   @media (max-width: 600px) { .dl a.os { grid-template-columns: 1fr auto; } .dl a.os span { display: none; } }
   .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; }
-  .facts div { padding: 20px 22px; color: var(--soft); font-size: 13.5px; }
+  .facts div { padding: 20px 22px; color: var(--soft); font-size: 13.9px; }
   .facts b { display: block; color: var(--ink); margin-bottom: 4px; font-weight: 600; }
   @media (max-width: 720px) { .facts { grid-template-columns: 1fr; } }
 
