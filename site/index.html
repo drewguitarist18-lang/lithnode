@@ -95,7 +95,7 @@
   .dl a.os b { display: inline-flex; align-items: center; gap: 10px; }
 
   /* sections */
-  section { padding: 120px 0; }
+  section { padding: 130px 0; }
   /* a real run, drawn the way the app draws it, as the background of its own section */
   .live { position: relative; padding: 0; height: min(440px, 70svh); overflow: hidden; }
   .live .lead { margin-inline: auto; }
@@ -111,7 +111,9 @@
   .center { text-align: center; } .center .lead { margin-inline: auto; }
 
   /* the film, the one real look at the product */
-  .film { margin-top: 44px; padding: 10px; }
+  .film { margin-top: 44px; padding: 10px; position: relative; box-shadow: 0 40px 120px -40px rgba(122,156,240,.35); }
+  .film::before { content: ""; position: absolute; inset: -12% -6%; z-index: -1; pointer-events: none; border-radius: 50%;
+                  background: radial-gradient(closest-side, rgba(122,156,240,.16), rgba(183,156,242,.08) 55%, transparent); }
   .film .frame { position: relative; border-radius: calc(var(--r) - 6px); overflow: hidden; aspect-ratio: 16 / 9; background: #000; }
   .film video { width: 100%; height: 100%; object-fit: cover; display: block; }
   /* the player: a glass start card, then a glass bar that steps aside while you watch */
@@ -151,44 +153,156 @@
   .film .seek:focus-visible { outline: none; } .film .seek:focus-visible .track { box-shadow: 0 0 0 2px var(--ink); }
   @media (max-width: 600px) { .film .time .total { display: none; } .film .start span { height: 54px; } .film .start span small { display: none; } }
 
-  /* how: three verbs, stacked rows */
-  .rows { margin-top: 44px; }
-  .row { display: grid; grid-template-columns: 240px 1fr; gap: 28px; align-items: baseline; padding: 28px 4px; }
-  .row + .row { border-top: 1px solid var(--edge); }
-  .row b { font: 700 30px var(--pixel); }
-  .row p { margin: 0; color: var(--soft); max-width: 58ch; }
-  @media (max-width: 720px) { .row { grid-template-columns: 1fr; gap: 6px; } }
+  /* below the hero: the same night sky keeps going (a fixed field of stars), with faint colored nebulas behind sections.
+     The bots' colors are the page's accents: blue builds, green checks, purple ships, amber waits for you. */
+  body::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .7;
+                 background-image:
+                   radial-gradient(1px 1px at 23px 41px, rgba(236,235,230,.9), transparent),
+                   radial-gradient(1px 1px at 131px 97px, rgba(236,235,230,.55), transparent),
+                   radial-gradient(1.5px 1.5px at 187px 13px, rgba(236,235,230,.7), transparent),
+                   radial-gradient(1px 1px at 61px 173px, rgba(167,123,230,.8), transparent),
+                   radial-gradient(1px 1px at 211px 151px, rgba(236,235,230,.45), transparent),
+                   radial-gradient(1px 1px at 97px 211px, rgba(122,156,240,.8), transparent);
+                 background-size: 233px 233px; }
+  main { overflow-x: clip; }
+  section { position: relative; }
+  .neb { position: absolute; z-index: -1; pointer-events: none; width: 900px; height: 640px; border-radius: 50%;
+         background: radial-gradient(closest-side, var(--n, rgba(91,141,239,.13)), transparent); }
+  :root { --blue: #7a9cf0; --green: #79c47f; --purple: #b79cf2; --amber: #e6b450; --teal: #3cc2ac; --red: #ef6f83; --orange: #ec9450; }
+  .spot { position: relative; overflow: hidden; }
+  .spot::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .4s;
+                  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--c, #ecebe6) 13%, transparent), transparent 65%); }
+  .spot:hover::before { opacity: 1; }
 
-  /* bento: five things, five cells, uneven */
-  .bento { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; margin-top: 44px; }
-  .cell { padding: 26px; min-width: 0; display: flex; flex-direction: column; }
-  .cell canvas { width: 54px; height: 45px; image-rendering: pixelated; margin-bottom: 16px; }
-  .cell h3 { font: 700 17px var(--pixel); margin: 0 0 8px; }
+  /* how: three moves, three cards, each with a little loop of the app doing it */
+  .moves { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 48px; }
+  .move { --c: var(--blue); display: flex; flex-direction: column; padding-bottom: 26px; }
+  .move::after { content: ""; position: absolute; top: 0; left: 22px; right: 22px; height: 1px; pointer-events: none;
+                 background: linear-gradient(90deg, transparent, var(--c), transparent); }
+  .move .stage { position: relative; height: 190px; margin: 10px; border-radius: 10px; overflow: hidden;
+                 background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--c) 14%, transparent), transparent 70%), rgba(0,0,0,.4);
+                 border: 1px solid var(--edge); }
+  .move .stage::before { content: ""; position: absolute; inset: 0; opacity: .5;
+                         background: radial-gradient(circle, rgba(236,235,230,.16) 1px, transparent 1.2px) 0 0 / 14px 14px; }
+  .move .txt { padding: 16px 24px 0; }
+  .move .n { font: 700 13px var(--pixel); color: var(--c); letter-spacing: .08em; }
+  .move h3 { font: 700 30px/1.1 var(--pixel); margin: 4px 0 10px; }
+  .move p { margin: 0; color: var(--soft); font-size: 14.4px; }
+  @media (max-width: 900px) { .moves { grid-template-columns: 1fr; max-width: 520px; margin-inline: auto; } }
+  /* draw: three bots pop onto the canvas and get wired up */
+  .nd { position: absolute; width: 28%; height: 40px; display: flex; align-items: center; gap: 7px; padding: 0 8px; border-radius: 8px;
+        background: rgba(20,20,24,.92); border: 1px solid color-mix(in srgb, var(--k) 45%, var(--edge)); font: 600 11px var(--mono); white-space: nowrap; overflow: hidden;
+        box-shadow: 0 0 22px -6px color-mix(in srgb, var(--k) 60%, transparent); animation: pop 7s cubic-bezier(.16,1,.3,1) infinite; }
+  .nd span.ic { width: 26px; height: 26px; flex: none; border-radius: 6px; display: grid; place-items: center; background: color-mix(in srgb, var(--k) 18%, transparent); }
+  .nd canvas { width: 18px; height: 15px; image-rendering: pixelated; }
+  .nd.a { left: 3%; top: 26px; } .nd.b { left: 36%; top: 112px; animation-delay: .35s; } .nd.c { left: 69%; top: 26px; animation-delay: .7s; }
+  .wires { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .wires path { fill: none; stroke: rgba(236,235,230,.55); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-dasharray: 160; stroke-dashoffset: 160;
+                animation: wire 7s cubic-bezier(.65,0,.35,1) infinite; }
+  .wires path + path { animation-delay: .5s; }
+  @keyframes pop { 0% { opacity: 0; transform: translateY(6px) scale(.92); } 7%, 88% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+  @keyframes wire { 0%, 18% { stroke-dashoffset: 160; opacity: 1; } 32%, 86% { stroke-dashoffset: 0; opacity: 1; } 96%, 100% { stroke-dashoffset: 0; opacity: 0; } }
+  /* run: a live terminal, one line per agent */
+  .term { position: absolute; inset: 14px; font: 500 11.5px/1.95 var(--mono); }
+  .term .tl { display: flex; gap: 8px; align-items: center; white-space: nowrap; overflow: hidden; opacity: 0; animation: line 7s steps(1) infinite; }
+  .term .tl i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--k); box-shadow: 0 0 8px var(--k); }
+  .term .tl b { color: var(--k); font-weight: 600; width: 52px; flex: none; }
+  .term .tl span { color: var(--soft); overflow: hidden; text-overflow: ellipsis; }
+  .term .tl em { margin-left: auto; font-style: normal; color: var(--green); }
+  .term .tl:nth-child(2) { animation-delay: .6s; } .term .tl:nth-child(3) { animation-delay: 1.2s; } .term .tl:nth-child(4) { animation-delay: 1.8s; }
+  .term .tl:nth-child(5) { animation-delay: 2.6s; }
+  .term .cur { display: inline-block; width: 7px; height: 13px; background: var(--ink); vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+  @keyframes line { 0% { opacity: 0; } 2%, 92% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes blink { 50% { opacity: 0; } }
+  /* approve: the run waits on you; a click, and it ships */
+  .ask { position: absolute; left: 50%; top: 50%; width: min(250px, 84%); transform: translate(-50%, -50%); padding: 14px; border-radius: 10px;
+         background: rgba(20,20,24,.94); border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--edge)); font-size: 12px; }
+  .ask .h { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .ask .h i { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 10px var(--amber); animation: blink 1.2s steps(1) infinite; }
+  .ask .d { color: var(--soft); margin: 4px 0 12px; font-size: 11.5px; } .ask .d b { color: var(--green); font-weight: 500; } .ask .d s { color: var(--red); text-decoration: none; }
+  .ask .bs { display: flex; gap: 8px; }
+  .ask .bs span { flex: 1; text-align: center; height: 30px; line-height: 30px; border-radius: 7px; font-weight: 600; border: 1px solid var(--edge); color: var(--soft); }
+  .ask .bs span.ok { background: var(--ink); color: var(--void); border-color: var(--ink); animation: press 7s infinite; }
+  .ask .done { position: absolute; inset: 0; border-radius: 10px; display: grid; place-content: center; text-align: center; gap: 2px; background: rgba(16,22,18,.97);
+               border: 1px solid color-mix(in srgb, var(--green) 55%, transparent); color: var(--green); font: 700 17px var(--pixel); opacity: 0; animation: shipped 7s infinite; }
+  .ask .done small { font: 500 11px var(--mono); color: var(--soft); }
+  .ptr { position: absolute; width: 16px; height: 20px; left: 0; top: 0; animation: ptr 7s cubic-bezier(.65,0,.35,1) infinite; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+  @keyframes ptr { 0%, 12% { transform: translate(var(--fx), 170px); opacity: 0; } 18% { opacity: 1; } 40%, 46% { transform: translate(var(--tx), var(--ty)); opacity: 1; }
+                   48% { transform: translate(var(--tx), var(--ty)) scale(.85); } 52%, 80% { transform: translate(var(--tx), var(--ty)); opacity: 1; }
+                   90%, 100% { transform: translate(var(--tx), var(--ty)); opacity: 0; } }
+  @keyframes press { 0%, 46% { transform: none; } 48% { transform: scale(.94); } 52%, 100% { transform: none; } }
+  @keyframes shipped { 0%, 52% { opacity: 0; transform: scale(.96); } 56%, 90% { opacity: 1; transform: none; } 98%, 100% { opacity: 0; } }
+
+  /* bento: four things, uneven, each in its own color */
+  .bento { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; margin-top: 48px; }
+  .cell { --c: var(--blue); padding: 26px; min-width: 0; display: flex; flex-direction: column; }
+  .cell > canvas { width: 54px; height: 45px; image-rendering: pixelated; margin-bottom: 16px; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--c) 45%, transparent)); }
+  .cell h3 { font: 700 19px var(--pixel); margin: 0 0 8px; }
   .cell p { margin: 0; color: var(--soft); font-size: 14.4px; }
-  .cell.wide { grid-row: span 2; justify-content: space-between; background: linear-gradient(180deg, rgba(236,235,230,.02), rgba(236,235,230,.075)); }
-  .cell.wide .parts { display: grid; gap: 26px; margin: 10px 0 30px; font-size: 13px; }
+  .cell .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 18px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 7px; font: 500 11.5px var(--mono);
+          border: 1px solid var(--edge); background: rgba(236,235,230,.04); color: var(--ink); }
+  .chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--k, var(--green)); }
+  .chip.off { color: var(--faint); } .chip.off i { background: transparent; border: 1px solid var(--red); }
+  .chip.no { color: var(--faint); text-decoration: line-through; text-decoration-color: var(--red); }
+  .cell.wide { grid-row: span 2; justify-content: space-between;
+               background: radial-gradient(90% 60% at 30% 0%, rgba(122,156,240,.12), transparent 70%), linear-gradient(180deg, rgba(236,235,230,.02), rgba(236,235,230,.06)); }
+  .cell.wide .parts { flex: 1; display: grid; gap: 18px; align-content: space-evenly; margin: 0 0 26px; }
   .cell.wide .part { display: grid; grid-template-columns: 74px 1fr auto; gap: 12px; align-items: center; font-size: 12.5px; color: var(--soft); }
-  .cell.wide .part i { height: 6px; border-radius: 3px; background: var(--ink); opacity: .85; transform-origin: left; animation: fill 3.2s cubic-bezier(.16,1,.3,1) infinite; }
-  .cell.wide .part:nth-child(2) i { animation-delay: .35s; } .cell.wide .part:nth-child(3) i { animation-delay: .7s; }
+  .cell.wide .part span:first-child { color: var(--k); font-weight: 600; }
+  .cell.wide .part b { position: relative; height: 8px; border-radius: 4px; background: rgba(236,235,230,.07); overflow: hidden; }
+  .cell.wide .part i { position: absolute; inset: 0; border-radius: 4px; background: var(--k); box-shadow: 0 0 12px var(--k); transform-origin: left;
+                       animation: fill 3.6s cubic-bezier(.16,1,.3,1) infinite; }
+  .cell.wide .part:nth-child(2) i { animation-delay: .3s; } .cell.wide .part:nth-child(3) i { animation-delay: .6s; } .cell.wide .part:nth-child(4) i { animation-delay: 1.3s; }
   .cell.wide .part.check { color: var(--ink); }
-  @keyframes fill { 0% { transform: scaleX(.04); } 60%, 100% { transform: scaleX(1); } }
+  .cell.wide .merged { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 9px; font-size: 12.5px; color: var(--soft);
+                       background: color-mix(in srgb, var(--green) 9%, transparent); border: 1px solid color-mix(in srgb, var(--green) 30%, transparent); }
+  .cell.wide .merged b { color: var(--green); font-weight: 600; } .cell.wide .merged span { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
+  @keyframes fill { 0% { transform: scaleX(.03); } 55%, 100% { transform: scaleX(1); } }
   .cell.long { grid-column: span 2; }
   @media (max-width: 860px) { .bento { grid-template-columns: 1fr; } .cell.wide { grid-row: auto; } .cell.long { grid-column: auto; } }
 
-  /* download */
-  .dl { padding: 8px; margin-top: 40px; }
-  .dl a.os { display: grid; grid-template-columns: 110px 1fr auto; gap: 18px; align-items: center; padding: 18px; border-radius: calc(var(--r) - 4px);
-             text-decoration: none; transition: background .25s; }
-  .dl a.os:hover { background: var(--glass-hi); }
-  .dl a.os b { font: 700 15px var(--pixel); }
-  .dl a.os span { color: var(--soft); font-size: 13.9px; overflow-wrap: anywhere; }
-  .dl a.os em { font-style: normal; font-size: 13px; color: var(--ink); }
-  .dl a.os.you em::after { content: " (yours)"; color: var(--soft); }
-  .dl .src { padding: 18px; color: var(--soft); font-size: 13.5px; border-top: 1px solid var(--edge); margin-top: 6px; }
-  .dl code { display: block; margin-top: 8px; color: var(--ink); font: 500 13px var(--mono); overflow-wrap: anywhere; user-select: all; }
-  @media (max-width: 600px) { .dl a.os { grid-template-columns: 1fr auto; } .dl a.os span { display: none; } }
-  .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; }
-  .facts div { padding: 20px 22px; color: var(--soft); font-size: 13.9px; }
+  /* download: a small ring of light (the black hole, once more), three platforms, the source, the fine print */
+  #download .wrap { position: relative; }
+  .ring { position: absolute; left: 50%; top: -48px; width: min(640px, 100%); height: 160px; transform: translateX(-50%) rotate(-7deg); border-radius: 50%; pointer-events: none;
+          background: conic-gradient(from var(--a), transparent 0deg, rgba(183,156,242,.55) 60deg, rgba(236,235,230,.85) 110deg, rgba(122,156,240,.5) 160deg, transparent 220deg,
+                      rgba(236,235,230,.25) 290deg, transparent 360deg);
+          -webkit-mask: radial-gradient(closest-side, transparent 84%, #000 88%, #000 93%, transparent 100%);
+                  mask: radial-gradient(closest-side, transparent 84%, #000 88%, #000 93%, transparent 100%);
+          filter: blur(3px); animation: orbit 14s linear infinite; z-index: -1; }
+  @property --a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+  @keyframes orbit { to { --a: 360deg; } }
+  #download h2 { font-size: clamp(36px, 5.4vw, 64px); }
+  #download .lead { margin-top: 46px; }
+  .plats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 52px; text-align: left; }
+  .plats a.os { display: flex; flex-direction: column; gap: 4px; padding: 24px; text-decoration: none; min-height: 210px;
+                transition: transform .35s cubic-bezier(.16,1,.3,1), border-color .35s, background .35s; }
+  .plats a.os:hover { transform: translateY(-3px); border-color: rgba(236,235,230,.3); background: var(--glass-hi); }
+  .plats a.os .os-i { width: 34px; height: 34px; margin-bottom: 14px; }
+  .plats a.os b { font: 700 22px var(--pixel); }
+  .plats a.os .meta { color: var(--soft); font-size: 13px; }
+  .plats a.os em { margin-top: auto; padding-top: 18px; display: inline-flex; align-items: center; gap: 8px; font: 600 13.5px var(--mono); font-style: normal; color: var(--ink); }
+  .plats a.os em::after { content: "↓"; transition: transform .3s cubic-bezier(.16,1,.3,1); }
+  .plats a.os:hover em::after { transform: translateY(3px); }
+  .plats a.os .yours { position: absolute; top: 18px; right: 18px; height: 24px; padding: 0 9px; border-radius: 6px; font: 600 11px/24px var(--mono);
+                       background: var(--ink); color: var(--void); display: none; }
+  .plats a.os.you { border-color: rgba(236,235,230,.42); background: linear-gradient(180deg, rgba(236,235,230,.1), rgba(236,235,230,.035));
+                    box-shadow: 0 20px 60px -30px rgba(236,235,230,.35); }
+  .plats a.os.you .yours { display: block; }
+  @media (max-width: 760px) { .plats { grid-template-columns: 1fr; } .plats a.os { min-height: 0; } }
+  .src { margin-top: 14px; padding: 18px 20px; text-align: left; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 22px; align-items: center; }
+  .src p { margin: 0; color: var(--soft); font-size: 13.5px; } .src p b { color: var(--ink); font-weight: 600; display: block; }
+  .src .cmd { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 8px 8px 14px; border-radius: 9px; background: rgba(0,0,0,.45); border: 1px solid var(--edge); }
+  .src .cmd::before { content: "$"; color: var(--green); font: 600 13px var(--mono); }
+  .src .cmd code { flex: 1; min-width: 0; font: 500 12.5px var(--mono); color: var(--ink); white-space: nowrap; overflow-x: auto; user-select: all; scrollbar-width: none; }
+  .src .cmd button { flex: none; height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: var(--ink); color: var(--void); font: 600 12px var(--mono); cursor: pointer; }
+  @media (max-width: 760px) { .src { grid-template-columns: 1fr; } }
+  .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; text-align: left; }
+  .facts div { --c: var(--amber); display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 20px 22px; color: var(--soft); font-size: 13.9px; }
+  .facts div + div { --c: var(--red); }
+  .facts div::before { content: "!"; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font: 700 16px var(--pixel); color: var(--c);
+                       background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); }
+  .facts div:first-child::before { content: "$"; }
   .facts b { display: block; color: var(--ink); margin-bottom: 4px; font-weight: 600; }
   @media (max-width: 720px) { .facts { grid-template-columns: 1fr; } }
 
@@ -235,15 +349,19 @@
   @keyframes rise { 0% { opacity: 0; transform: translate(0, 6px) scale(.6); } 18% { opacity: 1; transform: translate(0, 0) scale(1); }
                     100% { opacity: 0; transform: translate(var(--dx), -74px) scale(.9); } }
   @media (prefers-reduced-motion: reduce) { .heart { animation-duration: .01s; } }
-  footer { padding: 40px 0 60px; color: var(--faint); font-size: 12.5px; }
-  footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 26px; justify-content: space-between; }
-  footer a { color: var(--soft); }
+  footer { padding: 30px 0 40px; color: var(--faint); font-size: 12.5px; overflow: hidden; }
+  footer .big { display: block; text-align: center; font: 700 clamp(60px, 17.5vw, 236px)/.78 var(--pixel); letter-spacing: -.02em; white-space: nowrap; user-select: none; margin: 30px 0 34px;
+                background: linear-gradient(180deg, rgba(236,235,230,.16), rgba(236,235,230,0) 92%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  footer .frow { display: flex; flex-wrap: wrap; gap: 12px 26px; justify-content: space-between; align-items: center; padding: 18px 0; border-top: 1px solid var(--edge); }
+  footer .flinks { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; }
+  footer a { color: var(--soft); text-decoration: none; } footer a:hover { color: var(--ink); }
 
   .rv { opacity: 0; transform: translateY(24px); transition: opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1); }
   .rv.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) {
     .rv { opacity: 1; transform: none; transition: none; }
-    .cell.wide .part i { animation: none; }
+    .cell.wide .part i, .nd, .wires path, .term .tl, .ptr, .ask .bs span.ok, .ask .done, .ring { animation: none; }
+    .nd, .term .tl { opacity: 1; } .wires path { stroke-dashoffset: 0; }
   }
 </style>
 <script defer src="/_vercel/insights/script.js"></script>
@@ -255,7 +373,7 @@
 
 <div id="top" aria-hidden="true"></div>
 <nav id="nav"><div class="wrap"><div class="bar">
-  <a class="brand" href="#"><svg class="mark" viewBox="0 0 16 13" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M1 0h1v1h-1zM2 0h1v1h-1zM13 0h1v1h-1zM14 0h1v1h-1zM0 1h1v1h-1zM2 1h1v1h-1zM13 1h1v1h-1zM15 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM13 2h1v1h-1zM14 2h1v1h-1zM15 2h1v1h-1zM1 3h1v1h-1zM14 3h1v1h-1zM1 4h1v1h-1zM14 4h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM7 5h1v1h-1zM8 5h1v1h-1zM9 5h1v1h-1zM10 5h1v1h-1zM11 5h1v1h-1zM13 5h1v1h-1zM14 5h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM8 6h1v1h-1zM9 6h1v1h-1zM10 6h1v1h-1zM11 6h1v1h-1zM12 6h1v1h-1zM13 6h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM10 7h1v1h-1zM12 7h1v1h-1zM13 7h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1zM9 8h1v1h-1zM10 8h1v1h-1zM11 8h1v1h-1zM12 8h1v1h-1zM13 8h1v1h-1zM3 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM6 9h1v1h-1zM7 9h1v1h-1zM8 9h1v1h-1zM9 9h1v1h-1zM10 9h1v1h-1zM11 9h1v1h-1zM12 9h1v1h-1zM3 10h1v1h-1zM5 10h1v1h-1zM10 10h1v1h-1zM12 10h1v1h-1zM3 11h1v1h-1zM5 11h1v1h-1zM10 11h1v1h-1zM12 11h1v1h-1zM2 12h1v1h-1zM3 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM9 12h1v1h-1zM10 12h1v1h-1zM12 12h1v1h-1zM13 12h1v1h-1z"/></svg>lithnode</a>
+  <a class="brand" href="#"><svg class="mark" viewBox="0 0 16 13" shape-rendering="crispEdges" aria-hidden="true"><path id="crabMark" fill="currentColor" d="M1 0h1v1h-1zM2 0h1v1h-1zM13 0h1v1h-1zM14 0h1v1h-1zM0 1h1v1h-1zM2 1h1v1h-1zM13 1h1v1h-1zM15 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM13 2h1v1h-1zM14 2h1v1h-1zM15 2h1v1h-1zM1 3h1v1h-1zM14 3h1v1h-1zM1 4h1v1h-1zM14 4h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM7 5h1v1h-1zM8 5h1v1h-1zM9 5h1v1h-1zM10 5h1v1h-1zM11 5h1v1h-1zM13 5h1v1h-1zM14 5h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM8 6h1v1h-1zM9 6h1v1h-1zM10 6h1v1h-1zM11 6h1v1h-1zM12 6h1v1h-1zM13 6h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM10 7h1v1h-1zM12 7h1v1h-1zM13 7h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM8 8h1v1h-1zM9 8h1v1h-1zM10 8h1v1h-1zM11 8h1v1h-1zM12 8h1v1h-1zM13 8h1v1h-1zM3 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM6 9h1v1h-1zM7 9h1v1h-1zM8 9h1v1h-1zM9 9h1v1h-1zM10 9h1v1h-1zM11 9h1v1h-1zM12 9h1v1h-1zM3 10h1v1h-1zM5 10h1v1h-1zM10 10h1v1h-1zM12 10h1v1h-1zM3 11h1v1h-1zM5 11h1v1h-1zM10 11h1v1h-1zM12 11h1v1h-1zM2 12h1v1h-1zM3 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM9 12h1v1h-1zM10 12h1v1h-1zM12 12h1v1h-1zM13 12h1v1h-1z"/></svg>lithnode</a>
   <div class="links"><a href="#live">Flow</a><a href="#film">Film</a><a href="#how">How it works</a><a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a></div>
   <a class="btn sm main" href="#download">Download</a>
 </div></div></nav>
@@ -295,54 +413,104 @@
   </div></div>
 </div></section>
 
-<section id="how"><div class="wrap">
+<section id="how"><div class="neb" style="left:-380px; top:40px; --n: rgba(122,156,240,.12)"></div><div class="wrap">
   <h2 class="rv">Three moves.</h2>
-  <div class="rows">
-    <div class="row rv"><b>Draw</b><p>Drop in bots, give each team a job, its command-line tools and connectors, and wire them up. Or describe the team in one line and it gets drawn for you.</p></div>
-    <div class="row rv"><b>Run</b><p>Every agent is a real Claude Code, Codex or Cursor session on your machine. Watch each one work, live, in the folder you picked.</p></div>
-    <div class="row rv"><b>Approve</b><p>Put an approval step anywhere. The run waits for you before anything ships, and the result lands in one report.</p></div>
+  <p class="lead rv">Draw the team, let it run, say go. That's the whole app.</p>
+  <div class="moves">
+    <article class="move glass spot rv" style="--c: var(--blue)">
+      <div class="stage" aria-hidden="true">
+        <svg class="wires" viewBox="0 0 300 190" preserveAspectRatio="none"><path d="M93 46 C 104 46, 97 132, 108 132"/><path d="M192 132 C 203 132, 196 46, 207 46"/></svg>
+        <div class="nd a" style="--k: var(--blue)"><span class="ic"><canvas width="12" height="10" data-sprite="byte" data-color="#7a9cf0"></canvas></span>Build</div>
+        <div class="nd b" style="--k: var(--green)"><span class="ic"><canvas width="12" height="10" data-sprite="bug" data-color="#79c47f"></canvas></span>Check</div>
+        <div class="nd c" style="--k: var(--purple)"><span class="ic"><canvas width="12" height="10" data-sprite="rocket" data-color="#b79cf2"></canvas></span>Ship</div>
+      </div>
+      <div class="txt"><span class="n">01</span><h3>Draw</h3>
+        <p>Drop in bots, give each team a job, its command-line tools and connectors, and wire them up. Or describe the team in one line and it gets drawn for you.</p></div>
+    </article>
+    <article class="move glass spot rv" style="--c: var(--green)">
+      <div class="stage" aria-hidden="true"><div class="term">
+        <div class="tl" style="--k: var(--blue)"><i></i><b>byte</b><span>editing src/parse.py</span></div>
+        <div class="tl" style="--k: var(--orange)"><i></i><b>forge</b><span>writing tests/test_parse.py</span></div>
+        <div class="tl" style="--k: var(--teal)"><i></i><b>scout</b><span>reading docs/api.md</span></div>
+        <div class="tl" style="--k: var(--green)"><i></i><b>beetle</b><span>pytest: 24 passed</span><em>✓</em></div>
+        <div class="tl" style="--k: var(--ink)"><span>~/my-app $ <span class="cur"></span></span></div>
+      </div></div>
+      <div class="txt"><span class="n">02</span><h3>Run</h3>
+        <p>Every agent is a real Claude Code, Codex or Cursor session on your machine. Watch each one work, live, in the folder you picked.</p></div>
+    </article>
+    <article class="move glass spot rv" style="--c: var(--amber)">
+      <div class="stage" aria-hidden="true">
+        <div class="ask"><div class="h"><i></i>Ready to ship</div>
+          <div class="d">3 files, <b>+128</b> <s>−14</s>, every check passed</div>
+          <div class="bs"><span class="ok">Approve</span><span>Not yet</span></div>
+          <div class="done">Shipped<small>v1.4.0 is out</small></div></div>
+        <svg class="ptr" viewBox="0 0 8 10" shape-rendering="crispEdges"><path fill="#08080a" d="M0 0h1v1h1v1h1v1h1v1h1v1h1v1h1v1h-3v1h1v2h-1v-1h-1v-1h-1v1h-1z"/><path fill="#ecebe6" d="M1 2h1v1h1v1h1v1h1v1h1v1h-2v1h-1v-1h-1v1h-1z"/></svg>
+      </div>
+      <div class="txt"><span class="n">03</span><h3>Approve</h3>
+        <p>Put an approval step anywhere. The run waits for you before anything ships, and the result lands in one report.</p></div>
+    </article>
   </div>
 </div></section>
 
-<section id="features"><div class="wrap">
+<section id="features"><div class="neb" style="right:-420px; top:120px; --n: rgba(121,196,127,.09)"></div><div class="wrap">
   <h2 class="rv">What a team gets.</h2>
   <div class="bento">
-    <div class="cell wide glass rv">
+    <div class="cell wide glass spot rv" style="--c: var(--blue)">
       <div class="parts" aria-hidden="true">
-        <div class="part"><span>part 1</span><i></i><span>rows 1-33,334</span></div>
-        <div class="part"><span>part 2</span><i></i><span>rows 33,335-66,667</span></div>
-        <div class="part"><span>part 3</span><i></i><span>rows 66,668-100,000</span></div>
-        <div class="part check"><span>checker</span><i style="animation-delay:1.2s"></i><span>every part</span></div>
+        <div class="part" style="--k: var(--blue)"><span>part 1</span><b><i></i></b><span>rows 1-33,334</span></div>
+        <div class="part" style="--k: var(--orange)"><span>part 2</span><b><i></i></b><span>rows 33,335-66,667</span></div>
+        <div class="part" style="--k: var(--teal)"><span>part 3</span><b><i></i></b><span>rows 66,668-100,000</span></div>
+        <div class="part check" style="--k: var(--green)"><span>checker</span><b><i></i></b><span>every part</span></div>
+        <div class="merged"><b>✓ merged</b>3 parts, 0 bad rows<span>100,000 rows</span></div>
       </div>
       <div><h3>Split it, then check it</h3>
       <p>Cut one big job into parts that agents do side by side, then put a checker team after them to verify every part.</p></div>
     </div>
-    <div class="cell glass rv"><canvas width="12" height="10" data-sprite="bug" title="Pet me"></canvas><h3>Mix engines</h3><p>Claude Code, Codex and Cursor in one flow, each with the models its plan offers.</p></div>
-    <div class="cell glass rv"><canvas width="12" height="10" data-sprite="scout" title="Pet me"></canvas><h3>Only the tools you allow</h3><p>Switch on git, gh or python per team. Everything else stays blocked.</p></div>
-    <div class="cell long glass rv"><canvas width="12" height="10" data-sprite="rocket" title="Pet me"></canvas><h3>Local and open source</h3><p>No account, no API keys, no telemetry. Your code and sign-in stay on your machine, and every line of Lithnode is on GitHub.</p></div>
+    <div class="cell glass spot rv" style="--c: var(--green)"><canvas width="12" height="10" data-sprite="bug" data-color="#79c47f" title="Pet me"></canvas><h3>Mix engines</h3>
+      <p>Claude Code, Codex and Cursor in one flow, each with the models its plan offers.</p>
+      <div class="chips"><span class="chip" style="--k: var(--orange)"><i></i>Claude Code</span><span class="chip" style="--k: var(--ink)"><i></i>Codex</span><span class="chip" style="--k: var(--blue)"><i></i>Cursor</span></div></div>
+    <div class="cell glass spot rv" style="--c: var(--teal)"><canvas width="12" height="10" data-sprite="scout" data-color="#3cc2ac" title="Pet me"></canvas><h3>Only the tools you allow</h3>
+      <p>Switch on git, gh or python per team. Everything else stays blocked.</p>
+      <div class="chips"><span class="chip"><i></i>git</span><span class="chip"><i></i>gh</span><span class="chip"><i></i>python</span><span class="chip off"><i></i>the rest</span></div></div>
+    <div class="cell long glass spot rv" style="--c: var(--purple)"><canvas width="12" height="10" data-sprite="rocket" data-color="#b79cf2" title="Pet me"></canvas>
+      <div><h3>Local and open source</h3><p>Your code and sign-in stay on your machine, and every line of Lithnode is on GitHub.</p></div>
+      <div class="chips"><span class="chip no">account</span><span class="chip no">API keys</span><span class="chip no">telemetry</span><span class="chip" style="--k: var(--purple)"><i></i>MIT</span></div></div>
   </div>
 </div></section>
 
-<section id="download"><div class="wrap">
+<section id="download"><div class="neb" style="left:50%; top:-80px; margin-left:-450px; --n: rgba(183,156,242,.1)"></div><div class="wrap center">
+  <div class="ring" aria-hidden="true"></div>
   <h2 class="rv">Download.</h2>
   <p class="lead rv">Free and MIT licensed. Needs Claude Code, Codex or Cursor installed and signed in.</p>
-  <div class="dl glass rv">
-    <a class="os" data-os="win" href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/LithnodeSetup.exe"><b><svg class="os-i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8.4v8.4H3zM12.6 3H21v8.4h-8.4zM3 12.6h8.4V21H3zM12.6 12.6H21V21h-8.4z"/></svg>Windows</b><span>LithnodeSetup.exe, Windows 10 or 11</span><em>Download</em></a>
-    <a class="os" data-os="mac" href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/Lithnode-mac-arm64.dmg"><b><svg class="os-i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Mac</b><span>Lithnode-mac-arm64.dmg, Apple silicon</span><em>Download</em></a>
-    <a class="os" data-os="linux" href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/Lithnode.flatpak"><b><svg class="os-i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.043c-.06-.003-.12 0-.18 0h-.016c.151-.467-.182-.825-1.065-1.224-.915-.4-1.646-.336-1.77.465-.008.043-.013.066-.018.135-.068.023-.139.053-.209.064-.43.268-.662.669-.793 1.187-.13.533-.17 1.156-.205 1.869v.003c-.02.334-.17.838-.319 1.35-1.5 1.072-3.58 1.538-5.348.334a2.645 2.645 0 00-.402-.533 1.45 1.45 0 00-.275-.333c.182 0 .338-.03.465-.067a.615.615 0 00.314-.334c.108-.267 0-.697-.345-1.163-.345-.467-.931-.995-1.788-1.521-.63-.4-.986-.87-1.15-1.396-.165-.534-.143-1.085-.015-1.645.245-1.07.873-2.11 1.274-2.763.107-.065.037.135-.408.974-.396.751-1.14 2.497-.122 3.854a8.123 8.123 0 01.647-2.876c.564-1.278 1.743-3.504 1.836-5.268.048.036.217.135.289.202.218.133.38.333.59.465.21.201.477.335.876.335.039.003.075.006.11.006.412 0 .73-.134.997-.268.29-.134.52-.334.74-.4h.005c.467-.135.835-.402 1.044-.7zm2.185 8.958c.037.6.343 1.245.882 1.377.588.134 1.434-.333 1.791-.765l.211-.01c.315-.007.577.01.847.268l.003.003c.208.199.305.53.391.876.085.4.154.78.409 1.066.486.527.645.906.636 1.14l.003-.007v.018l-.003-.012c-.015.262-.185.396-.498.595-.63.401-1.746.712-2.457 1.57-.618.737-1.37 1.14-2.036 1.191-.664.053-1.237-.2-1.574-.898l-.005-.003c-.21-.4-.12-1.025.056-1.69.176-.668.428-1.344.463-1.897.037-.714.076-1.335.195-1.814.12-.465.308-.797.641-.984l.045-.022zm-10.814.049h.01c.053 0 .105.005.157.014.376.055.706.333 1.023.752l.91 1.664.003.003c.243.533.754 1.064 1.189 1.637.434.598.77 1.131.729 1.57v.006c-.057.744-.48 1.148-1.125 1.294-.645.135-1.52.002-2.395-.464-.968-.536-2.118-.469-2.857-.602-.369-.066-.61-.2-.723-.4-.11-.2-.113-.602.123-1.23v-.004l.002-.003c.117-.334.03-.752-.027-1.118-.055-.401-.083-.71.043-.94.16-.334.396-.4.69-.533.294-.135.64-.202.915-.47h.002v-.002c.256-.268.445-.601.668-.838.19-.201.38-.336.663-.336zm7.159-9.074c-.435.201-.945.535-1.488.535-.542 0-.97-.267-1.28-.466-.154-.134-.28-.268-.373-.335-.164-.134-.144-.333-.074-.333.109.016.129.134.199.2.096.066.215.2.36.333.292.2.68.467 1.167.467.485 0 1.053-.267 1.398-.466.195-.135.445-.334.648-.467.156-.136.149-.267.279-.267.128.016.034.134-.147.332a8.097 8.097 0 01-.69.468zm-1.082-1.583V5.64c-.006-.02.013-.042.029-.05.074-.043.18-.027.26.004.063 0 .16.067.15.135-.006.049-.085.066-.135.066-.055 0-.092-.043-.141-.068-.052-.018-.146-.008-.163-.065zm-.551 0c-.02.058-.113.049-.166.066-.047.025-.086.068-.14.068-.05 0-.13-.02-.136-.068-.01-.066.088-.133.15-.133.08-.031.184-.047.259-.005.019.009.036.03.03.05v.02h.003z"/></svg>Linux</b><span>Lithnode.flatpak, any distro</span><em>Download</em></a>
-    <div class="src">Rather read it first? Run it from source. Plain Python, no packages.
-      <code>git clone https://github.com/drewguitarist18-lang/lithnode &amp;&amp; python3 lithnode/hq.py</code></div>
+  <div class="plats">
+    <a class="os glass rv" data-os="win" href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/LithnodeSetup.exe">
+      <span class="yours">Your system</span><svg class="os-i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8.4v8.4H3zM12.6 3H21v8.4h-8.4zM3 12.6h8.4V21H3zM12.6 12.6H21V21h-8.4z"/></svg><b>Windows</b><span class="meta">Windows 10 or 11</span><span class="meta">LithnodeSetup.exe, 99 MB</span><em>Download</em></a>
+    <a class="os glass rv" data-os="mac" href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/Lithnode-mac-arm64.dmg">
+      <span class="yours">Your system</span><svg class="os-i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg><b>Mac</b><span class="meta">Apple silicon</span><span class="meta">Lithnode-mac-arm64.dmg, 153 MB</span><em>Download</em></a>
+    <a class="os glass rv" data-os="linux" href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/Lithnode.flatpak">
+      <span class="yours">Your system</span><svg class="os-i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.043c-.06-.003-.12 0-.18 0h-.016c.151-.467-.182-.825-1.065-1.224-.915-.4-1.646-.336-1.77.465-.008.043-.013.066-.018.135-.068.023-.139.053-.209.064-.43.268-.662.669-.793 1.187-.13.533-.17 1.156-.205 1.869v.003c-.02.334-.17.838-.319 1.35-1.5 1.072-3.58 1.538-5.348.334a2.645 2.645 0 00-.402-.533 1.45 1.45 0 00-.275-.333c.182 0 .338-.03.465-.067a.615.615 0 00.314-.334c.108-.267 0-.697-.345-1.163-.345-.467-.931-.995-1.788-1.521-.63-.4-.986-.87-1.15-1.396-.165-.534-.143-1.085-.015-1.645.245-1.07.873-2.11 1.274-2.763.107-.065.037.135-.408.974-.396.751-1.14 2.497-.122 3.854a8.123 8.123 0 01.647-2.876c.564-1.278 1.743-3.504 1.836-5.268.048.036.217.135.289.202.218.133.38.333.59.465.21.201.477.335.876.335.039.003.075.006.11.006.412 0 .73-.134.997-.268.29-.134.52-.334.74-.4h.005c.467-.135.835-.402 1.044-.7zm2.185 8.958c.037.6.343 1.245.882 1.377.588.134 1.434-.333 1.791-.765l.211-.01c.315-.007.577.01.847.268l.003.003c.208.199.305.53.391.876.085.4.154.78.409 1.066.486.527.645.906.636 1.14l.003-.007v.018l-.003-.012c-.015.262-.185.396-.498.595-.63.401-1.746.712-2.457 1.57-.618.737-1.37 1.14-2.036 1.191-.664.053-1.237-.2-1.574-.898l-.005-.003c-.21-.4-.12-1.025.056-1.69.176-.668.428-1.344.463-1.897.037-.714.076-1.335.195-1.814.12-.465.308-.797.641-.984l.045-.022zm-10.814.049h.01c.053 0 .105.005.157.014.376.055.706.333 1.023.752l.91 1.664.003.003c.243.533.754 1.064 1.189 1.637.434.598.77 1.131.729 1.57v.006c-.057.744-.48 1.148-1.125 1.294-.645.135-1.52.002-2.395-.464-.968-.536-2.118-.469-2.857-.602-.369-.066-.61-.2-.723-.4-.11-.2-.113-.602.123-1.23v-.004l.002-.003c.117-.334.03-.752-.027-1.118-.055-.401-.083-.71.043-.94.16-.334.396-.4.69-.533.294-.135.64-.202.915-.47h.002v-.002c.256-.268.445-.601.668-.838.19-.201.38-.336.663-.336zm7.159-9.074c-.435.201-.945.535-1.488.535-.542 0-.97-.267-1.28-.466-.154-.134-.28-.268-.373-.335-.164-.134-.144-.333-.074-.333.109.016.129.134.199.2.096.066.215.2.36.333.292.2.68.467 1.167.467.485 0 1.053-.267 1.398-.466.195-.135.445-.334.648-.467.156-.136.149-.267.279-.267.128.016.034.134-.147.332a8.097 8.097 0 01-.69.468zm-1.082-1.583V5.64c-.006-.02.013-.042.029-.05.074-.043.18-.027.26.004.063 0 .16.067.15.135-.006.049-.085.066-.135.066-.055 0-.092-.043-.141-.068-.052-.018-.146-.008-.163-.065zm-.551 0c-.02.058-.113.049-.166.066-.047.025-.086.068-.14.068-.05 0-.13-.02-.136-.068-.01-.066.088-.133.15-.133.08-.031.184-.047.259-.005.019.009.036.03.03.05v.02h.003z"/></svg><b>Linux</b><span class="meta">Any distro, sandboxed</span><span class="meta">Lithnode.flatpak, 95 MB</span><em>Download</em></a>
   </div>
+  <div class="src glass rv"><p><b>Rather read it first?</b>Run it from source. Plain Python, no packages.</p>
+    <div class="cmd"><code>git clone https://github.com/drewguitarist18-lang/lithnode &amp;&amp; python3 lithnode/hq.py</code><button type="button" data-copy>Copy</button></div></div>
   <div class="facts">
-    <div class="glass rv"><b>Your plan, your usage</b>Every agent uses your own Claude, ChatGPT or Cursor plan. Lithnode never charges you, so it can't refund usage.</div>
-    <div class="glass rv"><b>Use at your own risk</b>Builder agents can edit files in the folder you pick. Start with a test folder or a project in git.</div>
+    <div class="glass rv"><span><b>Your plan, your usage</b>Every agent uses your own Claude, ChatGPT or Cursor plan. Lithnode never charges you, so it can't refund usage.</span></div>
+    <div class="glass rv"><span><b>Use at your own risk</b>Builder agents can edit files in the folder you pick. Start with a test folder or a project in git.</span></div>
   </div>
 </div></section>
 </main>
 
 <footer><div class="wrap">
-  <span>Lithnode is an independent project. Not made or endorsed by Anthropic, OpenAI or Cursor.</span>
-  <span><a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a> &nbsp; This site counts visits anonymously. The app has no tracking.</span>
+  <span class="big" aria-hidden="true">lithnode</span>
+  <div class="frow">
+    <a class="brand" href="#"><svg class="mark" viewBox="0 0 16 13" shape-rendering="crispEdges" aria-hidden="true"><use href="#crabMark"/></svg>lithnode</a>
+    <div class="flinks"><a href="#live">Flow</a><a href="#film">Film</a><a href="#how">How it works</a><a href="#download">Download</a>
+      <a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/drewguitarist18-lang/lithnode/releases" target="_blank" rel="noopener">Releases</a></div>
+  </div>
+  <div class="frow">
+    <span>Lithnode is an independent project. Not made or endorsed by Anthropic, OpenAI or Cursor.</span>
+    <span>This site counts visits anonymously. The app has no tracking.</span>
+  </div>
 </div></footer>
 
 <aside class="help" id="help" role="dialog" aria-labelledby="helpTitle" aria-hidden="true">
@@ -386,12 +554,16 @@ const SPRITES = {
   bug:    ["..k......k..", "...k....k...", "..########..", ".#e##kk##e#.", "#####kk#####", ".####kk####.", "#.########.#", "#..#....#..#"],
   scout:  ["...#....#...", "....#..#....", "..########..", ".#e######e#.", ".##########.", "..########..", "...#.##.#...", "..##....##.."],
   rocket: [".....##.....", "....####....", "...######...", "...#e##e#...", "...######...", "..########..", ".##.####.##.", "....k..k...."],
+  byte:   [".....kk.....", "..########..", ".##e####e##.", ".##########.", "#.########.#", "#.########.#", "..##....##..", "..##....##.."],
 };
 const HEART = [".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."];
 const bots = [];
 function makeBot(cv, frame, eyes) {
   const g = cv.getContext("2d");
   const bot = { cv, look: [0, 0], lift: [false, false], blink: false, pet: false };
+  // a bot can wear its color (data-color); its darker bits are the same color, dimmed
+  const body = cv.dataset.color || "#ecebe6", n = parseInt(body.slice(1), 16);
+  const dark = cv.dataset.color ? `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * .55)).join(",")})` : "#8a8984";
   bot.draw = () => {
     const rows = frame(bot);
     // pupils: shift each eye toward the cursor, onto the body; petting closes them into a happy line
@@ -405,7 +577,7 @@ function makeBot(cv, frame, eyes) {
     g.clearRect(0, 0, cv.width, cv.height);
     rows.px.forEach((row, y) => row.forEach((ch, x) => {
       if (ch === ".") return;
-      g.fillStyle = ch === "e" || ch === "c" ? "#08080a" : ch === "k" ? "#8a8984" : "#ecebe6";
+      g.fillStyle = ch === "e" || ch === "c" ? "#08080a" : ch === "k" ? dark : body;
       g.fillRect(x, y, 1, 1);
     }));
   };
@@ -444,7 +616,7 @@ function hearts(cv) {
   const r = cv.getBoundingClientRect();
   for (let i = 0; i < 5; i++) {
     const h = document.createElement("canvas"); h.width = 7; h.height = 6; h.className = "heart";
-    const g = h.getContext("2d"); g.fillStyle = "#ecebe6";
+    const g = h.getContext("2d"); g.fillStyle = cv.dataset.color || "#ecebe6";
     HEART.forEach((row, y) => [...row].forEach((ch, x) => ch === "#" && g.fillRect(x, y, 1, 1)));
     h.style.left = r.left + r.width * (.2 + Math.random() * .6) - 10 + "px";
     h.style.top = r.top - 14 + "px";   // just above the bot, so the hearts never cover it
@@ -698,6 +870,23 @@ new IntersectionObserver(([e]) => document.getElementById("nav").classList.toggl
   });
   frame.tabIndex = -1;
 })();
+// ---------------------------------------------------------------- glass cards light up where the cursor is
+document.querySelectorAll(".spot").forEach((el) => el.addEventListener("pointermove", (e) => {
+  const r = el.getBoundingClientRect();
+  el.style.setProperty("--mx", e.clientX - r.left + "px"); el.style.setProperty("--my", e.clientY - r.top + "px");
+}, { passive: true }));
+// the Approve loop: the pointer travels from the corner to the Approve button, wherever it sits at this width
+function aimPointer() {
+  document.querySelectorAll(".move .stage").forEach((st) => {
+    const ptr = st.querySelector(".ptr"), ok = st.querySelector(".ok");
+    if (!ptr || !ok) return;
+    const s = st.getBoundingClientRect(), o = ok.getBoundingClientRect();
+    ptr.style.setProperty("--fx", s.width - 30 + "px");
+    ptr.style.setProperty("--tx", o.left - s.left + o.width * .45 + "px"); ptr.style.setProperty("--ty", o.top - s.top + o.height * .45 + "px");
+  });
+}
+aimPointer(); addEventListener("resize", aimPointer);
+
 const io = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } }), { threshold: .12 });
 document.querySelectorAll(".rv").forEach((el, i) => { el.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(el); });
 </script>
