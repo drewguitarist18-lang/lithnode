@@ -94,6 +94,16 @@
 
   /* sections */
   section { padding: 120px 0; }
+  /* a real run, drawn the way the app draws it, as the background of its own section */
+  .live { position: relative; padding: 0; height: min(440px, 70svh); overflow: hidden; }
+  .live .lead { margin-inline: auto; }
+  @media (max-width: 1180px) { .live { height: 600px; } }   /* two rows of steps */
+  @media (max-width: 600px) { .live { height: 520px; } }
+  .live canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+                 -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 55%, #000 55%, transparent);
+                 mask-image: radial-gradient(ellipse 75% 70% at 50% 55%, #000 55%, transparent); }
+  .live .wrap { position: relative; padding-top: 56px; text-align: center; pointer-events: none; }
+  .live h2 { margin-bottom: 8px; }
   h2 { font: 700 clamp(28px, 3.8vw, 44px)/1.08 var(--pixel); margin: 0 0 14px; letter-spacing: -.01em; text-wrap: balance; }
   .lead { color: var(--soft); max-width: 60ch; margin: 0; }
   .center { text-align: center; } .center .lead { margin-inline: auto; }
@@ -244,7 +254,7 @@
 <div id="top" aria-hidden="true"></div>
 <nav id="nav"><div class="wrap"><div class="bar">
   <a class="brand" href="#">lithnode</a>
-  <div class="links"><a href="#film">Film</a><a href="#how">How it works</a><a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a></div>
+  <div class="links"><a href="#live">Flow</a><a href="#film">Film</a><a href="#how">How it works</a><a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a></div>
   <a class="btn sm main" href="#download">Download</a>
 </div></div></nav>
 
@@ -259,6 +269,12 @@
   </div>
   <p class="fine">Free. It runs on your own Claude Code binary. <span id="also">Also for <a href="#download">Mac</a> and <a href="#download">Linux</a>.</span></p>
 </div></header>
+
+<section class="live" id="live" aria-label="A run, drawn live">
+  <canvas id="flowCanvas" aria-hidden="true"></canvas>
+  <div class="wrap"><h2 class="rv">One job. A whole team on it.</h2>
+    <p class="lead rv">Three agents split the rows, a checker verifies every part, and it waits for you before it ships.</p></div>
+</section>
 
 <section id="film"><div class="wrap center">
   <h2 class="rv">Watch one run, start to finish.</h2>
@@ -512,6 +528,121 @@ if (DISCORD) { const d = document.getElementById("discord"); d.href = DISCORD; d
   });
   $("helpX").onclick = hide;
   addEventListener("keydown", (e) => { if (e.key === "Escape") hide(); });
+})();
+
+
+// ---------------------------------------------------------------- a live run, drawn the way the app draws it
+(() => {
+  const cv = document.getElementById("flowCanvas");
+  if (!cv) return;
+  const MONO = '"Geist Mono", ui-monospace, monospace', INK = "#ecebe6", MUTED = "#8d8c87", DONE = "#7fc98a", ASK = "#e0b25c", WORK = "#ecebe6";
+  const SH = {
+    crab:   ["..########..", "..#e####e#..", "############", "############", "..########..", "..########..", "..#.#..#.#..", "..#.#..#.#.."],
+    byte:   [".....kk.....", "..########..", ".##e####e##.", ".##########.", "#.########.#", "#.########.#", "..##....##..", "..##....##.."],
+    bug:    ["..k......k..", "...k....k...", "..########..", ".#e##kk##e#.", "#####kk#####", ".####kk####.", "#.########.#", "#..#....#..#"],
+    rocket: [".....##.....", "....####....", "...######...", "...#e##e#...", "...######...", "..########..", ".##.####.##.", "....k..k...."],
+  };
+  const tint = (hex, a) => { const v = parseInt(hex.slice(1), 16); return `rgba(${v >> 16},${(v >> 8) & 255},${v & 255},${a})`; };
+  const ease = (x) => 1 - Math.pow(1 - x, 3), clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+  const rr = (g, x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
+  function sprite(g, shape, color, x, y, c, bob) {
+    SH[shape].forEach((row, ry) => [...row].forEach((ch, cx) => {
+      if (ch === ".") return;
+      g.fillStyle = ch === "e" ? "#08080a" : ch === "k" ? tint(color, .6) : color;
+      g.fillRect(x + cx * c, y - bob + ry * c, c + .4, c + .4);
+    }));
+  }
+  function fitText(g, str, w) { if (g.measureText(str).width <= w) return str; while (str.length > 1 && g.measureText(str + "…").width > w) str = str.slice(0, -1); return str + "…"; }
+  // the run: the same nodes, wires and states as the app
+  const W = 168, H = 80;
+  const N = [
+    { kind: "start", name: "Start" },
+    { kind: "team", name: "Workers", job: "Clean 100,000 rows", step: "rows 33,335-66,667", shape: "byte", color: "#7a9cf0", count: 3, model: "Haiku 4.5", how: "split 3 ways" },
+    { kind: "team", name: "Checker", job: "Checks every part", step: "part 3 checked", shape: "bug", color: "#79c47f", count: 1, model: "Sonnet 5.5", how: "1 agent" },
+    { kind: "approval", name: "You" },
+    { kind: "team", name: "Publisher", job: "Ships it with gh", step: "gh release create", shape: "rocket", color: "#b79cf2", count: 1, model: "Haiku 4.5", how: "1 agent" },
+    { kind: "done", name: "Done" },
+  ];
+  const PH = [0, .6, 3.0, 5.2, 6.8, 8.6, 9.0], LOOP = 11.5;
+  const pillW = (g, n) => { g.font = `600 10px ${MONO}`; return Math.ceil(g.measureText(n.name).width + (n.kind === "approval" ? 86 : 40)); };
+  const nodeW = (g, n) => (n.kind === "team" ? W : pillW(g, n));
+  function node(g, x, y, n, st, t) {
+    const edge = st === "work" ? WORK : st === "ask" ? ASK : st === "done" ? DONE : "#2c2c31";
+    g.save();
+    if (n.kind !== "team") {
+      const pw = pillW(g, n), ph = 28, py = y + H / 2 - ph / 2;
+      rr(g, x, py, pw, ph, 14); g.fillStyle = "#121215"; g.fill();
+      g.lineWidth = st === "ask" ? 1.6 : 1; g.strokeStyle = edge; rr(g, x, py, pw, ph, 14); g.stroke();
+      g.fillStyle = n.kind === "approval" ? ASK : st === "done" ? DONE : MUTED;
+      g.beginPath(); g.arc(x + 14, y + H / 2, 3.4, 0, 7); g.fill();
+      g.fillStyle = INK; g.font = `600 10px ${MONO}`; g.fillText(n.name, x + 25, y + H / 2 + 3.5);
+      if (n.kind === "approval" && st === "ask") { g.fillStyle = ASK; g.font = `500 9px ${MONO}`; g.fillText("needs you", x + 32 + g.measureText(n.name).width, y + H / 2 + 3.2); }
+      g.restore(); return;
+    }
+    rr(g, x, y, W, H, 11); g.fillStyle = "#121215"; g.fill();
+    g.lineWidth = st === "work" ? 1.5 : 1; g.strokeStyle = edge; rr(g, x, y, W, H, 11); g.stroke();
+    rr(g, x + 10, y + 10, 28, 28, 8); g.fillStyle = tint(n.color, .16); g.fill();
+    sprite(g, n.shape, n.color, x + 14, y + 17, 1.7, st === "work" ? Math.abs(Math.sin(t * 9)) * 1.3 : 0);
+    if (st === "done") { g.fillStyle = DONE; g.beginPath(); g.arc(x + 37, y + 37, 5, 0, 7); g.fill(); g.strokeStyle = "#08080a"; g.lineWidth = 1.4; g.beginPath(); g.moveTo(x + 34.8, y + 37.2); g.lineTo(x + 36.5, y + 38.8); g.lineTo(x + 39.4, y + 35.4); g.stroke(); }
+    g.fillStyle = INK; g.font = `700 11px ${MONO}`; g.fillText(fitText(g, n.name, W - 56), x + 46, y + 21);
+    const live = st === "work";
+    g.font = `400 9px ${MONO}`; g.fillStyle = live ? INK : MUTED; g.fillText(fitText(g, live ? n.step : n.job, W - 56), x + 46, y + 34);
+    g.fillStyle = "#24242a"; g.fillRect(x + 1, y + 48, W - 2, 1);
+    const fy = y + 48 + (H - 48) / 2;
+    for (let i = 0; i < n.count; i++) {
+      g.fillStyle = st === "done" ? DONE : live ? (i < Math.floor((t * 2) % (n.count + 1)) ? DONE : WORK) : tint(n.color, .7);
+      g.beginPath(); g.arc(x + 14 + i * 7, fy, 3.2, 0, 7); g.fill();
+    }
+    g.font = `500 8.5px ${MONO}`; g.fillStyle = MUTED;
+    g.fillText(live ? (n.count > 1 ? "working, side by side" : "working") : st === "done" ? "done" : n.how, x + 20 + n.count * 7, fy + 3);
+    g.font = `600 8px ${MONO}`; const mw = g.measureText(n.model).width + 10;
+    rr(g, x + W - mw - 8, fy - 7, mw, 14, 4); g.fillStyle = "#1d1d22"; g.fill(); g.fillStyle = "#a3a29c"; g.fillText(n.model, x + W - mw - 3, fy + 3);
+    g.restore();
+  }
+  function wire(g, ax, ay, bx, by, state, t, wrap) {
+    g.save(); g.lineWidth = state === "live" ? 1.8 : 1.3;
+    g.strokeStyle = state === "live" ? WORK : state === "done" ? DONE : "#3a3a40";
+    if (state === "live") { g.setLineDash([6, 5]); g.lineDashOffset = -t * 40; }
+    g.beginPath(); g.moveTo(ax, ay);
+    if (wrap) { const midY = (ay + by) / 2; g.bezierCurveTo(ax + 40, ay, ax + 40, midY, (ax + bx) / 2, midY); g.bezierCurveTo(bx - 40, midY, bx - 40, by, bx, by); }
+    else { const dx = (bx - ax) / 2; g.bezierCurveTo(ax + dx, ay, bx - dx, by, bx, by); }
+    g.stroke(); g.restore();
+    for (const [px, py] of [[ax, ay], [bx, by]]) { g.fillStyle = "#08080a"; g.strokeStyle = "#4c4c52"; g.lineWidth = 1; g.beginPath(); g.arc(px, py, 3.4, 0, 7); g.fill(); g.stroke(); }
+  }
+  let g, w, h, on = false, mx = 0, tmx = 0, my = 0, tmy = 0;
+  function size() {
+    const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+    cv.width = Math.max(1, r.width * d); cv.height = Math.max(1, r.height * d); g = cv.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0); w = r.width; h = r.height;
+  }
+  size(); addEventListener("resize", size);
+  addEventListener("pointermove", (e) => { tmx = e.clientX / innerWidth - .5; tmy = e.clientY / innerHeight - .5; }, { passive: true });
+  function frame(now) {
+    const t = now / 1000, L = reduce ? 6 : t % LOOP;
+    mx += (tmx - mx) * .05; my += (tmy - my) * .05;
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = "#1a1a1e";   // the canvas grid
+    const ox = (mx * 30) % 26, oy = (my * 30) % 26;
+    for (let x = -26 + ox; x < w + 26; x += 26) for (let y = -26 + oy; y < h + 26; y += 26) g.fillRect(x, y, 1.6, 1.6);
+    const st = (i) => (L < PH[i] ? "wait" : L < PH[i + 1] ? (N[i].kind === "approval" ? "ask" : N[i].kind === "team" ? "work" : "done") : "done");
+    // one row when there's room, otherwise two rows of three
+    const GAP = 56, oneRow = w > 1180;
+    const widths = N.map((n) => nodeW(g, n));
+    let P;
+    if (oneRow) { let x = 0; P = N.map((_, i) => { const p = [x, 0]; x += widths[i] + GAP; return p; }); }
+    else { P = N.map((_, i) => [ (i % 3) * (W + GAP) + (N[i].kind === "team" ? 0 : (W - widths[i]) / 2), Math.floor(i / 3) * (H + 70) ]); }
+    const fw = Math.max(...P.map((p, i) => p[0] + widths[i])), fh = Math.max(...P.map((p) => p[1])) + H;
+    const k = Math.min(1.25, (w - 40) / fw), top = Math.max(170, h * .5 - fh * k / 2 + 60);
+    g.save(); g.translate((w - fw * k) / 2 + mx * 18, top + my * 12); g.scale(k, k);
+    [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]].forEach(([a, b]) => {
+      const sb = st(b), s2 = sb === "work" || sb === "ask" ? "live" : sb === "done" ? "done" : "idle";
+      wire(g, P[a][0] + widths[a], P[a][1] + H / 2, P[b][0], P[b][1] + H / 2, s2, t, !oneRow && b === 3);
+    });
+    N.forEach((n, i) => node(g, P[i][0], P[i][1], n, st(i), t));
+    g.restore();
+    if (on && !reduce) requestAnimationFrame(frame);
+  }
+  new IntersectionObserver(([e]) => { const was = on; on = e.isIntersecting; if (on && !was) requestAnimationFrame(frame); }).observe(cv);
+  document.fonts.ready.then(() => requestAnimationFrame(frame));
 })();
 
 // ---------------------------------------------------------------- film and reveals
