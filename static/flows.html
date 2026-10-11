@@ -949,7 +949,9 @@ async function openFlow(id) {
   }
   $("flowName").value = flow.name;
   renderFlowPick(); renderAll(); renderInspector(); autoFit = true; fit();
+  requestAnimationFrame(() => { if (autoFit) fit(); });   // again once the nodes have their real sizes
 }
+document.fonts.ready.then(() => { if (autoFit && flow) fit(); });   // the fonts change how wide the steps are
 async function createFlow(template) {
   const d = await api("/api/flows", { method: "POST", body: { template } });
   flows = (await api("/api/flows")).flows;
@@ -1176,8 +1178,9 @@ function fit() {
   if (nodes.length && f.auto !== false && f.dir !== "tb") { layoutFlow("lr", f); renderNodes(); renderWires(); }   // rows to suit this window
   if (!nodes.length) { view.x = 40; view.y = 20; view.k = 1; return applyView(); }
   const box = nodes.map((n) => ({ n, ...nodeSize(n) }));
-  const minX = Math.min(...box.map((b) => b.n.x)) - 40, minY = Math.min(...box.map((b) => b.n.y)) - 40;
-  const maxX = Math.max(...box.map((b) => b.n.x + b.w)) + 40, maxY = Math.max(...box.map((b) => b.n.y + b.h)) + 40;
+  const minX = Math.min(...box.map((b) => b.n.x)) - (!vertical() && (rowGaps.get(shown().id) || []).length ? 90 : 40), minY = Math.min(...box.map((b) => b.n.y)) - 40;
+  const wraps = !vertical() && (rowGaps.get(f.id) || []).length;   // wires to the next row bulge out past both sides
+  const maxX = Math.max(...box.map((b) => b.n.x + b.w)) + (wraps ? 90 : 40), maxY = Math.max(...box.map((b) => b.n.y + b.h)) + 40;
   const tray = $("tray"), trayH = tray.classList.contains("show") ? tray.offsetHeight + 12 : 0;
   const top = 64, bottom = 44 + trayH;   // room for the describe box (or the run banner), the zoom buttons and the items tray
   const h = r.height - top - bottom;
@@ -1439,10 +1442,9 @@ function wirePath(a, b) {
     const dy = Math.max(40, Math.abs(b.y - a.y) / 2);
     return `M${a.x},${a.y} C${a.x},${a.y + dy} ${b.x},${b.y - dy} ${b.x},${b.y}`;
   }
-  if (b.x < a.x - 40) {   // to the start of the next row, like a carriage return: out right, along the gap, down into the node
-    const gy = gapBetween(a.y, b.y), r = 16, xr = a.x + 30, xl = b.x - 30;
-    return `M${a.x},${a.y} H${xr - r} Q${xr},${a.y} ${xr},${a.y + r} V${gy - r} Q${xr},${gy} ${xr - r},${gy} H${xl + r} Q${xl},${gy} ${xl},${gy + r}`
-         + ` V${b.y - r} Q${xl},${b.y} ${xl + r},${b.y} H${b.x}`;
+  if (b.x < a.x - 40) {   // to the start of the next row: one smooth curve out to the right, back along the gap between rows, into the node
+    const gy = gapBetween(a.y, b.y), mx = (a.x + b.x) / 2;
+    return `M${a.x},${a.y} C${a.x + 80},${a.y} ${a.x + 80},${gy} ${mx},${gy} S${b.x - 80},${b.y} ${b.x},${b.y}`;
   }
   const dx = Math.max(50, Math.abs(b.x - a.x) / 2);
   return `M${a.x},${a.y} C${a.x + dx},${a.y} ${b.x - dx},${b.y} ${b.x},${b.y}`;
