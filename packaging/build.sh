@@ -44,7 +44,12 @@ if [ "$TARGET" = mac ]; then
   codesign --force --deep --sign - "$APP"
   codesign --verify --deep "$APP"
   rm -f "dist/Lithnode-mac-$ARCH.dmg"
-  hdiutil create -volname Lithnode -srcfolder "$APP" -ov -format UDZO "dist/Lithnode-mac-$ARCH.dmg"
+  # macOS sometimes holds the new image for a moment ("Resource busy"): try a few times
+  for try in 1 2 3 4 5; do
+    hdiutil create -volname Lithnode -srcfolder "$APP" -ov -format UDZO "dist/Lithnode-mac-$ARCH.dmg" && break
+    [ "$try" = 5 ] && exit 1
+    sleep $((try * 5))
+  done
   ls -la "dist/Lithnode-mac-$ARCH.dmg"
 else
   # 3. what the Flatpak packs: the window, the engine in server/ beside it, and the desktop files
