@@ -3,8 +3,14 @@
 const BODY = "#ecebe6";
 const LOGO = [".##..........##.", "#.#..........#.#", "###..........###", ".#............#.", ".#............#.", ".##.########.##.", "..############..", "..##.######.##..", "..############..", "...##########...", "...#.#....#.#...", "...#.#....#.#...", "..##.##..##.##.."];
 // the logo, drawn at (x, y) with c pixels per cell
+// White (the logo, Lith) is drawn near-black on the light theme, where white would vanish.
+function lightTheme() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === "light" : !matchMedia("(prefers-color-scheme: dark)").matches;
+}
+const onTheme = (color) => (String(color).toLowerCase() === BODY && lightTheme() ? "#24242a" : color);
 function drawLogo(ctx, x, y, c, color = BODY) {
-  ctx.fillStyle = color;
+  ctx.fillStyle = onTheme(color);
   LOGO.forEach((row, ry) => [...row].forEach((ch, cx) => { if (ch === "#") ctx.fillRect(Math.round(x + cx * c), Math.round(y + ry * c), Math.ceil(c), Math.ceil(c)); }));
 }
 // Pages may define a global `theme` object (read from CSS variables); these are the fallbacks.
@@ -25,7 +31,7 @@ const CRAB = [
   ".##.#..#.##.",
 ];
 function drawClawd(ctx, x, y, c, o) {
-  const { state: st, t, tired = 0, look = 0, seed = 0 } = o, body = o.body || BODY;
+  const { state: st, t, tired = 0, look = 0, seed = 0 } = o, body = onTheme(o.body || BODY);
   let bob = 0;
   if (st === "waiting") bob = Math.abs(Math.sin(t * 4)) * 0.5;
   else if (st === "celebrate") bob = Math.abs(Math.sin(t * 7)) * 2;
@@ -79,6 +85,7 @@ const BOT_SHAPES = {
 };
 function drawBot(ctx, bot, x, y, c, o) {
   const { state = "idle", t = 0 } = o, rows = BOT_SHAPES[bot.shape] || BOT_SHAPES.crab;
+  if (bot.color && onTheme(bot.color) !== bot.color) bot = { ...bot, color: onTheme(bot.color) };
   const n = parseInt(bot.color.slice(1), 16), mix = (m, p) => `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (m - v) * p)).join(",")})`;
   const dark = mix(0, 0.4), bob = state === "working" ? Math.abs(Math.sin(t * 6)) * 0.35 : state === "waiting" ? Math.abs(Math.sin(t * 4)) * 0.5 : 0;
   const closed = state === "sleeping" || t % 4.5 < 0.15, Y = y - bob * c;

@@ -12,16 +12,19 @@
     --accent: #D97757; --grid: #e2e5ec; --wire: #a3a9bb; --hover: #f1f2f6;
     --running: #D97757; --done: #4fae6a; --failed: #e5566e; --approval: #e0a23c; --waiting: #9aa0b4;
     --shadow: rgba(40, 48, 72, .12);
+    --neb1: rgba(91,141,239,.07); --neb2: rgba(167,123,230,.06); --star: transparent;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) { --bg: #0a0a0a; --panel: #111111; --pad: #171717; --line: #262626; --ink: #ededed; --muted: #8d8d8d;
             --grid: #1c1c1c; --wire: #4a4a4a; --hover: #202020; --done: #9ece6a; --failed: #f7768e;
-            --approval: #e0af68; --waiting: #5a5a5a; --shadow: rgba(0, 0, 0, .45); }
+            --approval: #e0af68; --waiting: #5a5a5a; --shadow: rgba(0, 0, 0, .45);
+            --neb1: rgba(122,156,240,.12); --neb2: rgba(183,156,242,.1); --star: rgba(236,235,230,.55); }
   }
   /* the theme switch in the top bar forces one or the other */
   :root[data-theme="dark"] { color-scheme: dark; --bg: #0a0a0a; --panel: #111111; --pad: #171717; --line: #262626; --ink: #ededed; --muted: #8d8d8d;
             --grid: #1c1c1c; --wire: #4a4a4a; --hover: #202020; --done: #9ece6a; --failed: #f7768e;
-            --approval: #e0af68; --waiting: #5a5a5a; --shadow: rgba(0, 0, 0, .45); }
+            --approval: #e0af68; --waiting: #5a5a5a; --shadow: rgba(0, 0, 0, .45);
+            --neb1: rgba(122,156,240,.12); --neb2: rgba(183,156,242,.1); --star: rgba(236,235,230,.55); }
   :root[data-theme="light"] { color-scheme: light; }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -684,6 +687,41 @@
   @media (max-width: 1000px) { main { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .palette { flex-direction: row; gap: 8px; overflow-x: auto; }
     .palette h3, .palette .tip, .palette .find { display: none; } .tiles, #botPal { display: flex; gap: 8px; } .tile { min-width: 96px; }
     .bot { min-width: 190px; border-color: var(--line); background: var(--pad); } .insp { max-height: 40vh; border-left: 0; border-top: 1px solid var(--line); } }
+
+  /* ---- the look: the canvas is a patch of night sky (like lithnode.com), and every team wears its bot's color ---- */
+  #canvas { background-color: var(--bg);
+            background-image:
+              radial-gradient(var(--grid) 1.1px, transparent 1.2px),
+              radial-gradient(1px 1px at 23px 41px, var(--star), transparent), radial-gradient(1px 1px at 131px 97px, var(--star), transparent),
+              radial-gradient(1.5px 1.5px at 187px 13px, var(--star), transparent), radial-gradient(1px 1px at 61px 173px, var(--star), transparent),
+              radial-gradient(1px 1px at 211px 151px, var(--star), transparent),
+              radial-gradient(55% 60% at 12% 8%, var(--neb1), transparent 70%), radial-gradient(50% 55% at 92% 96%, var(--neb2), transparent 70%);
+            background-size: 22px 22px, 233px 233px, 233px 233px, 233px 233px, 233px 233px, 233px 233px, 100% 100%, 100% 100%; }
+  .node.nd-team { background: linear-gradient(180deg, color-mix(in srgb, var(--tc) 14%, var(--pad)), var(--pad) 64%);
+                  border-color: color-mix(in srgb, var(--tc) 40%, var(--line));
+                  box-shadow: 0 2px 6px var(--shadow), 0 18px 44px -22px color-mix(in srgb, var(--tc) 60%, transparent); }
+  .node.nd-team:hover { border-color: color-mix(in srgb, var(--tc) 70%, var(--line)); }
+  .node.nd-team .ntile { background: color-mix(in srgb, var(--tc) 22%, var(--pad));
+                         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 42%, transparent), 0 0 20px -4px color-mix(in srgb, var(--tc) 55%, transparent); }
+  .node.nd-team .ft { border-top-color: color-mix(in srgb, var(--tc) 20%, var(--line)); }
+  .node.nd-team .jb.live { color: var(--tc); }
+  .node.nd-team .ag i.run { background: var(--tc); }
+  .node.nd-team .mdl { color: color-mix(in srgb, var(--tc) 55%, var(--muted)); background: color-mix(in srgb, var(--tc) 12%, transparent); }
+  .node.nd-team.st-running { border-color: var(--tc); animation: team-glow 2.2s ease-in-out infinite;
+                             box-shadow: 0 0 0 3px color-mix(in srgb, var(--tc) 22%, transparent), 0 0 46px -10px color-mix(in srgb, var(--tc) 75%, transparent); }
+  @keyframes team-glow { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--tc) 30%, transparent), 0 0 64px -6px color-mix(in srgb, var(--tc) 85%, transparent); } }
+  .node.nd-team.st-done { border-color: color-mix(in srgb, var(--done) 60%, var(--line)); }
+  .node.nd-team.sel { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent), 0 18px 44px -22px color-mix(in srgb, var(--tc) 60%, transparent); }
+  /* the steps between teams: small glass pills, each kind with its own tint */
+  .node.nd-step { --pc: var(--muted); background: color-mix(in srgb, var(--pad) 82%, transparent); backdrop-filter: blur(8px);
+                  border-color: color-mix(in srgb, var(--pc) 34%, var(--line)); }
+  .node.nd-step .pico { color: var(--pc); }
+  .node.nd-step.master { --pc: var(--done); } .node.nd-step.approval { --pc: var(--approval); } .node.nd-step.done { --pc: #b79cf2; }
+  .node.nd-step.checkpoint { --pc: #7a9cf0; }
+  /* wires take the color of the team they come from; live ones run in it and glow */
+  #wires .vis { stroke: color-mix(in srgb, var(--wc, var(--wire)) 50%, var(--wire)); }
+  #wires .wire.live .vis { stroke: var(--wc, var(--running)); filter: drop-shadow(0 0 4px var(--wc, var(--running))); }
+  #wires .wire.ok .vis { stroke: color-mix(in srgb, var(--done) 75%, var(--wire)); }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -1134,6 +1172,8 @@ function zoomAt(cx, cy, k) {
 function fit() {
   const nodes = shown().nodes, r = $("canvas").getBoundingClientRect();
   if (r.width < 60 || r.height < 60) return;   // hidden tab: fit when it's shown again
+  const f = shown();
+  if (nodes.length && f.auto !== false && f.dir !== "tb") { layoutFlow("lr", f); renderNodes(); renderWires(); }   // rows to suit this window
   if (!nodes.length) { view.x = 40; view.y = 20; view.k = 1; return applyView(); }
   const box = nodes.map((n) => ({ n, ...nodeSize(n) }));
   const minX = Math.min(...box.map((b) => b.n.x)) - 40, minY = Math.min(...box.map((b) => b.n.y)) - 40;
@@ -1148,7 +1188,13 @@ function fit() {
 }
 // Until you pan or zoom yourself, keep the whole flow in view as the window resizes.
 let autoFit = true;
-new ResizeObserver(() => { if (autoFit && flow) fit(); }).observe($("canvas"));
+let refitting = 0;
+new ResizeObserver(() => {
+  if (!autoFit || !flow || refitting) return;
+  refitting = requestAnimationFrame(() => {   // a new window size can want a different number of rows
+    refitting = 0; fit();
+  });
+}).observe($("canvas"));
 $("canvas").addEventListener("mousedown", () => { autoFit = false; }, true);
 $("zIn").onclick = () => { const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k * 1.2); };
 $("zOut").onclick = () => { const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k / 1.2); };
@@ -1176,12 +1222,29 @@ function nodeSize(n) {   // the real size once drawn; the server's numbers befor
   if (el && el.offsetWidth) return { w: el.offsetWidth, h: el.offsetHeight };
   return n.type === "cluster" ? { w: TEAM_W, h: 97 } : { w: 120, h: 38 };
 }
-function layoutFlow(direction) {   // same rules as the server's flows._layout
-  flow.dir = direction;
-  const WRAP = 5, STACK = 3, COL_GAP = 84, ROW_H = 150, MAX_ROW_W = 2100, edges = flow.edges;
+// Left to right, a long flow wraps onto more rows. How wide a row may get depends on the window: try a few widths
+// and keep the one that lets the whole flow show biggest, so nodes stay readable instead of shrinking to a strip.
+function layoutFlow(direction, f = flow) {
+  if (direction === "tb") return layoutAt(direction, f, 2100);
+  const r = $("canvas").getBoundingClientRect(), ch = r.height - 108;
+  if (r.width < 200 || ch < 120) return layoutAt(direction, f, 2100);
+  let best = 2100, bestK = -1;
+  for (let w = 2100; w >= 700; w -= 140) {   // widest first: when two fit as big, fewer rows wins
+    layoutAt(direction, f, w);
+    const bx = f.nodes.map((n) => ({ n, ...nodeSize(n) }));
+    const W = Math.max(...bx.map((b) => b.n.x + b.w)) - Math.min(...bx.map((b) => b.n.x)) + 80;
+    const H = Math.max(...bx.map((b) => b.n.y + b.h)) - Math.min(...bx.map((b) => b.n.y)) + 80;
+    const k = Math.min(1, r.width / W, ch / H);
+    if (k > bestK + .02) { bestK = k; best = w; }
+  }
+  layoutAt(direction, f, best);
+}
+function layoutAt(direction, f, MAX_ROW_W) {   // same rules as the server's flows._layout
+  f.dir = direction;
+  const WRAP = 5, STACK = 3, COL_GAP = 84, ROW_H = 150, edges = f.edges;
   const wired = new Set(edges.flatMap((e) => [e.from, e.to]));
-  const loose = flow.nodes.filter((n) => !wired.has(n.id) && n.type !== "master");
-  const main = flow.nodes.filter((n) => wired.has(n.id) || n.type === "master");
+  const loose = f.nodes.filter((n) => !wired.has(n.id) && n.type !== "master");
+  const main = f.nodes.filter((n) => wired.has(n.id) || n.type === "master");
   const depth = Object.fromEntries(main.map((n) => [n.id, 0]));
   for (let k = 0; k < main.length; k++) for (const e of edges) if (e.from in depth && e.to in depth) depth[e.to] = Math.max(depth[e.to], depth[e.from] + 1);
   const levels = {};
@@ -1202,14 +1265,16 @@ function layoutFlow(direction) {   // same rules as the server's flows._layout
   }
   const colW = (stack) => Math.max(...stack.map((n) => nodeSize(n).w));   // each column as wide as what's in it
   const rows = []; let cur = [], width = 0;
-  for (const stack of stacks) {   // wrap onto a new row once a row gets too wide
-    if (cur.length && width + colW(stack) > MAX_ROW_W) { rows.push(cur); cur = []; width = 0; }
+  for (const stack of stacks) {   // wrap onto a new row once a row gets too wide, but only right after a single node
+    if (cur.length && width + colW(stack) > MAX_ROW_W && cur[cur.length - 1].length === 1) { rows.push(cur); cur = []; width = 0; }
     cur.push(stack); width += colW(stack) + COL_GAP;
   }
   if (cur.length) rows.push(cur);
   if (rows.length > 1 && rows[rows.length - 1].length === 1) rows[rows.length - 2].push(rows.pop()[0]);   // never leave one step alone
   let top = 80;
+  const gaps = [];
   for (const row of rows) {
+    if (top > 80) gaps.push(top - 120);   // the middle of the empty band above this row, where wrapping wires run
     const tallest = Math.max(...row.map((s) => s.length)), middle = top + (tallest - 1) * ROW_H / 2;
     let x = 60;
     for (const stack of row) {
@@ -1223,6 +1288,12 @@ function layoutFlow(direction) {   // same rules as the server's flows._layout
     top += tallest * ROW_H + 90;
   }
   loose.forEach((n, i) => { n.x = 60 + (i % WRAP) * (TEAM_W + COL_GAP); n.y = top + 40 + Math.floor(i / WRAP) * 170; });   // not wired yet: a row underneath
+  rowGaps.set(f.id, gaps);
+}
+const rowGaps = new Map();   // by flow id: a run's copy of the flow is swapped for a fresh one every poll
+function gapBetween(ay, by) {   // where a wire to the next row runs: the band between the rows, or halfway if unknown
+  const g = (rowGaps.get(shown().id) || []).find((y) => y > ay && y < by);
+  return g === undefined ? (ay + by) / 2 : g;
 }
 $("zAuto").onclick = () => {
   if (flow.auto !== false) { flow.auto = false; changed(false); toast("Auto-arrange is off. Place nodes wherever you like."); }
@@ -1368,9 +1439,10 @@ function wirePath(a, b) {
     const dy = Math.max(40, Math.abs(b.y - a.y) / 2);
     return `M${a.x},${a.y} C${a.x},${a.y + dy} ${b.x},${b.y - dy} ${b.x},${b.y}`;
   }
-  if (b.x < a.x - 40) {   // to the start of the next row: out to the right, down, back left, into the node
-    const mid = (a.y + b.y) / 2;
-    return `M${a.x},${a.y} C${a.x + 90},${a.y} ${a.x + 90},${mid} ${(a.x + b.x) / 2},${mid} S${b.x - 90},${b.y} ${b.x},${b.y}`;
+  if (b.x < a.x - 40) {   // to the start of the next row, like a carriage return: out right, along the gap, down into the node
+    const gy = gapBetween(a.y, b.y), r = 16, xr = a.x + 30, xl = b.x - 30;
+    return `M${a.x},${a.y} H${xr - r} Q${xr},${a.y} ${xr},${a.y + r} V${gy - r} Q${xr},${gy} ${xr - r},${gy} H${xl + r} Q${xl},${gy} ${xl},${gy + r}`
+         + ` V${b.y - r} Q${xl},${b.y} ${xl + r},${b.y} H${b.x}`;
   }
   const dx = Math.max(50, Math.abs(b.x - a.x) / 2);
   return `M${a.x},${a.y} C${a.x + dx},${a.y} ${b.x - dx},${b.y} ${b.x},${b.y}`;
@@ -1386,12 +1458,14 @@ function renderWires() {
     }
     const a = portPos(ed.from, "out"), b = portPos(ed.to, "in"), d = wirePath(a, b), m = wireMid(a, b);
     // a wide invisible stroke to grab, the visible wire, and an ✕ at the middle to cut it
-    return `<g class="wire ${cls}" data-edge="${i}"><path class="hit" d="${d}"/><path class="vis" d="${d}"/>
+    const fn = nodeById(ed.from), tn = nodeById(ed.to), wc = (fn && fn.type === "cluster" && fn.color) || (tn && tn.type === "cluster" && tn.color) || "";
+    return `<g class="wire ${cls}" data-edge="${i}"${wc ? ` style="--wc:${esc(wc)}"` : ""}><path class="hit" d="${d}"/><path class="vis" d="${d}"/>
       <g class="cut" data-cut="${i}" transform="translate(${m.x},${m.y})"><title>Disconnect</title><circle r="11"/><path d="M-4,-4 L4,4 M4,-4 L-4,4"/></g></g>`;
   }).join("") + (tempWire ? `<path class="temp" d="${wirePath(tempWire.a, tempWire.b)}"/>` : "");
 }
 function wireMid(a, b) {   // the curve's point halfway along (t = 0.5)
-  if (vertical() || b.x < a.x - 40) return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  if (b.x < a.x - 40 && !vertical()) return { x: (a.x + b.x) / 2, y: gapBetween(a.y, b.y) };
+  if (vertical()) return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   const dx = Math.max(50, Math.abs(b.x - a.x) / 2);
   return { x: (a.x + 3 * (a.x + dx) + 3 * (b.x - dx) + b.x) / 8, y: (a.y + b.y) / 2 };
 }
@@ -1929,8 +2003,15 @@ function usageLine(e) {
 const TASK_IDEAS = ["Review this project for bugs", "Fix the failing tests", "Clean up every row in data.csv", "Triage my open GitHub issues"];
 $("taskIdeas").addEventListener("click", (e) => { const b = e.target.closest("[data-idea]"); if (b) { $("taskIn").value = b.dataset.idea; $("taskIn").focus(); } });
 $("recentChips").addEventListener("click", (e) => { const b = e.target.closest("[data-folder]"); if (b) $("folderIn").value = b.dataset.folder; });
+// Nodes in the order a run reaches them: by how many steps from the start, then top to bottom. (Not by where they sit:
+// a long flow wraps onto rows, so a later step can sit further left.)
+function flowOrder(f) {
+  const depth = Object.fromEntries(f.nodes.map((n) => [n.id, 0]));
+  for (let k = 0; k < f.nodes.length; k++) for (const e of f.edges) if (e.from in depth && e.to in depth) depth[e.to] = Math.max(depth[e.to], depth[e.from] + 1);
+  return [...f.nodes].sort((a, b) => depth[a.id] - depth[b.id] || a.y - b.y || a.x - b.x);
+}
 function renderRunTeam() {   // the team in running order, as little avatars
-  const order = [...flow.nodes].sort((a, b) => (a.y > b.y + 300 ? 1 : b.y > a.y + 300 ? -1 : a.x - b.x || a.y - b.y));
+  const order = flowOrder(flow);
   const members = order.filter((n) => n.type === "cluster" || n.type === "master" || n.type === "approval");
   const steps = flow.nodes.filter((n) => n.type !== "done").length;
   $("runTeam").innerHTML = members.map((n, i) => {
@@ -2039,6 +2120,8 @@ async function pollRun() {
   try {
     const fresh = await api("/api/runs/" + id);
     if (!run || run.id !== id) return;   // closed (or another run opened) while this was in flight
+    const at = Object.fromEntries(run.flow.nodes.map((n) => [n.id, [n.x, n.y]]));   // keep the layout drawn for this window
+    for (const n of fresh.flow.nodes) if (at[n.id]) [n.x, n.y] = at[n.id];
     run = fresh;
     renderNodes(); renderWires(); renderBanner(); renderInspector(); renderTray();
     maybeShowResult(run);
@@ -2131,7 +2214,7 @@ function logClass(text) { return /finished|approved/i.test(text) ? "ok" : /fail|
 
 // every step of the run, in flow order, with what it's doing right now; click one to see its agents
 function stepList(r) {
-  const order = r.flow.nodes.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+  const order = flowOrder(r.flow);
   return `<div class="runsteps">${order.map((n) => {
     const st = r.nodes[n.id] || { status: "waiting", agents: [] }, running = (st.agents || []).find((a) => a.status === "running");
     const took = st.started ? dur(((st.ended || Date.now() / 1000)) - st.started) : "";

@@ -69,7 +69,7 @@ def flow_agents(runner):
             if st["status"] == "approval":
                 out[f"approval-{snap['id']}-{nid}"] = {
                     "id": f"approval-{snap['id']}-{nid}",
-                    "bot": {"id": nid, "name": node["name"], "shape": "crab", "color": "#D97757"},
+                    "bot": {"id": nid, "name": node["name"], "shape": "crab", "color": "#e6b450"},
                     "project": node["name"], "cwd": snap["folder"], "status": "waiting",
                     "status_ts": st["started"] or time.time(), "detail": node.get("message") or "Needs your approval",
                     "tokens": 0, "window": 0, "tools": 0, "done": 0, "started": st["started"] or time.time(),

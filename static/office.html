@@ -13,20 +13,23 @@
     --floor: #e9ecf1; --grid: #dde1e9; --desk-top: #cfd4de; --desk-front: #b9c0cd;
     --shadow: rgba(40, 48, 72, .14);
     --working: #D97757; --waiting: #e5566e; --idle: #8d93a8; --done: #4fae6a;
+    --neb1: rgba(91,141,239,.07); --neb2: rgba(167,123,230,.06); --star: rgba(0,0,0,0);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) { --bg: #0a0a0a; --panel: #111111; --pad: #171717; --line: #262626;
       --ink: #ededed; --muted: #8d8d8d;
       --floor: #0d0d0d; --grid: #171717; --desk-top: #333333; --desk-front: #262626;
       --shadow: rgba(0, 0, 0, .45);
-      --waiting: #f7768e; --done: #9ece6a; }
+      --waiting: #f7768e; --done: #9ece6a;
+      --neb1: rgba(122,156,240,.12); --neb2: rgba(183,156,242,.1); --star: rgba(236,235,230,.55); }
   }
   /* the theme switch in the top bar forces one or the other */
   :root[data-theme="dark"] { color-scheme: dark; --bg: #0a0a0a; --panel: #111111; --pad: #171717; --line: #262626;
       --ink: #ededed; --muted: #8d8d8d;
       --floor: #0d0d0d; --grid: #171717; --desk-top: #333333; --desk-front: #262626;
       --shadow: rgba(0, 0, 0, .45);
-      --waiting: #f7768e; --done: #9ece6a; }
+      --waiting: #f7768e; --done: #9ece6a;
+      --neb1: rgba(122,156,240,.12); --neb2: rgba(183,156,242,.1); --star: rgba(236,235,230,.55); }
   :root[data-theme="light"] { color-scheme: light; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -147,7 +150,7 @@ const nowS = () => Date.now() / 1000 + drift;
 const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 function readTheme() {
   for (const n of ["bg", "pad", "line", "ink", "muted", "floor", "grid", "desk-top", "desk-front",
-                   "shadow", "working", "waiting", "idle", "done"]) theme[n] = cssVar("--" + n);
+                   "shadow", "working", "waiting", "idle", "done", "neb1", "neb2", "star"]) theme[n] = cssVar("--" + n);
 }
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTheme);
 
@@ -175,6 +178,10 @@ function statusText(s, st) {
   if (st === "sleeping") return "Asleep · " + dur(nowS() - s.status_ts);
   return "Idle · " + dur(nowS() - s.status_ts);
 }
+function rgba(hex, a) {   // "#rrggbb" at alpha a (anything else passes through)
+  if (!/^#[0-9a-f]{6}$/i.test(hex || "")) return hex;
+  const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
 const hash = (str) => [...str].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -200,11 +207,16 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
   const st = effState(s), f = fill(s), tired = tiredLevel(f), seed = hash(s.id) % 50;
   const accent = isSub ? body : stColor(st);
 
-  // pad
+  // pad: tinted and lit in the bot's color, like a team card on the canvas
+  const tint = isSub ? body : (s.bot && s.bot.color) || BODY;
   ctx.save();
-  ctx.shadowColor = theme.shadow; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+  ctx.shadowColor = rgba(tint, st === "working" ? .45 : .22); ctx.shadowBlur = st === "working" ? 34 : 24; ctx.shadowOffsetY = 8;
   ctx.fillStyle = theme.pad; roundRect(ctx, ox + 8, oy + 8, SW - 16, SH - 16, 18); ctx.fill();
   ctx.restore();
+  const wash = ctx.createLinearGradient(0, oy + 8, 0, oy + SH - 8);
+  wash.addColorStop(0, rgba(tint, .16)); wash.addColorStop(.62, rgba(tint, 0));
+  ctx.fillStyle = wash; roundRect(ctx, ox + 8, oy + 8, SW - 16, SH - 16, 18); ctx.fill();
+  if (!isSub) { ctx.strokeStyle = rgba(tint, .38); ctx.lineWidth = 1; roundRect(ctx, ox + 8.5, oy + 8.5, SW - 17, SH - 17, 18); ctx.stroke(); }
   if (isSub) {
     ctx.save(); ctx.setLineDash([7, 5]); ctx.strokeStyle = body; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.7;
     roundRect(ctx, ox + 8, oy + 8, SW - 16, SH - 16, 18); ctx.stroke(); ctx.restore();
@@ -222,10 +234,10 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
   }
 
   // name tag: the bot's name, and for a Codex or Cursor agent, that engine's icon and name
-  ctx.font = "600 12px system-ui, sans-serif";
+  ctx.font = "600 12px 'Geist Mono', ui-monospace, monospace";
   const eng = !isSub && s.engine && s.engine !== "claude" ? s.engine : null, img = eng && ENGINE_IMG[eng];
   const label = clip(ctx, s.project, eng ? 110 : 150), lw0 = ctx.measureText(label).width;
-  ctx.font = "500 11px system-ui, sans-serif";
+  ctx.font = "500 11px 'Geist Mono', ui-monospace, monospace";
   const suffix = eng ? ` · ${ENGINE_NAME[eng] || eng}` : "", sufW = suffix ? ctx.measureText(suffix).width : 0;
   const lw = lw0 + sufW + 30, tagX = ox + 70 - lw / 2, tagY = oy + 22;
   ctx.fillStyle = "#1f1f1f"; roundRect(ctx, tagX, tagY, lw, 22, 11); ctx.fill();
@@ -234,8 +246,8 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
     const k = eng === "codex" ? 10 : 14; ctx.drawImage(img, tagX + 5 + (14 - k) / 2, tagY + 4 + (14 - k) / 2, k, k);
   } else { ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(tagX + 12, tagY + 11, 4, 0, 7); ctx.fill(); }
   ctx.textBaseline = "middle";
-  ctx.font = "600 12px system-ui, sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(label, tagX + 22, tagY + 11.5);
-  if (suffix) { ctx.font = "500 11px system-ui, sans-serif"; ctx.fillStyle = "#a8a8a8"; ctx.fillText(suffix, tagX + 22 + lw0, tagY + 11.5); }
+  ctx.font = "600 12px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = "#fff"; ctx.fillText(label, tagX + 22, tagY + 11.5);
+  if (suffix) { ctx.font = "500 11px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = "#a8a8a8"; ctx.fillText(suffix, tagX + 22 + lw0, tagY + 11.5); }
 
   // sprite behind desk
   if (!isSub && s.bot) drawBot(ctx, s.bot, ox + 28, oy + 74, 7, { state: st, t });
@@ -270,22 +282,22 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
       ctx.fillRect(sx + 10, sy + 48 + i * 10, 30 + ((Math.floor(t * 3) + i * 3) % 6) * 14, 4);
     }
   } else if (st === "waiting") {
-    ctx.fillStyle = theme.waiting; ctx.font = "bold 34px system-ui"; ctx.textAlign = "center";
+    ctx.fillStyle = theme.waiting; ctx.font = "bold 34px 'Geist Mono', ui-monospace, monospace"; ctx.textAlign = "center";
     ctx.fillText("!", sx + sw / 2, sy + 62);
-    ctx.font = "bold 12px system-ui"; ctx.fillStyle = "#ededed"; ctx.fillText("Needs you", sx + sw / 2, sy + 82);
+    ctx.font = "bold 12px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = "#ededed"; ctx.fillText("Needs you", sx + sw / 2, sy + 82);
     ctx.textAlign = "left";
   } else if (st === "celebrate") {
-    ctx.fillStyle = "#9ece6a"; ctx.font = "bold 13px system-ui"; ctx.textAlign = "center";
+    ctx.fillStyle = "#9ece6a"; ctx.font = "bold 13px 'Geist Mono', ui-monospace, monospace"; ctx.textAlign = "center";
     ctx.fillText("✓ All done!", sx + sw / 2, sy + 60); ctx.textAlign = "left";
   } else {
-    ctx.fillStyle = "#6f6f6f"; ctx.font = "12px system-ui"; ctx.textAlign = "center";
+    ctx.fillStyle = "#6f6f6f"; ctx.font = "12px 'Geist Mono', ui-monospace, monospace"; ctx.textAlign = "center";
     ctx.fillText(st === "sleeping" ? "zzz…" : "idle", sx + sw / 2, sy + 54);
-    ctx.font = "11px system-ui"; ctx.fillText(dur(nowS() - s.status_ts), sx + sw / 2, sy + 72); ctx.textAlign = "left";
+    ctx.font = "11px 'Geist Mono', ui-monospace, monospace"; ctx.fillText(dur(nowS() - s.status_ts), sx + sw / 2, sy + 72); ctx.textAlign = "left";
   }
 
   // screen stand + energy bar
   ctx.fillStyle = theme["desk-front"]; ctx.fillRect(ox + 206, oy + 150, 16, 10); ctx.fillRect(ox + 190, oy + 158, 48, 5);
-  ctx.font = "10.5px system-ui"; ctx.fillStyle = theme.muted;
+  ctx.font = "10.5px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = theme.muted;
   if (isSub) {
     ctx.fillText(clip(ctx, "helping " + station.s.project, sw), sx, oy + 176);
     ctx.fillText(`running ${dur(nowS() - station.a.started)} · ${station.a.tools} tools`, sx, oy + 192);
@@ -333,9 +345,9 @@ function stationAt(mx, my) {
 function drawHead(ctx, h, W) {
   const [title, sub] = groupTitle(h.key);
   ctx.textBaseline = "alphabetic";
-  ctx.font = "650 13px system-ui, sans-serif"; ctx.fillStyle = theme.ink || "#ededed";
+  ctx.font = "650 13px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = theme.ink || "#ededed";
   const tw = Math.min(ctx.measureText(title).width, 420); ctx.fillText(clip(ctx, title, 420), h.x, h.y);
-  ctx.font = "12px system-ui, sans-serif"; ctx.fillStyle = theme.muted; ctx.fillText(sub, h.x + tw + 10, h.y);
+  ctx.font = "12px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = theme.muted; ctx.fillText(sub, h.x + tw + 10, h.y);
   if (h.key !== "you") { ctx.fillStyle = theme.working; ctx.beginPath(); ctx.arc(h.x - 10, h.y - 4.5, 3.5, 0, 7); ctx.fill(); }
 }
 stage.addEventListener("click", (e) => {
@@ -347,12 +359,32 @@ stage.addEventListener("mousemove", (e) => {
   stage.style.cursor = stationAt(e.clientX - r.left, e.clientY - r.top) >= 0 ? "pointer" : "default";
 });
 
+let floorCache = null;   // the floor only changes with the size or the theme: draw it once, then copy it each frame
 function drawFloor(ctx, W, H) {
+  const key = [W, H, theme.floor, theme.star, ctx.getTransform().a].join();
+  if (!floorCache || floorCache.key !== key) {
+    const k = ctx.getTransform().a, c = document.createElement("canvas");
+    c.width = Math.ceil(W * k); c.height = Math.ceil(H * k);
+    const g = c.getContext("2d"); g.scale(k, k); paintFloor(g, W, H);
+    floorCache = { key, c };
+  }
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(floorCache.c, 0, 0); ctx.restore();
+}
+function paintFloor(ctx, W, H) {
   ctx.fillStyle = theme.floor; ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = theme.grid; ctx.lineWidth = 1; ctx.beginPath();
-  for (let x = 0; x < W; x += 40) { ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); }
-  for (let y = 0; y < H; y += 40) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
-  ctx.stroke();
+  for (const [cx, cy, col] of [[W * .12, H * .06, theme.neb1], [W * .92, H * .96, theme.neb2]]) {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * .6);
+    g.addColorStop(0, col); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  ctx.fillStyle = theme.star;
+  let seed = 7;   // a small seeded random, so the stars stay put
+  const rnd = () => { seed = (seed + 0x6D2B79F5) | 0; let r = Math.imul(seed ^ (seed >>> 15), 1 | seed); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; };
+  for (let i = 0, n = Math.round(W * H / 5000); i < n; i++) {
+    const x = rnd() * W, y = rnd() * H;
+    ctx.fillRect(x, y, i % 7 ? 1 : 1.5, i % 7 ? 1 : 1.5);
+  }
+  ctx.fillStyle = theme.grid;
+  for (let x = 12; x < W; x += 24) for (let y = 12; y < H; y += 24) ctx.fillRect(x, y, 1.5, 1.5);
 }
 
 // ------------------------------------------------------------------ sidebar

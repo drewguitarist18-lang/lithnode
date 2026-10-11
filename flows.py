@@ -196,7 +196,7 @@ def clean_node(raw):
                     summary=_text(raw, "summary", 80),   # the one line on the team's card
                     focuses=_text(raw, "focuses", 2000),
                     shape=raw.get("shape") if raw.get("shape") in SHAPES else "crab",
-                    color=raw.get("color") if COLOR_RE.match(str(raw.get("color") or "")) else "#D97757",
+                    color=raw.get("color") if COLOR_RE.match(str(raw.get("color") or "")) else "#ecebe6",
                     bot=_text(raw, "bot", 40),
                     connectors=_connectors(raw.get("connectors")), clis=_clis(raw.get("clis")),
                     split=raw.get("split") is True,
@@ -987,7 +987,7 @@ class Run:
         """Run one agent to completion, tracked in the node's state. Returns its record."""
         rec = {"name": label, "status": "running", "step": "", "steps": [], "report": "", "items": [], "error": "",
                "cost": 0.0, "turns": 0, "model": model if engine == "claude" else engines.LABELS[engine], "engine": engine, "session_id": "", "started": time.time(), "ended": None,
-               "shape": shape or node.get("shape") or "crab", "color": color or node.get("color") or "#D97757"}
+               "shape": shape or node.get("shape") or "crab", "color": color or node.get("color") or "#ecebe6"}
 
         def update():
             with self.lock:
@@ -1035,7 +1035,7 @@ class Run:
         rec = self._agent(node, st, "Planner", model=node["model"], effort=node.get("effort", "low"),
                           tools=node.get("tools", "read"), system=system,
                           prompt=f"# Task\n{self.task}\n\nWrite the brief.", max_turns=node.get("max_turns", 0),
-                          shape="crab", color="#D97757")
+                          shape="crab", color="#ecebe6")
         if rec["status"] == "done":
             with self.lock:
                 self.brief = rec["report"]
