@@ -1,7 +1,12 @@
 # Lithnode as a Flatpak, for any Linux (Arch, Fedora, Ubuntu, ...). Built by packaging/linux/build.sh.
-# The sandbox is opened up on purpose: Lithnode's whole job is running Claude Code, Codex, Cursor and your own
-# command-line tools in your project folders, and those live on your system. It starts them there with
-# `flatpak-spawn --host` (that's what org.freedesktop.Flatpak is for) and needs your folders (--filesystem=host).
+# Every permission, and why (the same list is in the store description and the README):
+#   --talk-name=org.freedesktop.Flatpak  starts claude, codex, cursor-agent, git and the CLIs you allow on your system
+#                                        (flatpak-spawn --host), in the folder you pick. Lithnode's whole job; it's also
+#                                        why app stores show "Arbitrary permissions".
+#   --filesystem=home                    reads the project folders you pick and keeps its data in ~/.lithnode
+#   --socket=x11, --share=ipc            draws the window
+#   --device=dri                         lets the window use your graphics card
+# No network permission: Lithnode itself never goes online (the CLIs it starts use your system's network).
 app-id: com.lithnode.Lithnode
 runtime: org.freedesktop.Platform
 runtime-version: '24.08'
@@ -12,12 +17,10 @@ command: lithnode
 separate-locales: false
 finish-args:
   - --share=ipc
-  - --share=network
   - --socket=x11
   - --device=dri
-  - --filesystem=host
+  - --filesystem=home
   - --talk-name=org.freedesktop.Flatpak
-  - --talk-name=org.freedesktop.Notifications
 modules:
   - name: lithnode
     buildsystem: simple

@@ -141,10 +141,17 @@ A team with connectors can change things in those apps for real, so the Run menu
    - **Linux (any distro):** download `Lithnode.flatpak` from the
      [latest release](https://github.com/drewguitarist18-lang/lithnode/releases/latest), then
      `flatpak install --user Lithnode.flatpak` and open Lithnode from your app menu. The Flatpak runs `claude`,
-     `codex`, `cursor-agent` and your other tools on your system (through `flatpak-spawn --host`), so it isn't
-     sandboxed away from your files: that's its whole job. That's why it asks for `--filesystem=host` and
-     `org.freedesktop.Flatpak` (which lets it start programs outside the sandbox). If you'd rather not grant that,
-     run it from source instead (below): it's the same app, and you can read all of it first.
+     `codex`, `cursor-agent` and your other tools on your system (through `flatpak-spawn --host`). Its permissions,
+     exactly:
+     - `org.freedesktop.Flatpak`: starts `claude`, `codex`, `cursor-agent`, `git` and the CLIs you allow, outside
+       the sandbox, in the folder you pick. That's Lithnode's whole job, and it's why app stores warn about
+       "arbitrary permissions": they can't tell what it will start.
+     - `--filesystem=home`: reads the project folders you pick and keeps its own data in `~/.lithnode`.
+     - `--socket=x11`, `--share=ipc`, `--device=dri`: draw the window.
+     - No network access: Lithnode itself never goes online.
+
+     If you'd rather not grant that, run it from source instead (below): it's the same app, and you can read all
+     of it first.
    - **Run from source** (any system): `git clone https://github.com/drewguitarist18-lang/lithnode && python3 lithnode/hq.py`
      (Windows: double-click **Lithnode.bat**). Python 3's standard library only: no packages, no binaries. It opens in
      Chrome, Edge or Chromium as an app window, or your normal browser.

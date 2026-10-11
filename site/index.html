@@ -193,8 +193,10 @@
                      font: 700 11px var(--pixel); color: var(--ink); }
   .help li > div { min-width: 0; }   /* long commands scroll inside their box instead of widening the panel */
   .help li b { display: block; font-size: 13.5px; font-weight: 600; margin-top: 2px; }
-  .help li p { margin: 2px 0 0; color: var(--soft); font-size: 13px; line-height: 1.55; }
+  .help li .tx { margin: 2px 0 0; color: var(--soft); font-size: 13px; line-height: 1.55; }
   .help li em { font-style: normal; color: var(--ink); }
+  .help li .note { display: block; margin-top: 8px; }
+  .help li a { color: var(--ink); }
   .help .cmd { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 6px 6px 10px; border-radius: 9px; background: rgba(0,0,0,.35);
                border: 1px solid var(--edge); }
   .help .cmd code { flex: 1; min-width: 0; font: 500 12px var(--mono); color: var(--ink); white-space: nowrap; overflow-x: auto; user-select: all; }
@@ -424,9 +426,9 @@ if (DISCORD) { const d = document.getElementById("discord"); d.href = DISCORD; d
       ["Let your Mac open it", "The first time, macOS says it can't check Lithnode. Open <em>System Settings</em>, then <em>Privacy &amp; Security</em>, scroll down and click <em>Open Anyway</em>."],
       ["Sign in", "Click <em>Sign in</em> at the top right. It uses your Claude Code login."]] },
     linux: { title: "Installing on Linux", file: "Lithnode.flatpak, 95 MB, any distro", steps: [
-      ["Install it", "In a terminal, in your downloads folder:" + cmd("flatpak install --user Lithnode.flatpak") + "<p>It fetches what it needs from Flathub the first time.</p>"],
-      ["Open it", "Find <em>Lithnode</em> in your app menu, or run:" + cmd("flatpak run com.lithnode.Lithnode")],
-      ["Sign in", "Click <em>Sign in</em>. Lithnode uses the <em>claude</em>, <em>codex</em> and <em>cursor-agent</em> on your system. Rather skip the Flatpak? Run it from source:" + cmd("git clone https://github.com/drewguitarist18-lang/lithnode && python3 lithnode/hq.py")]] },
+      ["Simplest to trust: run it from source", "Plain Python, no sandbox to open up, nothing to grant. Read it first if you like:" + cmd("git clone https://github.com/drewguitarist18-lang/lithnode && python3 lithnode/hq.py")],
+      ["Or install the Flatpak", "In a terminal, in your downloads folder:" + cmd("flatpak install --user Lithnode.flatpak") + "<span class=\"note\">Your app store will warn about <em>arbitrary permissions</em>. That's the one permission that lets Lithnode start <em>claude</em>, <em>codex</em>, <em>git</em> and the tools you allow on your system, in the folder you pick. It also gets your home folder and nothing else: no network. <a href=\"https://github.com/drewguitarist18-lang/lithnode#run-it\" target=\"_blank\" rel=\"noopener\">Every permission, explained</a>.</span>"],
+      ["Sign in", "Open Lithnode (app menu, or <em>flatpak run com.lithnode.Lithnode</em>) and click <em>Sign in</em>. It uses the <em>claude</em> already on your system."]] },
   };
   function cmd(text) { return `<div class="cmd"><code>${text.replace(/&/g, "&amp;")}</code><button type="button" data-copy>Copy</button></div>`; }
   const help = document.getElementById("help"), $ = (id) => document.getElementById(id);
@@ -434,7 +436,7 @@ if (DISCORD) { const d = document.getElementById("discord"); d.href = DISCORD; d
   function show(os, href) {
     const o = STEPS[os];
     $("helpTitle").textContent = o.title; $("helpFile").textContent = o.file; $("helpAgain").href = href;
-    $("helpSteps").innerHTML = o.steps.map(([b, t]) => `<li><div><b>${b}</b><p>${t}</p></div></li>`).join("");
+    $("helpSteps").innerHTML = o.steps.map(([b, t]) => `<li><div><b>${b}</b><div class="tx">${t}</div></div></li>`).join("");
     help.classList.add("show"); help.setAttribute("aria-hidden", "false");
     clearTimeout(timer); $("helpX").focus({ preventScroll: true });
   }

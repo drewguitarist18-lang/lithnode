@@ -9,6 +9,14 @@
     <p>Lithnode runs teams of coding-agent sessions (Claude Code, Codex and Cursor) as a graph you draw. Give each
     team a job, its command-line tools and connectors, split big jobs across agents, and have others check the work.</p>
     <p>Every agent runs on your own sign-in and plan. Lithnode is free and never charges you.</p>
+    <p>What each permission is for:</p>
+    <ul>
+      <li>Start programs on your system (org.freedesktop.Flatpak): runs claude, codex, cursor-agent, git and the command-line tools you allow, outside the sandbox, in the folder you pick. That is the app's whole job, and it is why your app store says "Arbitrary permissions".</li>
+      <li>Home folder: reads the project folders you pick and keeps Lithnode's own data in ~/.lithnode.</li>
+      <li>Display and graphics: draws the window.</li>
+      <li>No network access: Lithnode itself never goes online.</li>
+    </ul>
+    <p>Rather not grant this? Run it from source instead: it is plain Python, and every line is on GitHub.</p>
   </description>
   <launchable type="desktop-id">com.lithnode.Lithnode.desktop</launchable>
   <url type="homepage">https://lithnode.com</url>
@@ -16,6 +24,7 @@
   <developer id="com.lithnode"><name>Lithnode</name></developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.4" date="2026-10-11"/>
     <release version="0.1.3" date="2026-10-10"/>
     <release version="0.1.2" date="2026-10-10"/>
     <release version="0.1.1" date="2026-10-10"/>

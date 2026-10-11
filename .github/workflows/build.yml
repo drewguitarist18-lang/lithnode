@@ -55,7 +55,7 @@ jobs:
         run: |
           flatpak install --user -y --noninteractive dist/Lithnode.flatpak
           dbus-run-session -- python3 packaging/check_installed.py \
-            '["flatpak", "run", "--command=/app/lithnode/server/lithnode-server", "com.lithnode.Lithnode"]'
+            '["flatpak", "run", "--share=network", "--command=/app/lithnode/server/lithnode-server", "com.lithnode.Lithnode"]'
       - name: Open the window and take a screenshot
         run: |
           sudo apt-get install -yq xvfb x11-apps imagemagick
