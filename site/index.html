@@ -168,6 +168,38 @@
   .facts b { display: block; color: var(--ink); margin-bottom: 4px; font-weight: 600; }
   @media (max-width: 720px) { .facts { grid-template-columns: 1fr; } }
 
+  /* after you press Download: the steps for your computer, next to where the browser shows its downloads */
+  .help { position: fixed; top: 84px; right: 20px; z-index: 20; width: min(400px, calc(100% - 32px)); max-height: calc(100svh - 104px); overflow: auto;
+          padding: 20px 20px 16px; border-radius: var(--r); background: rgba(16,16,19,.86); border: 1px solid var(--edge);
+          backdrop-filter: blur(20px) saturate(1.2); -webkit-backdrop-filter: blur(20px) saturate(1.2);
+          opacity: 0; transform: translateY(-10px) scale(.98); transform-origin: top right; pointer-events: none;
+          transition: opacity .35s cubic-bezier(.16,1,.3,1), transform .45s cubic-bezier(.16,1,.3,1); }
+  .help.show { opacity: 1; transform: none; pointer-events: auto; }
+  .help .x { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--soft);
+             cursor: pointer; font: 500 15px var(--mono); }
+  .help .x:hover { background: var(--glass-hi); color: var(--ink); }
+  .help h3 { font: 700 15px var(--pixel); margin: 2px 40px 2px 0; }
+  .help .file { color: var(--soft); font-size: 12.5px; margin: 0 0 14px; overflow-wrap: anywhere; }
+  .help .busy { height: 2px; border-radius: 2px; background: rgba(236,235,230,.12); overflow: hidden; margin-bottom: 16px; position: relative; }
+  .help .busy::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%; background: var(--ink); animation: busy 1.3s cubic-bezier(.4,0,.2,1) infinite; }
+  @keyframes busy { from { left: -30%; } to { left: 100%; } }
+  .help ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: s; }
+  .help li { display: grid; grid-template-columns: 26px 1fr; gap: 12px; counter-increment: s; }
+  .help li::before { content: counter(s); width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--edge); display: grid; place-items: center;
+                     font: 700 11px var(--pixel); color: var(--ink); }
+  .help li > div { min-width: 0; }   /* long commands scroll inside their box instead of widening the panel */
+  .help li b { display: block; font-size: 13.5px; font-weight: 600; margin-top: 2px; }
+  .help li p { margin: 2px 0 0; color: var(--soft); font-size: 13px; line-height: 1.55; }
+  .help li em { font-style: normal; color: var(--ink); }
+  .help .cmd { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 6px 6px 10px; border-radius: 9px; background: rgba(0,0,0,.35);
+               border: 1px solid var(--edge); }
+  .help .cmd code { flex: 1; min-width: 0; font: 500 12px var(--mono); color: var(--ink); white-space: nowrap; overflow-x: auto; user-select: all; }
+  .help .cmd button { flex: none; height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: var(--ink); color: var(--void);
+                      font: 600 11.5px var(--mono); cursor: pointer; }
+  .help .again { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--edge); color: var(--faint); font-size: 12px; }
+  .help .again a { color: var(--soft); }
+  @media (max-width: 600px) { .help { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 78svh; transform: translateY(16px); transform-origin: bottom center; } }
+  @media (prefers-reduced-motion: reduce) { .help .busy::after { animation: none; width: 100%; left: 0; } }
   footer { padding: 40px 0 60px; color: var(--faint); font-size: 12.5px; }
   footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 26px; justify-content: space-between; }
   footer a { color: var(--soft); }
@@ -270,6 +302,15 @@
   <span><a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a> &nbsp; This site counts visits anonymously. The app has no tracking.</span>
 </div></footer>
 
+<aside class="help" id="help" role="dialog" aria-labelledby="helpTitle" aria-hidden="true">
+  <button class="x" type="button" id="helpX" aria-label="Close">✕</button>
+  <h3 id="helpTitle">Downloading</h3>
+  <p class="file" id="helpFile"></p>
+  <div class="busy" aria-hidden="true"></div>
+  <ol id="helpSteps"></ol>
+  <p class="again">Didn't start? <a id="helpAgain" href="#">Download again</a>. Need an engine first? <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>, <a href="https://developers.openai.com/codex" target="_blank" rel="noopener">Codex</a> or <a href="https://cursor.com/cli" target="_blank" rel="noopener">Cursor</a>.</p>
+</aside>
+
 <script>
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -313,43 +354,51 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     }
     void main(){
       vec2 uv = (gl_FragCoord.xy - .5 * uRes) / uRes.y * uZoom;
-      float pitch = .13 + uLook.y, yaw = uLook.x;
+      float pitch = .11 + uLook.y, yaw = uLook.x;
       vec3 ro = vec3(sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch)) * 28.;
       vec3 fw = normalize(-ro), rt = normalize(cross(vec3(0., 1., 0.), fw)), up = cross(fw, rt);
       vec3 pos = ro, vel = normalize(fw * 2. + rt * uv.x + up * uv.y);
       float h2 = dot(cross(pos, vel), cross(pos, vel));
-      vec3 col = vec3(0.); float a = 0.; bool fell = false;
-      for (int i = 0; i < 170; i++) {
+      vec3 col = vec3(0.); float a = 0., glow = 0., haze = 0.; bool fell = false;
+      for (int i = 0; i < 240; i++) {
         float r2 = dot(pos, pos), r = sqrt(r2);
         if (r < 1.) { fell = true; break; }
-        float dt = clamp(.07 * r, .03, 1.4);                  // small steps near the hole, big ones far out
+        float dt = clamp(.045 * r * r / (r + 2.), .012, 1.1);   // fine steps near the hole: a clean shadow edge
         vec3 prev = pos;
         vel += -1.5 * h2 * pos / (r2 * r2 * r) * dt;
         pos += vel * dt;
-        if (prev.y * pos.y < 0.) {                             // crossed the disk plane
+        // light that skims the photon sphere (r = 1.5) piles up into the thin bright ring around the shadow
+        glow += dt * exp(-pow((r - 1.52) * 7., 2.));
+        // a little light scattered just above and below the disk, so it blooms instead of ending in a hard line
+        float pr = length(pos.xz);
+        if (pr > 2.6 && pr < 11.) haze += dt * exp(-pos.y * pos.y * 30.) * pow(3. / pr, 3.);
+        if (prev.y * pos.y < 0.) {                                 // crossed the disk plane
           vec3 q = mix(prev, pos, prev.y / (prev.y - pos.y));
           float qr = length(q.xz);
-          if (qr > 2.4 && qr < 12.) {
-            float ang = atan(q.z, q.x), spin = uT * 1.6 * pow(qr, -1.5);   // inner gas orbits faster: the swirl shears
-            float n = fbm(vec2(qr * 1.1, (ang + spin) * 2.6));
-            float fine = fbm(vec2(qr * 5.5, (ang + spin) * 9.));
-            float dens = smoothstep(2.4, 3.2, qr) * smoothstep(12., 5.5, qr);
-            float heat = pow(3. / qr, 1.7);
+          if (qr > 2.45 && qr < 12.) {
+            float ang = atan(q.z, q.x) + uT * .9 * pow(qr, -1.5);  // inner gas orbits faster, so the streaks shear
+            vec2 cs = vec2(cos(ang), sin(ang));
+            // streaks that follow the orbit: fine in radius, long along the circle (sampled on the circle: no seam)
+            float streak = noise3(vec3(qr * 7., cs * 1.4)) * .6 + noise3(vec3(qr * 19., cs * 3.)) * .3 + noise3(vec3(qr * 48., cs * 6.)) * .1;
+            float x = (qr - 2.45) / 9.55;
+            float profile = smoothstep(0., .035, x) * pow(1. - x, 2.6);   // a sharp, hot inner edge fading outward
             vec3 orbit = normalize(vec3(-q.z, 0., q.x));
             float beta = sqrt(.5 / qr);
             float dop = 1. / (1. - beta * dot(orbit, -normalize(vel)));
-            float lum = heat * (.3 + 1.5 * n * fine) * pow(dop, 3.);
-            float op = clamp(dens * (.35 + .75 * n), 0., 1.);
+            float lum = profile * (.3 + 1.2 * streak) * pow(dop, 2.4) * 1.25;
+            float op = clamp(profile * (.6 + .9 * streak) * 1.6, 0., 1.);
             col += (1. - a) * op * vec3(lum);
             a += (1. - a) * op;
-            if (a > .97) break;
+            if (a > .985) break;
           }
         }
         if (r2 > 2500.) break;
       }
       if (!fell) col += (1. - a) * sky(normalize(vel));
-      col = 1. - exp(-col * 1.3);                             // soft highlights, no clipping
-      col *= vec3(1., .985, .96);                             // the page's off-white, not pure white
+      if (!fell) col += vec3(glow * .3) * (1. - a * .7);        // the shadow stays black: light that falls in never comes out
+      col += vec3(haze * .016) * (1. - a * .6);
+      col = 1. - exp(-col * 1.45);
+      col = pow(col, vec3(.92)) * vec3(1., .988, .965);           // the page's off-white
       gl_FragColor = vec4(col, 1.);
     }`;
   const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; };
@@ -363,7 +412,7 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const U = (n) => gl.getUniformLocation(prog, n);
   const uRes = U("uRes"), uT = U("uT"), uLook = U("uLook"), uZoom = U("uZoom");
   // resolution follows the GPU: it starts a little under the screen's and steps down if frames run slow
-  let scale = Math.min(devicePixelRatio || 1, 1.5) * .6, slow = 0;
+  let scale = Math.min(devicePixelRatio || 1, 1.5) * .8, slow = 0;
   function size() {
     const w = cv.clientWidth, h = cv.clientHeight;
     cv.width = Math.max(2, Math.round(w * scale)); cv.height = Math.max(2, Math.round(h * scale));
@@ -378,7 +427,7 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on && !reduce) requestAnimationFrame(frame); }).observe(cv);
   function frame(now) {
     const dt = now - (last || now); last = now;
-    if (dt > 34 && ++slow > 20 && scale > .3) { scale *= .82; slow = 0; size(); }
+    if (dt > 30 && ++slow > 20 && scale > .35) { scale *= .85; slow = 0; size(); }
     look = look.map((v, i) => v + (want[i] - v) * .05);
     gl.uniform1f(uT, reduce ? 6 : (now - t0) / 1000);
     gl.uniform2f(uLook, look[0], look[1]);
@@ -471,7 +520,52 @@ if (DISCORD) { const d = document.getElementById("discord"); d.href = DISCORD; d
   const main = document.getElementById("dlMain");
   main.href = row.href; main.querySelector("span").textContent = "Download for " + names[os];
   const others = Object.keys(names).filter((k) => k !== os);
-  document.getElementById("also").innerHTML = "Also for " + others.map((k) => `<a href="${document.querySelector(`a.os[data-os="${k}"]`).href}">${names[k]}</a>`).join(" and ") + ".";
+  document.getElementById("also").innerHTML = "Also for " + others.map((k) => `<a data-os="${k}" href="${document.querySelector(`a.os[data-os="${k}"]`).href}">${names[k]}</a>`).join(" and ") + ".";
+  main.dataset.os = os;
+})();
+
+// ---------------------------------------------------------------- after Download: the steps for that computer
+(() => {
+  const STEPS = {
+    win: { title: "Installing on Windows", file: "LithnodeSetup.exe, 99 MB", steps: [
+      ["Open it", "Click the downloads icon at the top right of your browser, then <em>LithnodeSetup.exe</em>."],
+      ["Let Windows run it", "Lithnode is new, so Windows may say it protected your PC. Click <em>More info</em>, then <em>Run anyway</em>."],
+      ["Install", "Click <em>Next</em> through the installer. No admin rights needed. Lithnode opens when it's done."],
+      ["Sign in", "Click <em>Sign in</em> at the top right. It uses your Claude Code login, then build your first team."]] },
+    mac: { title: "Installing on Mac", file: "Lithnode-mac-arm64.dmg, 153 MB, Apple silicon", steps: [
+      ["Open it", "Open <em>Lithnode-mac-arm64.dmg</em> from your downloads and drag <em>Lithnode</em> into <em>Applications</em>."],
+      ["Let your Mac open it", "The first time, macOS says it can't check Lithnode. Open <em>System Settings</em>, then <em>Privacy &amp; Security</em>, scroll down and click <em>Open Anyway</em>."],
+      ["Sign in", "Click <em>Sign in</em> at the top right. It uses your Claude Code login."]] },
+    linux: { title: "Installing on Linux", file: "Lithnode.flatpak, 95 MB, any distro", steps: [
+      ["Install it", "In a terminal, in your downloads folder:" + cmd("flatpak install --user Lithnode.flatpak") + "<p>It fetches what it needs from Flathub the first time.</p>"],
+      ["Open it", "Find <em>Lithnode</em> in your app menu, or run:" + cmd("flatpak run com.lithnode.Lithnode")],
+      ["Sign in", "Click <em>Sign in</em>. Lithnode uses the <em>claude</em>, <em>codex</em> and <em>cursor-agent</em> on your system. Rather skip the Flatpak? Run it from source:" + cmd("git clone https://github.com/drewguitarist18-lang/lithnode && python3 lithnode/hq.py")]] },
+  };
+  function cmd(text) { return `<div class="cmd"><code>${text.replace(/&/g, "&amp;")}</code><button type="button" data-copy>Copy</button></div>`; }
+  const help = document.getElementById("help"), $ = (id) => document.getElementById(id);
+  let timer = 0;
+  function show(os, href) {
+    const o = STEPS[os];
+    $("helpTitle").textContent = o.title; $("helpFile").textContent = o.file; $("helpAgain").href = href;
+    $("helpSteps").innerHTML = o.steps.map(([b, t]) => `<li><div><b>${b}</b><p>${t}</p></div></li>`).join("");
+    help.classList.add("show"); help.setAttribute("aria-hidden", "false");
+    clearTimeout(timer); $("helpX").focus({ preventScroll: true });
+  }
+  function hide() { help.classList.remove("show"); help.setAttribute("aria-hidden", "true"); }
+  // any download link: the file starts downloading as normal, and the steps slide in
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a[data-os], #dlMain");
+    if (a && !a.closest(".help")) setTimeout(() => show(a.dataset.os || "win", a.href), 200);
+    const c = e.target.closest("[data-copy]");
+    if (c) {
+      const code = c.previousElementSibling;
+      const done = () => { c.textContent = "Copied"; setTimeout(() => (c.textContent = "Copy"), 1600); };
+      if (navigator.clipboard) navigator.clipboard.writeText(code.textContent).then(done, () => getSelection().selectAllChildren(code));
+      else getSelection().selectAllChildren(code);
+    }
+  });
+  $("helpX").onclick = hide;
+  addEventListener("keydown", (e) => { if (e.key === "Escape") hide(); });
 })();
 
 // ---------------------------------------------------------------- film and reveals
