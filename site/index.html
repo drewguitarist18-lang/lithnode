@@ -75,12 +75,11 @@
 
   /* hero: centered, the black hole sits behind it */
   .hero { min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 76px 0 20vh; }   /* sits a little above the middle */
-  .hero .wrap > * { text-shadow: 0 1px 3px rgba(8,8,10,.9); }
   /* a soft dark pool right behind the words, so they read over the bright disk */
   .hero .wrap { position: relative; }
   .hero .wrap::before { content: ""; position: absolute; z-index: -1; left: 50%; top: 50%; width: min(980px, 120%); height: 115%;
                         transform: translate(-50%, -50%); pointer-events: none;
-                        background: radial-gradient(closest-side, rgba(8,8,10,.62), rgba(8,8,10,.38) 55%, rgba(8,8,10,0)); }   /* readable over the bright disk */
+                        background: radial-gradient(closest-side, rgba(8,8,10,.72), rgba(8,8,10,.45) 55%, rgba(8,8,10,0)); }   /* readable over the bright disk */
   #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block; }
   h1 { font: 700 clamp(40px, 7.4vw, 92px)/1.02 var(--pixel); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
   h1 .dim { color: #c9c8c2; font-weight: 400; }
@@ -147,7 +146,7 @@
   /* bento: five things, five cells, uneven */
   .bento { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; margin-top: 44px; }
   .cell { padding: 26px; min-width: 0; display: flex; flex-direction: column; }
-  .cell canvas { width: 54px; height: 36px; image-rendering: pixelated; margin-bottom: 20px; }
+  .cell canvas { width: 54px; height: 45px; image-rendering: pixelated; margin-bottom: 16px; }
   .cell h3 { font: 700 17px var(--pixel); margin: 0 0 8px; }
   .cell p { margin: 0; color: var(--soft); font-size: 14px; }
   .cell.wide { grid-row: span 2; justify-content: space-between; background: linear-gradient(180deg, rgba(236,235,230,.02), rgba(236,235,230,.075)); }
@@ -211,6 +210,15 @@
   .help .again a { color: var(--soft); }
   @media (max-width: 600px) { .help { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 78svh; transform: translateY(16px); transform-origin: bottom center; } }
   @media (prefers-reduced-motion: reduce) { .help .busy::after { animation: none; width: 100%; left: 0; } }
+  /* the bots can be petted */
+  canvas.pet { cursor: pointer; transition: transform .25s cubic-bezier(.16,1,.3,1); }
+  canvas.pet:hover { transform: translateY(-2px); }
+  canvas.pet:active { transform: translateY(1px) scale(.97); }
+  .heart { position: fixed; z-index: 30; width: 21px; height: 18px; image-rendering: pixelated; pointer-events: none;
+           animation: rise 1.15s cubic-bezier(.16,1,.3,1) forwards; }
+  @keyframes rise { 0% { opacity: 0; transform: translate(0, 6px) scale(.6); } 18% { opacity: 1; transform: translate(0, 0) scale(1); }
+                    100% { opacity: 0; transform: translate(var(--dx), -74px) scale(.9); } }
+  @media (prefers-reduced-motion: reduce) { .heart { animation-duration: .01s; } }
   footer { padding: 40px 0 60px; color: var(--faint); font-size: 12.5px; }
   footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 26px; justify-content: space-between; }
   footer a { color: var(--soft); }
@@ -239,7 +247,7 @@
 
 <main>
 <header class="hero"><div class="wrap">
-  <canvas id="crab" width="16" height="16" aria-label="Lithnode's pixel crab mascot" role="img"></canvas>
+  <canvas id="crab" width="16" height="16" aria-label="Lithnode's pixel crab mascot. Click to pet it." role="img" title="Pet me"></canvas>
   <h1>Your AI team.<br><span class="dim">Managed.</span></h1>
   <p class="sub">Draw a team of Claude Code, Codex and Cursor agents. They split the work, check each other, then wait for your go.</p>
   <div class="ctas">
@@ -288,9 +296,9 @@
       <div><h3>Split it, then check it</h3>
       <p>Cut one big job into parts that agents do side by side, then put a checker team after them to verify every part.</p></div>
     </div>
-    <div class="cell glass rv"><canvas width="12" height="8" data-sprite="bug"></canvas><h3>Mix engines</h3><p>Claude Code, Codex and Cursor in one flow, each with the models its plan offers.</p></div>
-    <div class="cell glass rv"><canvas width="12" height="8" data-sprite="scout"></canvas><h3>Only the tools you allow</h3><p>Switch on git, gh or python per team. Everything else stays blocked.</p></div>
-    <div class="cell long glass rv"><canvas width="12" height="8" data-sprite="rocket"></canvas><h3>Local and open source</h3><p>No account, no API keys, no telemetry. Your code and sign-in stay on your machine, and every line of Lithnode is on GitHub.</p></div>
+    <div class="cell glass rv"><canvas width="12" height="10" data-sprite="bug" title="Pet me"></canvas><h3>Mix engines</h3><p>Claude Code, Codex and Cursor in one flow, each with the models its plan offers.</p></div>
+    <div class="cell glass rv"><canvas width="12" height="10" data-sprite="scout" title="Pet me"></canvas><h3>Only the tools you allow</h3><p>Switch on git, gh or python per team. Everything else stays blocked.</p></div>
+    <div class="cell long glass rv"><canvas width="12" height="10" data-sprite="rocket" title="Pet me"></canvas><h3>Local and open source</h3><p>No account, no API keys, no telemetry. Your code and sign-in stay on your machine, and every line of Lithnode is on GitHub.</p></div>
   </div>
 </div></section>
 
@@ -337,67 +345,95 @@ if (!reduce) {
   }, { passive: true });
 }
 
-// ---------------------------------------------------------------- pixel art
+// ---------------------------------------------------------------- pixel bots
+// Every bot on the page watches your cursor (its pupils move toward it) and can be petted: click it and it closes
+// its eyes, crouches a pixel, and pixel hearts float up. The hero crab also lifts the claw on your side.
 const SPRITES = {
   bug:    ["..k......k..", "...k....k...", "..########..", ".#e##kk##e#.", "#####kk#####", ".####kk####.", "#.########.#", "#..#....#..#"],
   scout:  ["...#....#...", "....#..#....", "..########..", ".#e######e#.", ".##########.", "..########..", "...#.##.#...", "..##....##.."],
   rocket: [".....##.....", "....####....", "...######...", "...#e##e#...", "...######...", "..########..", ".##.####.##.", "....k..k...."],
 };
-function paint(cv, rows) {
-  const g = cv.getContext("2d"); g.clearRect(0, 0, cv.width, cv.height);
-  rows.forEach((row, y) => [...row].forEach((ch, x) => {
-    if (ch === ".") return;
-    g.fillStyle = ch === "e" ? "#08080a" : ch === "k" ? "#8a8984" : "#ecebe6";
-    g.fillRect(x, y, 1, 1);
-  }));
+const HEART = [".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."];
+const bots = [];
+function makeBot(cv, frame, eyes) {
+  const g = cv.getContext("2d");
+  const bot = { cv, look: [0, 0], lift: [false, false], blink: false, pet: false };
+  bot.draw = () => {
+    const rows = frame(bot);
+    // pupils: shift each eye toward the cursor, onto the body; petting closes them into a happy line
+    for (const [ex, ey] of eyes) {
+      const y = ey + rows.shift;
+      if (bot.pet) { for (const x of [ex - 1, ex, ex + 1]) if (rows.px[y] && "#k".includes(rows.px[y][x])) rows.px[y][x] = "c"; rows.px[y][ex] = "c"; continue; }
+      if (bot.blink) { rows.px[y][ex] = "#"; continue; }
+      const nx = ex + bot.look[0], ny = y + bot.look[1];
+      if (rows.px[ny] && "#".includes(rows.px[ny][nx] || ".")) { rows.px[y][ex] = "#"; rows.px[ny][nx] = "e"; }
+    }
+    g.clearRect(0, 0, cv.width, cv.height);
+    rows.px.forEach((row, y) => row.forEach((ch, x) => {
+      if (ch === ".") return;
+      g.fillStyle = ch === "e" || ch === "c" ? "#08080a" : ch === "k" ? "#8a8984" : "#ecebe6";
+      g.fillRect(x, y, 1, 1);
+    }));
+  };
+  cv.classList.add("pet");
+  cv.addEventListener("click", () => {
+    bot.pet = true; bot.draw(); hearts(cv);
+    clearTimeout(bot.petTimer); bot.petTimer = setTimeout(() => { bot.pet = false; bot.draw(); }, 1300);
+  });
+  bots.push(bot); bot.draw();
+  return bot;
 }
-document.querySelectorAll("canvas[data-sprite]").forEach((cv) => paint(cv, SPRITES[cv.dataset.sprite]));
-
-// the mascot: a pixel crab that stands still and watches you. Its eyes and claws follow the cursor; it blinks now and then.
+function grid(lines, w, h, top) {   // a w x h pixel grid with `lines` drawn starting at row `top`
+  const px = Array.from({ length: h }, () => Array(w).fill("."));
+  lines.forEach((line, y) => [...line].forEach((ch, x) => { if (px[y + top]) px[y + top][x] = ch === "e" ? "#" : ch; }));
+  return { px, shift: top };
+}
+// the feature bots: 12 x 8, one row of room below for the crouch
+document.querySelectorAll("canvas[data-sprite]").forEach((cv) => {
+  const rows = SPRITES[cv.dataset.sprite], eyes = [];
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === "e") eyes.push([x, y]); }));
+  makeBot(cv, (b) => grid(rows, 12, 10, b.pet ? 2 : 1), eyes);
+});
+// the hero crab: 16 x 16, with claws that rest or lift toward the cursor
 (() => {
-  const cv = document.getElementById("crab"), g = cv.getContext("2d");
-  // each claw is three columns, rows 0-5: resting, or lifted toward the cursor
   const LEFT  = { rest: ["...", "...", ".##", "#.#", "###", ".#."], up: [".##", "#.#", "###", ".#.", ".#.", ".#."] };
   const RIGHT = { rest: ["...", "...", "##.", "#.#", "###", ".#."], up: ["##.", "#.#", "###", ".#.", ".#.", ".#."] };
-  const BODY = [
-    ".##.########.##.",
-    "..############..",
-    "..############..",
-    "..############..",
-    "...##########...",
-    "...#.#....#.#...",
-    "...#.#....#.#...",
-    "..##.##..##.##..",
-  ];
-  let look = [0, 0], lift = [false, false], blink = false;
-  function draw() {
-    const rows = [];
-    for (let y = 0; y < 6; y++) rows.push(LEFT[lift[0] ? "up" : "rest"][y] + "..........", RIGHT[lift[1] ? "up" : "rest"][y]);
-    const top = []; for (let y = 0; y < 6; y++) top.push(rows[y * 2] + rows[y * 2 + 1]);
-    const all = [...top, ...BODY.map((r) => r)];
-    if (!blink) for (const ex of [4, 11]) {   // one dark pupil per eye, shifted toward the cursor
-      const x = ex + look[0], y = 8 + look[1];
-      all[y] = all[y].slice(0, x) + "e" + all[y].slice(x + 1);
-    }
-    g.clearRect(0, 0, 16, 16);
-    all.forEach((row, y) => [...row].forEach((ch, x) => {
-      if (ch === ".") return;
-      g.fillStyle = ch === "e" ? "#08080a" : "#ecebe6";
-      g.fillRect(x, y + 1, 1, 1);
-    }));
+  const BODY = [".##.########.##.", "..############..", "..############..", "..############..", "...##########...",
+                "...#.#....#.#...", "...#.#....#.#...", "..##.##..##.##.."];
+  makeBot(document.getElementById("crab"), (b) => {
+    const up = b.pet ? [false, false] : b.lift, top = [];
+    for (let y = 0; y < 6; y++) top.push(LEFT[up[0] ? "up" : "rest"][y] + ".........." + RIGHT[up[1] ? "up" : "rest"][y]);
+    return grid([...top, ...BODY], 16, 16, b.pet ? 2 : 1);
+  }, [[4, 8], [11, 8]]).crab = true;
+})();
+function hearts(cv) {
+  const r = cv.getBoundingClientRect();
+  for (let i = 0; i < 5; i++) {
+    const h = document.createElement("canvas"); h.width = 7; h.height = 6; h.className = "heart";
+    const g = h.getContext("2d"); g.fillStyle = "#ecebe6";
+    HEART.forEach((row, y) => [...row].forEach((ch, x) => ch === "#" && g.fillRect(x, y, 1, 1)));
+    h.style.left = r.left + r.width * (.2 + Math.random() * .6) - 10 + "px";
+    h.style.top = r.top - 14 + "px";   // just above the bot, so the hearts never cover it
+    h.style.setProperty("--dx", (Math.random() * 40 - 20).toFixed(0) + "px");
+    h.style.animationDelay = i * 90 + "ms";
+    document.body.appendChild(h);
+    setTimeout(() => h.remove(), 1500 + i * 90);
   }
-  addEventListener("pointermove", (e) => {
-    const r = cv.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-    const nx = Math.abs(dx) < 60 ? 0 : Math.sign(dx), up = dy < -40;
-    const nl = [up || nx < 0, up || nx > 0];
-    if (nx !== look[0] || (up ? -1 : 0) !== look[1] || nl[0] !== lift[0] || nl[1] !== lift[1]) {
-      look = [nx, up ? -1 : 0]; lift = nl; draw();
-    }
-  }, { passive: true });
-  draw();
-  if (!reduce) (function blinkSoon() {
-    setTimeout(() => { blink = true; draw(); setTimeout(() => { blink = false; draw(); blinkSoon(); }, 140); }, 2600 + Math.random() * 3400);
-  })();
+}
+// one pointer listener for all of them: each bot looks toward the cursor from where it sits
+addEventListener("pointermove", (e) => {
+  for (const b of bots) {
+    const r = b.cv.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const near = Math.max(30, r.width * .6);
+    const look = [Math.abs(dx) < near ? 0 : Math.sign(dx), dy < -near * .7 ? -1 : 0];
+    const lift = b.crab ? [dy < -40 || look[0] < 0, dy < -40 || look[0] > 0] : b.lift;
+    if (look[0] !== b.look[0] || look[1] !== b.look[1] || lift[0] !== b.lift[0] || lift[1] !== b.lift[1]) { b.look = look; b.lift = lift; b.draw(); }
+  }
+}, { passive: true });
+// each bot blinks on its own clock
+if (!reduce) for (const b of bots) (function blinkSoon() {
+  setTimeout(() => { if (!b.pet) { b.blink = true; b.draw(); setTimeout(() => { b.blink = false; b.draw(); blinkSoon(); }, 140); } else blinkSoon(); },
+             2400 + Math.random() * 4200);
 })();
 
 // ---------------------------------------------------------------- Discord: the button appears once there's an invite link
