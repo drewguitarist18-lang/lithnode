@@ -37,7 +37,7 @@
          -webkit-mask-image: linear-gradient(#000 72%, transparent); mask-image: linear-gradient(#000 72%, transparent); }
   .sky picture { position: absolute; inset: -14px -14px calc(-14px - 8vh); display: block; transform: translate(var(--px, 0px), calc(var(--py, 0px) - 8vh));   /* the bright band sits behind the headline, not the small text */
                  transition: transform 1.4s cubic-bezier(.16,1,.3,1); }
-  .sky img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sky img { width: 100%; height: 100%; object-fit: cover; display: block; filter: brightness(.78); }   /* a calmer backdrop for the text */
   @media (prefers-reduced-motion: reduce) { .sky picture { transition: none; } }
   main, nav, footer { position: relative; z-index: 1; }
   .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
@@ -75,7 +75,12 @@
 
   /* hero: centered, the black hole sits behind it */
   .hero { min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 76px 0 20vh; }   /* sits a little above the middle */
-  .hero .wrap > * { text-shadow: 0 1px 2px rgba(8,8,10,.8); }   /* readable over the bright disk */
+  .hero .wrap > * { text-shadow: 0 1px 3px rgba(8,8,10,.9); }
+  /* a soft dark pool right behind the words, so they read over the bright disk */
+  .hero .wrap { position: relative; }
+  .hero .wrap::before { content: ""; position: absolute; z-index: -1; left: 50%; top: 50%; width: min(980px, 120%); height: 115%;
+                        transform: translate(-50%, -50%); pointer-events: none;
+                        background: radial-gradient(closest-side, rgba(8,8,10,.62), rgba(8,8,10,.38) 55%, rgba(8,8,10,0)); }   /* readable over the bright disk */
   #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block; }
   h1 { font: 700 clamp(40px, 7.4vw, 92px)/1.02 var(--pixel); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
   h1 .dim { color: #c9c8c2; font-weight: 400; }

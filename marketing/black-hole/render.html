@@ -56,8 +56,11 @@ const FS = `
             float ang = atan(q.z, q.x) + uT * .9 * pow(qr, -1.5);  // inner gas orbits faster, so the streaks shear
             vec2 cs = vec2(cos(ang), sin(ang));
             // streaks that follow the orbit: fine in radius, long along the circle (sampled on the circle: no seam)
-            float streak = noise3(vec3(qr * 9., cs * 1.2)) * .5 + noise3(vec3(qr * 26., cs * 2.5)) * .3 + noise3(vec3(qr * 70., cs * 5.)) * .2;
-            streak = smoothstep(.25, .85, streak);
+            // blended gas, not strands: broad bands and clumps that mix (a warped lookup keeps it swirling, not striped)
+            vec3 w = vec3(qr * 2.2, cs * 1.8);
+            vec3 warp = vec3(noise3(w), noise3(w + 7.1), noise3(w + 3.7)) - .5;
+            float streak = noise3(vec3(qr * 3.6, cs * 2.4) + warp * 1.6) * .55 + noise3(vec3(qr * 8.5, cs * 4.5) + warp) * .3 + noise3(vec3(qr * 18., cs * 8.)) * .15;
+            streak = mix(.55, streak, .75);
             float x = (qr - 2.45) / 9.55;
             float profile = smoothstep(0., .02, x) * pow(1. - x, 2.2) * smoothstep(1., .82, x);   // a sharp, hot inner edge fading outward
             vec3 orbit = normalize(vec3(-q.z, 0., q.x));
