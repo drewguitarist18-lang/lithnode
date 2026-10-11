@@ -30,17 +30,25 @@
   html { background: var(--void); }
   body { margin: 0; color: var(--ink); font: 15px/1.65 var(--mono); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   a { color: inherit; }
-  #space { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; transition: opacity 1.2s cubic-bezier(.16,1,.3,1); }
-  body.past #space { opacity: .28; }   /* past the hero: the black hole steps back behind the content */
+  /* the black hole lives at the top of the page and scrolls away with it; it fades into the page at the bottom */
+  #space { position: absolute; top: 0; left: 0; width: 100%; height: 100svh; z-index: 0; display: block; background: var(--void);
+           -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
   main, nav, footer { position: relative; z-index: 1; }
   .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
 
   .glass { background: var(--glass); border: 1px solid var(--edge); border-radius: var(--r);
            backdrop-filter: blur(18px) saturate(1.1); -webkit-backdrop-filter: blur(18px) saturate(1.1); }
 
-  /* nav: one glass bar */
-  nav { padding-top: 18px; }
-  nav .bar { display: flex; align-items: center; gap: 22px; height: 56px; padding: 0 10px 0 18px; }
+  /* nav: fixed. At the very top it has no background and blends into the scene; once you scroll it becomes a glass pill
+     (the nav is the one pill on the page; everything else keeps the 14px radius) */
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10; padding-top: 14px; pointer-events: none; }
+  nav .bar { pointer-events: auto; display: flex; align-items: center; gap: 22px; height: 56px; padding: 0 8px 0 22px; margin-inline: auto;
+             max-width: 1080px; border-radius: 999px; border: 1px solid transparent; background: transparent;
+             transition: max-width .6s cubic-bezier(.16,1,.3,1), background .4s, border-color .4s, backdrop-filter .4s, padding .6s cubic-bezier(.16,1,.3,1); }
+  nav.pill .bar { max-width: 720px; padding-left: 20px; background: rgba(16,16,19,.62); border-color: var(--edge);
+                  backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
+  nav .bar .btn { border-radius: 999px; }
+  #top { position: absolute; top: 0; left: 0; width: 1px; height: 24px; }
   .brand { font: 700 15px var(--pixel); letter-spacing: .02em; text-decoration: none; }
   nav .links { display: flex; gap: 22px; margin-left: auto; color: var(--soft); font-size: 13.5px; }
   nav .links a { text-decoration: none; transition: color .2s; }
@@ -60,10 +68,11 @@
   .btn:focus-visible, a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
   /* hero: centered, the black hole sits behind it */
-  .hero { min-height: calc(100svh - 74px); display: grid; place-items: center; text-align: center; padding: 40px 0 96px; }
+  .hero { min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 96px 0 72px; }
+  .hero .wrap > * { text-shadow: 0 2px 24px rgba(8,8,10,.9), 0 0 2px rgba(8,8,10,.6); }   /* readable over the bright disk */
   #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block; }
   h1 { font: 700 clamp(40px, 7.4vw, 92px)/1.02 var(--pixel); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
-  h1 .dim { color: var(--soft); font-weight: 400; }
+  h1 .dim { color: #c9c8c2; font-weight: 400; }
   .sub { color: var(--soft); max-width: 46ch; margin: 24px auto 32px; font-size: clamp(15px, 1.5vw, 17px); }
   .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   .fine { margin-top: 18px; color: var(--faint); font-size: 13px; }
@@ -79,9 +88,42 @@
   .film { margin-top: 44px; padding: 10px; }
   .film .frame { position: relative; border-radius: calc(var(--r) - 6px); overflow: hidden; aspect-ratio: 16 / 9; background: #000; }
   .film video { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .film button { position: absolute; inset: 0; border: 0; background: rgba(8,8,10,.35); display: grid; place-items: center; cursor: pointer; }
-  .film button span { display: inline-flex; align-items: center; gap: 10px; height: 50px; padding: 0 22px; border-radius: var(--r);
-                      background: var(--ink); color: var(--void); font: 600 15px var(--mono); }
+  /* the player: a glass start card, then a glass bar that steps aside while you watch */
+  .film .frame:fullscreen { border-radius: 0; aspect-ratio: auto; }
+  .film .frame:fullscreen video { object-fit: contain; }
+  .film video { cursor: pointer; }
+  .film .start { position: absolute; inset: 0; border: 0; padding: 0; display: grid; place-items: center; cursor: pointer;
+                 background: radial-gradient(ellipse at center, rgba(8,8,10,.15), rgba(8,8,10,.55)); color: var(--ink); }
+  .film .start span { display: inline-flex; align-items: center; gap: 14px; height: 62px; padding: 0 26px 0 10px; border-radius: 999px;
+                      background: rgba(236,235,230,.1); border: 1px solid rgba(236,235,230,.28);
+                      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); font: 600 15px var(--mono);
+                      transition: transform .3s cubic-bezier(.16,1,.3,1), background .3s; }
+  .film .start span i { width: 44px; height: 44px; border-radius: 50%; background: var(--ink); color: var(--void); display: grid; place-items: center; }
+  .film .start span i svg { width: 18px; height: 18px; margin-left: 2px; }
+  .film .start span small { color: var(--soft); font: inherit; font-weight: 400; }
+  .film .start:hover span { transform: scale(1.04); background: rgba(236,235,230,.16); }
+  .film .start:active span { transform: scale(.98); }
+  .film .bar { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 4px; height: 48px; padding: 0 8px;
+               border-radius: 12px; background: rgba(8,8,10,.55); border: 1px solid rgba(236,235,230,.14);
+               backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+               transition: opacity .35s cubic-bezier(.16,1,.3,1), transform .35s cubic-bezier(.16,1,.3,1); }
+  .film .frame.idle .bar { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  .film .frame.idle { cursor: none; }
+  .film .bar button { width: 36px; height: 36px; flex: none; border: 0; border-radius: 9px; background: transparent; color: var(--ink);
+                      display: grid; place-items: center; cursor: pointer; transition: background .2s; }
+  .film .bar button:hover { background: rgba(236,235,230,.12); }
+  .film .bar button svg { width: 18px; height: 18px; }
+  .film .time { font: 500 12px var(--mono); color: var(--soft); font-variant-numeric: tabular-nums; padding: 0 8px; white-space: nowrap; }
+  .film .seek { flex: 1; position: relative; height: 28px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+  .film .seek .track { position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; background: rgba(236,235,230,.2); }
+  .film .seek .buf { position: absolute; left: 0; height: 3px; border-radius: 2px; background: rgba(236,235,230,.32); }
+  .film .seek .fill { position: absolute; left: 0; height: 3px; border-radius: 2px; background: var(--ink); }
+  .film .seek .knob { position: absolute; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--ink);
+                      transform: scale(0); transition: transform .2s cubic-bezier(.16,1,.3,1); }
+  .film .seek:hover .knob, .film .seek.drag .knob, .film .seek:focus-visible .knob { transform: scale(1); }
+  .film .seek:hover .track, .film .seek:hover .buf, .film .seek:hover .fill { height: 5px; }
+  .film .seek:focus-visible { outline: none; } .film .seek:focus-visible .track { box-shadow: 0 0 0 2px var(--ink); }
+  @media (max-width: 600px) { .film .time .total { display: none; } .film .start span { height: 54px; } .film .start span small { display: none; } }
 
   /* how: three verbs, stacked rows */
   .rows { margin-top: 44px; }
@@ -140,7 +182,8 @@
 <body>
 <canvas id="space" aria-hidden="true"></canvas>
 
-<nav><div class="wrap"><div class="bar glass">
+<div id="top" aria-hidden="true"></div>
+<nav id="nav"><div class="wrap"><div class="bar">
   <a class="brand" href="#">lithnode</a>
   <div class="links"><a href="#film">Film</a><a href="#how">How it works</a><a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a></div>
   <a class="btn sm" href="#download">Download</a>
@@ -163,7 +206,15 @@
   <p class="lead rv">A 100,000-row job, split three ways, checked, then shipped with gh. 31 seconds.</p>
   <div class="film glass rv"><div class="frame">
     <video id="video" src="media/lithnode-film.mp4" poster="media/film-poster.jpg" playsinline preload="metadata"></video>
-    <button id="play" type="button" aria-label="Play the film with sound"><span><svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>Play with sound</span></button>
+    <button class="start" id="start" type="button" aria-label="Play the film with sound"><span><i><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.8v14.4a1 1 0 0 0 1.5.86l12-7.2a1 1 0 0 0 0-1.72l-12-7.2A1 1 0 0 0 7 4.8z"/></svg></i><b id="startLabel">Play with sound</b><small>0:31</small></span></button>
+    <div class="bar" id="vbar" hidden>
+      <button type="button" id="vPlay" aria-label="Pause"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path id="vPlayIcon" d="M7 4h3.5v16H7zM13.5 4H17v16h-3.5z"/></svg></button>
+      <span class="time"><span id="vNow">0:00</span><span class="total"> / <span id="vDur">0:31</span></span></span>
+      <div class="seek" id="vSeek" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="31" aria-valuenow="0">
+        <span class="track"></span><span class="buf" id="vBuf"></span><span class="fill" id="vFill"></span><span class="knob" id="vKnob"></span></div>
+      <button type="button" id="vMute" aria-label="Mute"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path id="vWave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button>
+      <button type="button" id="vFull" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
   </div></div>
 </div></section>
 
@@ -221,82 +272,116 @@
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ---------------------------------------------------------------- the black hole
-// A tilted accretion disk orbiting a dark core, the far side lensed over the top and under the bottom,
-// over a field of pixel stars. Plain 2D canvas, white light only.
+// Ray traced on the GPU. Every pixel sends a ray of light from the camera and bends it step by step with the
+// Schwarzschild equation (a = -1.5 h^2 r / |r|^5, units where the event horizon is r = 1). Rays that fall in are black;
+// rays that cross the disk pick up its light; the rest show the stars, bent. So the far side of the disk lifts over
+// the top and under the bottom by itself, and the side spinning toward you is brighter (Doppler beaming).
 (() => {
-  const cv = document.getElementById("space"), g = cv.getContext("2d");
-  let W, H, D, cx, cy, R;
-  const stars = [], disk = [];
-  const rnd = (a, b) => a + Math.random() * (b - a);
+  const cv = document.getElementById("space");
+  const gl = cv.getContext("webgl", { antialias: false, alpha: false, depth: false, powerPreference: "high-performance" });
+  if (!gl) return;   // no WebGL: the page stays plain black
+  const VS = "attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }";
+  const FS = `
+    precision highp float;
+    uniform vec2 uRes; uniform float uT; uniform vec2 uLook; uniform float uZoom;
+    float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+    float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+      return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+    float fbm(vec2 p){ float v = 0., a = .5; for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= .5; } return v; }
+    // the sky, looked up by 3D direction so it has no seam for the lensing to bend into a ring
+    float hash3(vec3 p){ p = fract(p * .3183099 + .1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    float noise3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
+      return mix(mix(mix(hash3(i), hash3(i + vec3(1,0,0)), f.x), mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x), f.y),
+                 mix(mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x), mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+    vec3 sky(vec3 d){
+      vec3 c = vec3(0.);
+      for (int L = 0; L < 3; L++) {
+        float sc = 70. + float(L) * 120.;
+        vec3 g = d * sc, id = floor(g);
+        float h = hash3(id + float(L) * 13.1);
+        if (h > .93) {
+          vec3 o = vec3(hash3(id + 1.3), hash3(id + 5.9), hash3(id + 9.4));
+          float r = length(g - id - o);
+          c += vec3(smoothstep(.16 - .04 * float(L), 0., r) * (h - .93) * 16.);
+        }
+      }
+      float haze = noise3(d * 3.) * .6 + noise3(d * 7.) * .3 + noise3(d * 15.) * .1;
+      c += vec3(.03) * pow(haze, 4.) * 4.;
+      return c;
+    }
+    void main(){
+      vec2 uv = (gl_FragCoord.xy - .5 * uRes) / uRes.y * uZoom;
+      float pitch = .13 + uLook.y, yaw = uLook.x;
+      vec3 ro = vec3(sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch)) * 28.;
+      vec3 fw = normalize(-ro), rt = normalize(cross(vec3(0., 1., 0.), fw)), up = cross(fw, rt);
+      vec3 pos = ro, vel = normalize(fw * 2. + rt * uv.x + up * uv.y);
+      float h2 = dot(cross(pos, vel), cross(pos, vel));
+      vec3 col = vec3(0.); float a = 0.; bool fell = false;
+      for (int i = 0; i < 170; i++) {
+        float r2 = dot(pos, pos), r = sqrt(r2);
+        if (r < 1.) { fell = true; break; }
+        float dt = clamp(.07 * r, .03, 1.4);                  // small steps near the hole, big ones far out
+        vec3 prev = pos;
+        vel += -1.5 * h2 * pos / (r2 * r2 * r) * dt;
+        pos += vel * dt;
+        if (prev.y * pos.y < 0.) {                             // crossed the disk plane
+          vec3 q = mix(prev, pos, prev.y / (prev.y - pos.y));
+          float qr = length(q.xz);
+          if (qr > 2.4 && qr < 12.) {
+            float ang = atan(q.z, q.x), spin = uT * 1.6 * pow(qr, -1.5);   // inner gas orbits faster: the swirl shears
+            float n = fbm(vec2(qr * 1.1, (ang + spin) * 2.6));
+            float fine = fbm(vec2(qr * 5.5, (ang + spin) * 9.));
+            float dens = smoothstep(2.4, 3.2, qr) * smoothstep(12., 5.5, qr);
+            float heat = pow(3. / qr, 1.7);
+            vec3 orbit = normalize(vec3(-q.z, 0., q.x));
+            float beta = sqrt(.5 / qr);
+            float dop = 1. / (1. - beta * dot(orbit, -normalize(vel)));
+            float lum = heat * (.3 + 1.5 * n * fine) * pow(dop, 3.);
+            float op = clamp(dens * (.35 + .75 * n), 0., 1.);
+            col += (1. - a) * op * vec3(lum);
+            a += (1. - a) * op;
+            if (a > .97) break;
+          }
+        }
+        if (r2 > 2500.) break;
+      }
+      if (!fell) col += (1. - a) * sky(normalize(vel));
+      col = 1. - exp(-col * 1.3);                             // soft highlights, no clipping
+      col *= vec3(1., .985, .96);                             // the page's off-white, not pure white
+      gl_FragColor = vec4(col, 1.);
+    }`;
+  const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+  gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = (n) => gl.getUniformLocation(prog, n);
+  const uRes = U("uRes"), uT = U("uT"), uLook = U("uLook"), uZoom = U("uZoom");
+  // resolution follows the GPU: it starts a little under the screen's and steps down if frames run slow
+  let scale = Math.min(devicePixelRatio || 1, 1.5) * .6, slow = 0;
   function size() {
-    D = Math.min(devicePixelRatio || 1, 2);
-    W = innerWidth; H = innerHeight;
-    cv.width = W * D; cv.height = H * D; g.setTransform(D, 0, 0, D, 0, 0);
-    cx = W / 2; cy = H * (W < 700 ? .93 : .8); R = Math.max(70, Math.min(W * .13, H * .2));   // phones: the hero runs longer, so the hole sits lower
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = Math.max(2, Math.round(w * scale)); cv.height = Math.max(2, Math.round(h * scale));
+    gl.viewport(0, 0, cv.width, cv.height);
+    gl.uniform2f(uRes, cv.width, cv.height);
+    gl.uniform1f(uZoom, Math.min(2.5, Math.max(1.35, .95 * h / (.44 * w))));   // the disk fills about 90% of the width
   }
   size(); addEventListener("resize", size);
-  for (let i = 0; i < 520; i++) stars.push({ x: Math.random(), y: Math.random(), s: Math.random() < .12 ? 2 : 1, a: rnd(.25, .9), p: rnd(0, 6.3) });
-  for (let i = 0; i < 7000; i++) {
-    const t = Math.pow(Math.random(), 1.6);                 // more matter near the inner edge
-    disk.push({ r: 1.5 + t * 2.6, a: rnd(0, 6.283), z: rnd(-.035, .035), b: rnd(.35, 1) });
-  }
-  let tilt = .27, want = .27, mx = 0;
-  addEventListener("pointermove", (e) => { want = .27 + (e.clientY / H - .5) * .08; mx = (e.clientX / W - .5) * .06; }, { passive: true });
-
-  function frame(t) {
-    tilt += (want - tilt) * .04;
-    g.globalCompositeOperation = "source-over";
-    g.fillStyle = "#08080a"; g.fillRect(0, 0, W, H);
-    // stars, bent slightly away from the core
-    for (const s of stars) {
-      let x = s.x * W, y = s.y * H;
-      const dx = x - cx, dy = y - cy, d2 = dx * dx + dy * dy, push = (R * R * 2.2) / Math.max(d2, R * R);
-      x += dx * push * .35; y += dy * push * .35;
-      if (Math.hypot(x - cx, y - cy) < R * 1.05) continue;
-      g.globalAlpha = s.a * (reduce ? 1 : .65 + .35 * Math.sin(t / 900 + s.p));
-      g.fillStyle = "#ecebe6"; g.fillRect(Math.round(x), Math.round(y), s.s, s.s);
-    }
-    g.globalAlpha = 1;
-    g.globalCompositeOperation = "lighter";
-    const ct = Math.cos(tilt), st = Math.sin(tilt), rot = mx;
-    const behind = [], front = [];
-    for (const p of disk) {
-      if (!reduce) p.a += .0026 / Math.pow(p.r, 1.5);
-      const ca = Math.cos(p.a + rot), sa = Math.sin(p.a + rot);
-      const x = p.r * ca * R, depth = p.r * sa;
-      const y = (-depth * st + p.z * ct) * R;               // seen from just above: far side up, near side down
-      const beam = .55 + .45 * ca;                          // the side coming toward you is brighter
-      const heat = 1.45 - (p.r - 1.5) / 2.4;
-      const lum = Math.max(0, p.b * beam * heat);
-      (depth > 0 ? behind : front).push([x, y, lum, p.r, depth]);
-    }
-    const dot = (x, y, a, s) => { g.globalAlpha = Math.min(1, a); g.fillRect(cx + x, cy + y, s, s); };
-    g.fillStyle = "#ecebe6";
-    // the far side, seen twice: bent up over the top of the core and, fainter, under it
-    for (const [x, y, lum, r] of behind) {
-      const ux = x / (r * R);
-      if (Math.abs(ux) < 1) {
-        const ring = R * (1.06 + (r - 1.55) * .42), h = Math.sqrt(1 - ux * ux);
-        dot(x * .92, -ring * h, lum * .5, 1.3);
-        dot(x * .92, ring * h * .9, lum * .18, 1.2);
-      }
-      if (Math.hypot(x, y) > R) dot(x, y, lum * .6, 1.2);
-    }
-    // the core and its photon ring
-    g.globalCompositeOperation = "source-over"; g.globalAlpha = 1;
-    g.fillStyle = "#020203"; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
-    g.globalCompositeOperation = "lighter";
-    g.strokeStyle = "rgba(236,235,230,.55)"; g.lineWidth = 1.2; g.beginPath(); g.arc(cx, cy, R * 1.035, 0, 7); g.stroke();
-    g.strokeStyle = "rgba(236,235,230,.12)"; g.lineWidth = 5; g.beginPath(); g.arc(cx, cy, R * 1.07, 0, 7); g.stroke();
-    // the near side, in front of everything
-    g.fillStyle = "#ecebe6";
-    for (const [x, y, lum] of front) dot(x, y, lum * 1.2, 1.6);
-    g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
-    // keep the text readable: a soft darkening right where the hero copy sits
-    const fade = g.createLinearGradient(0, 0, 0, H);
-    fade.addColorStop(0, "rgba(8,8,10,.2)"); fade.addColorStop(.55, "rgba(8,8,10,0)"); fade.addColorStop(1, "rgba(8,8,10,.2)");
-    g.fillStyle = fade; g.fillRect(0, 0, W, H);
-    if (!reduce) requestAnimationFrame(frame);
+  let look = [0, 0], want = [0, 0];
+  addEventListener("pointermove", (e) => { want = [(e.clientX / innerWidth - .5) * .12, (e.clientY / innerHeight - .5) * -.05]; }, { passive: true });
+  let on = true, last = 0, t0 = performance.now();
+  new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on && !reduce) requestAnimationFrame(frame); }).observe(cv);
+  function frame(now) {
+    const dt = now - (last || now); last = now;
+    if (dt > 34 && ++slow > 20 && scale > .3) { scale *= .82; slow = 0; size(); }
+    look = look.map((v, i) => v + (want[i] - v) * .05);
+    gl.uniform1f(uT, reduce ? 6 : (now - t0) / 1000);
+    gl.uniform2f(uLook, look[0], look[1]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (on && !reduce) requestAnimationFrame(frame); else last = 0;
   }
   requestAnimationFrame(frame);
 })();
@@ -377,8 +462,54 @@ if (DISCORD) { const d = document.getElementById("discord"); d.href = DISCORD; d
 })();
 
 // ---------------------------------------------------------------- film and reveals
-new IntersectionObserver(([e]) => document.body.classList.toggle("past", !e.isIntersecting), { threshold: .15 }).observe(document.querySelector(".hero"));
-document.getElementById("play").onclick = (e) => { const v = document.getElementById("video"); v.muted = false; v.controls = true; v.play(); e.currentTarget.hidden = true; };
+new IntersectionObserver(([e]) => document.getElementById("nav").classList.toggle("pill", !e.isIntersecting)).observe(document.getElementById("top"));
+// the film player: start card, then play/pause, seek, time, mute and full screen in one glass bar
+(() => {
+  const v = document.getElementById("video"), frame = v.closest(".frame"), $ = (id) => document.getElementById(id);
+  const start = $("start"), bar = $("vbar"), seek = $("vSeek");
+  const PLAY = "M7 4.8v14.4a1 1 0 0 0 1.5.86l12-7.2a1 1 0 0 0 0-1.72l-12-7.2A1 1 0 0 0 7 4.8z", PAUSE = "M7 4h3.5v16H7zM13.5 4H17v16h-3.5z";
+  const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  let idle = 0;
+  const wake = () => { frame.classList.remove("idle"); clearTimeout(idle); if (!v.paused) idle = setTimeout(() => frame.classList.add("idle"), 2200); };
+  const go = () => { start.hidden = true; bar.hidden = false; v.muted = false; v.play(); wake(); };
+  start.onclick = () => { if (v.ended) v.currentTime = 0; go(); };
+  const toggle = () => (v.paused ? v.play() : v.pause());
+  v.onclick = () => { if (start.hidden) toggle(); };
+  $("vPlay").onclick = toggle;
+  v.onplay = v.onpause = () => {
+    $("vPlayIcon").setAttribute("d", v.paused ? PLAY : PAUSE); $("vPlay").setAttribute("aria-label", v.paused ? "Play" : "Pause"); wake();
+  };
+  v.onended = () => { bar.hidden = true; start.hidden = false; $("startLabel").textContent = "Watch again"; frame.classList.remove("idle"); };
+  v.onloadedmetadata = () => { $("vDur").textContent = fmt(v.duration); seek.setAttribute("aria-valuemax", Math.round(v.duration)); };
+  const show = () => {
+    const f = v.duration ? v.currentTime / v.duration : 0;
+    $("vFill").style.width = f * 100 + "%"; $("vKnob").style.left = f * 100 + "%";
+    $("vNow").textContent = fmt(v.currentTime); seek.setAttribute("aria-valuenow", Math.round(v.currentTime));
+    if (v.buffered.length) $("vBuf").style.width = (v.buffered.end(v.buffered.length - 1) / (v.duration || 1)) * 100 + "%";
+  };
+  v.ontimeupdate = v.onprogress = show;
+  const to = (x) => { const r = seek.getBoundingClientRect(); v.currentTime = Math.min(1, Math.max(0, (x - r.left) / r.width)) * (v.duration || 0); show(); };
+  seek.onpointerdown = (e) => { seek.setPointerCapture(e.pointerId); seek.classList.add("drag"); to(e.clientX); };
+  seek.onpointermove = (e) => { if (seek.classList.contains("drag")) to(e.clientX); };
+  seek.onpointerup = seek.onpointercancel = () => seek.classList.remove("drag");
+  const muteIcon = () => { $("vWave").style.display = v.muted ? "none" : ""; $("vMute").setAttribute("aria-label", v.muted ? "Unmute" : "Mute"); };
+  $("vMute").onclick = () => { v.muted = !v.muted; muteIcon(); };
+  v.onvolumechange = muteIcon;
+  $("vFull").onclick = () => (document.fullscreenElement ? document.exitFullscreen() : (frame.requestFullscreen || frame.webkitRequestFullscreen).call(frame));
+  frame.addEventListener("pointermove", wake);
+  frame.addEventListener("keydown", (e) => {
+    if (!start.hidden) return;
+    const k = e.key.toLowerCase();
+    if (k === " " || k === "k") { e.preventDefault(); toggle(); }
+    else if (k === "arrowright") { v.currentTime = Math.min(v.duration, v.currentTime + 5); }
+    else if (k === "arrowleft") { v.currentTime = Math.max(0, v.currentTime - 5); }
+    else if (k === "m") $("vMute").click();
+    else if (k === "f") $("vFull").click();
+    else return;
+    wake();
+  });
+  frame.tabIndex = -1;
+})();
 const io = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } }), { threshold: .12 });
 document.querySelectorAll(".rv").forEach((el, i) => { el.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(el); });
 </script>
