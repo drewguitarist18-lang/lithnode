@@ -21,7 +21,8 @@ BROWSERS = [r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe", r"%Pro
             r"%ProgramFiles%\Google\Chrome\Application\chrome.exe", r"%LocalAppData%\Google\Chrome\Application\chrome.exe",
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
             "/Applications/Chromium.app/Contents/MacOS/Chromium", "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"]
-FLATPAK = bool(os.environ.get("FLATPAK_ID")) and os.name != "nt"
+FLATPAK = bool(os.environ.get("FLATPAK_ID")) and os.name != "nt" and "org.freedesktop.Flatpak=talk" in (
+    Path("/.flatpak-info").read_text(encoding="utf-8", errors="replace") if Path("/.flatpak-info").exists() else "")
 NAMES = ("msedge", "chrome", "google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "microsoft-edge", "brave-browser")
 FREEZE = ("<script>addEventListener('load',function(){var t=%d;setTimeout(function(){document.getAnimations().forEach("
           "function(a){try{a.pause();a.currentTime=t}catch(e){}})},0)})</script>")

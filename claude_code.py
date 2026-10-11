@@ -31,7 +31,17 @@ COMMON_BINS = ["~/.local/bin", "~/.claude/local", "~/.npm-global/bin", "~/.bun/b
 
 # Inside the Linux Flatpak, Lithnode is sandboxed: Claude Code, Codex, Cursor and your CLIs live outside it, on
 # your system. Every one of them is started there with `flatpak-spawn --host` (see host), and found there (which).
-FLATPAK = bool(os.environ.get("FLATPAK_ID")) and not WINDOWS
+def _host_spawn_allowed():
+    """Under Flatpak: may this sandbox start programs on the system (org.freedesktop.Flatpak)? The published Flatpak
+    doesn't ask for that: it runs claude inside the sandbox, from your home folder, like any other Linux install."""
+    try:
+        return "org.freedesktop.Flatpak=talk" in Path("/.flatpak-info").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+
+# FLATPAK means "a Flatpak that starts the CLIs outside its sandbox"; a sandboxed Flatpak behaves like plain Linux.
+FLATPAK = bool(os.environ.get("FLATPAK_ID")) and not WINDOWS and _host_spawn_allowed()
 HOST_PATH = ""   # your system's PATH, under Flatpak
 
 

@@ -466,10 +466,10 @@ if (DISCORD) { const d = document.getElementById("discord"); d.href = DISCORD; d
       ["Open it", "Open <em>Lithnode-mac-arm64.dmg</em> from your downloads and drag <em>Lithnode</em> into <em>Applications</em>."],
       ["Let your Mac open it", "The first time, macOS says it can't check Lithnode. Open <em>System Settings</em>, then <em>Privacy &amp; Security</em>, scroll down and click <em>Open Anyway</em>."],
       ["Sign in", "Click <em>Sign in</em> at the top right. It uses your Claude Code login."]] },
-    linux: { title: "Installing on Linux", file: "Lithnode.flatpak, 95 MB, any distro", steps: [
-      ["Simplest to trust: run it from source", "Plain Python, no sandbox to open up, nothing to grant. Read it first if you like:" + cmd("git clone https://github.com/drewguitarist18-lang/lithnode && python3 lithnode/hq.py")],
-      ["Or install the Flatpak", "In a terminal, in your downloads folder:" + cmd("flatpak install --user Lithnode.flatpak") + "<span class=\"note\">Your app store will warn about <em>arbitrary permissions</em>. That's the one permission that lets Lithnode start <em>claude</em>, <em>codex</em>, <em>git</em> and the tools you allow on your system, in the folder you pick. It also gets your home folder and nothing else: no network. <a href=\"https://github.com/drewguitarist18-lang/lithnode#run-it\" target=\"_blank\" rel=\"noopener\">Every permission, explained</a>.</span>"],
-      ["Sign in", "Open Lithnode (app menu, or <em>flatpak run com.lithnode.Lithnode</em>) and click <em>Sign in</em>. It uses the <em>claude</em> already on your system."]] },
+    linux: { title: "Installing on Linux", file: "Lithnode.flatpak, 95 MB, any distro, sandboxed", steps: [
+      ["Have Claude Code", "If you don't have it yet, Anthropic's installer puts it in your home folder:" + cmd("curl -fsSL https://claude.ai/install.sh | bash")],
+      ["Install Lithnode", "In a terminal, in your downloads folder:" + cmd("flatpak install --user Lithnode.flatpak") + "<span class=\"note\">It's sandboxed: it only sees your home folder and the internet, and asks for no special permissions. <a href=\"https://github.com/drewguitarist18-lang/lithnode#run-it\" target=\"_blank\" rel=\"noopener\">What each one is for</a>.</span>"],
+      ["Sign in", "Open Lithnode from your app menu and click <em>Sign in</em>. Want agents to use system-wide tools too? Run it from source instead:" + cmd("git clone https://github.com/drewguitarist18-lang/lithnode && python3 lithnode/hq.py")]] },
   };
   function cmd(text) { return `<div class="cmd"><code>${text.replace(/&/g, "&amp;")}</code><button type="button" data-copy>Copy</button></div>`; }
   const help = document.getElementById("help"), $ = (id) => document.getElementById(id);

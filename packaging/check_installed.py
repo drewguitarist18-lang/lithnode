@@ -51,7 +51,8 @@ def main():
     bin_dir = Path.home() / ".local" / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     fake = bin_dir / "claude"
-    fake.write_text(f'#!/bin/sh\nexec "{shutil.which("python3") or sys.executable}" "{ROOT / "tests" / "mock_claude.py"}" "$@"\n')
+    py = "python3" if engine[0] == "flatpak" else (shutil.which("python3") or sys.executable)   # the sandbox has its own
+    fake.write_text(f'#!/bin/sh\nexec "{py}" "{ROOT / "tests" / "mock_claude.py"}" "$@"\n')
     fake.chmod(0o755)
     env = {**os.environ, "LITHNODE_PORT": str(PORT), "LITHNODE_HOME": str(work / "home"), "CLAWD_BOT_HOME": str(work / "bot"),
            "CLAWD_PET_HOME": str(work / "pet"), "CLAWD_MOCK_STATE": str(state), "CLAWD_MOCK_LOG": str(work / "calls.jsonl"),
