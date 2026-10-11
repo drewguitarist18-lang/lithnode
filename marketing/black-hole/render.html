@@ -3,7 +3,7 @@
 <script>
 const FS = `
     precision highp float;
-    uniform vec2 uRes; uniform float uT; uniform vec2 uLook; uniform float uZoom;
+    uniform vec2 uRes; uniform float uT; uniform vec2 uLook; uniform float uZoom; uniform float uSpin; uniform float uRoll;
     float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
     float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
       return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
@@ -31,8 +31,9 @@ const FS = `
     }
     void main(){
       vec2 uv = (gl_FragCoord.xy - .5 * uRes) / uRes.y * uZoom;
-      float pitch = .28 + uLook.y, yaw = uLook.x;
-      vec3 ro = vec3(sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch)) * 28.;
+      uv = mat2(cos(uRoll), sin(uRoll), -sin(uRoll), cos(uRoll)) * uv;   // tilted a little to the right
+      float pitch = .2 + uLook.y, yaw = uLook.x;
+      vec3 ro = vec3(sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch)) * 52.;   // farther back: room for a long disk
       vec3 fw = normalize(-ro), rt = normalize(cross(vec3(0., 1., 0.), fw)), up = cross(fw, rt);
       vec3 pos = ro, vel = normalize(fw * 2. + rt * uv.x + up * uv.y);
       float h2 = dot(cross(pos, vel), cross(pos, vel));
@@ -52,8 +53,8 @@ const FS = `
         if (prev.y * pos.y < 0.) {                                 // crossed the disk plane
           vec3 q = mix(prev, pos, prev.y / (prev.y - pos.y));
           float qr = length(q.xz);
-          if (qr > 2.45 && qr < 12.) {
-            float ang = atan(q.z, q.x) + uT * .9 * pow(qr, -1.5);  // inner gas orbits faster, so the streaks shear
+          if (qr > 2.45 && qr < 26.) {
+            float ang = atan(q.z, q.x) + uSpin;   // the whole disk turns, so a loop of the animation has no seam
             vec2 cs = vec2(cos(ang), sin(ang));
             // streaks that follow the orbit: fine in radius, long along the circle (sampled on the circle: no seam)
             // blended gas, not strands: broad bands and clumps that mix (a warped lookup keeps it swirling, not striped)
@@ -61,8 +62,8 @@ const FS = `
             vec3 warp = vec3(noise3(w), noise3(w + 7.1), noise3(w + 3.7)) - .5;
             float streak = noise3(vec3(qr * 3.6, cs * 2.4) + warp * 1.6) * .55 + noise3(vec3(qr * 8.5, cs * 4.5) + warp) * .3 + noise3(vec3(qr * 18., cs * 8.)) * .15;
             streak = mix(.55, streak, .75);
-            float x = (qr - 2.45) / 9.55;
-            float profile = smoothstep(0., .02, x) * pow(1. - x, 2.2) * smoothstep(1., .82, x);   // a sharp, hot inner edge fading outward
+            float x = (qr - 2.45) / 23.55;
+            float profile = smoothstep(0., .01, x) * (pow(1. - x, 3.2) * .85 + .15 * pow(1. - x, 1.2)) * smoothstep(1., .7, x);   // a hot inner edge, a long faint reach outward   // a sharp, hot inner edge fading outward
             vec3 orbit = normalize(vec3(-q.z, 0., q.x));
             float beta = sqrt(.5 / qr);
             float dop = 1. / (1. - beta * dot(orbit, -normalize(vel)));
@@ -74,13 +75,14 @@ const FS = `
             if (a > .985) break;
           }
         }
-        if (r2 > 2500.) break;
+        if (r2 > 9000. && dot(pos, vel) > 0.) break;   // far out and heading away: it escaped
       }
       if (!fell) col += (1. - a) * sky(normalize(vel));
       if (!fell) col += vec3(glow * .16) * (1. - a * .7);        // the shadow stays black: light that falls in never comes out
       
-      col = 1. - exp(-col * 1.2);
-      col = pow(col, vec3(.92)) * vec3(1., .988, .965);           // the page's off-white
+      col = 1. - exp(-col * 1.45);
+      col = smoothstep(.02, .97, col);                              // more white and black, less grey
+      col *= vec3(1., .988, .965);           // the page's off-white
       gl_FragColor = vec4(col, 1.);
     }`;
 const VS = "attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }";
@@ -92,7 +94,7 @@ window.render = (W, H, zoom) => {
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), gl.STATIC_DRAW);
   const l = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, 2, gl.FLOAT, false, 0, 0);
   const U = (n) => gl.getUniformLocation(pr, n);
-  gl.viewport(0, 0, W, H); gl.uniform2f(U("uRes"), W, H); gl.uniform1f(U("uT"), 6.); gl.uniform2f(U("uLook"), 0, 0); gl.uniform1f(U("uZoom"), zoom);
+  gl.viewport(0, 0, W, H); gl.uniform2f(U("uRes"), W, H); gl.uniform1f(U("uT"), 6.); gl.uniform2f(U("uLook"), 0, 0); gl.uniform1f(U("uZoom"), zoom); gl.uniform1f(U("uSpin"), window.SPIN || 0.); gl.uniform1f(U("uRoll"), window.ROLL ?? .1);
   gl.enable(gl.SCISSOR_TEST);
   const strip = 64;                                   // small strips, so the GPU never stalls long enough to reset
   for (let y = 0; y < H; y += strip) { gl.scissor(0, y, W, strip); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.finish(); }

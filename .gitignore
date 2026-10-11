@@ -21,3 +21,4 @@ packaging/linux/repo/
 packaging/linux/.flatpak-builder/
 installer/app/lithnode.png
 marketing/black-hole/*.png
+marketing/black-hole/frames-*/
