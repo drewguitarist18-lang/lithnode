@@ -1,15 +1,38 @@
-// Pixel sprites shared by the Office and Flows pages: Clawd plus Clawd Bot's bot shapes.
+// Pixel sprites shared by the Office and Flows pages: Lithnode's crab plus the bots' shapes. Everything is drawn in
+// black and white: a bot's color only picks how light its grey is.
 "use strict";
-const BODY = "#D97757";
+const BODY = "#ecebe6";
+function mono(color) {
+  if (!/^#[0-9a-f]{6}$/i.test(color || "")) return color;
+  const n = parseInt(color.slice(1), 16), lum = (.299 * (n >> 16) + .587 * ((n >> 8) & 255) + .114 * (n & 255)) / 255;
+  const v = Math.round(Math.min(236, 120 + lum * 116));
+  return `rgb(${v},${v},${Math.max(0, v - 3)})`;
+}
+const LOGO = [".##..........##.", "#.#..........#.#", "###..........###", ".#............#.", ".#............#.", ".##.########.##.", "..############..", "..##.######.##..", "..############..", "...##########...", "...#.#....#.#...", "...#.#....#.#...", "..##.##..##.##.."];
+// the logo, drawn at (x, y) with c pixels per cell
+function drawLogo(ctx, x, y, c, color = BODY) {
+  ctx.fillStyle = color;
+  LOGO.forEach((row, ry) => [...row].forEach((ch, cx) => { if (ch === "#") ctx.fillRect(Math.round(x + cx * c), Math.round(y + ry * c), Math.ceil(c), Math.ceil(c)); }));
+}
 // Pages may define a global `theme` object (read from CSS variables); these are the fallbacks.
 function spriteColor(name) {
   const fallback = { muted: "#8d93a8", waiting: "#e5566e" }[name];
   return (typeof theme !== "undefined" && theme[name]) || fallback;
 }
 
-// Clawd on a 12x8 grid, drawn at (x, y) with `c` pixels per cell.
+// The crab on a 12x8 grid, drawn at (x, y) with `c` pixels per cell. States: idle, working, waiting, celebrate, sleeping.
+const CRAB = [
+  ".##......##.",
+  "#.#......#.#",
+  "###......###",
+  ".#.######.#.",
+  "..########..",
+  "..########..",
+  "..#.#..#.#..",
+  ".##.#..#.##.",
+];
 function drawClawd(ctx, x, y, c, o) {
-  const { state: st, t, tired = 0, body = BODY, look = 0, seed = 0 } = o;
+  const { state: st, t, tired = 0, look = 0, seed = 0 } = o, body = mono(o.body || BODY);
   let bob = 0;
   if (st === "waiting") bob = Math.abs(Math.sin(t * 4)) * 0.5;
   else if (st === "celebrate") bob = Math.abs(Math.sin(t * 7)) * 2;
@@ -19,39 +42,25 @@ function drawClawd(ctx, x, y, c, o) {
     ctx.fillStyle = color;
     ctx.fillRect(Math.round(x + col * c), Math.round(Y + row * c), Math.ceil(w * c), Math.ceil(h * c));
   };
-  px(2, 0, body, 8, 6);
-  if (st === "working") {
-    const f = Math.floor(t * 8 + seed) % 2 ? 0.5 : 0;
-    px(0, 4.2 + f, body, 3, 1.4); px(9, 4.7 - f, body, 3, 1.4);
-  } else {
-    const up = st === "celebrate" || (st === "waiting" && Math.floor(t * 4) % 2 === 0);
-    px(0, up ? 1 : 2, body, 12, 2);
-  }
-  for (const col of [2, 4, 7, 9]) px(col, 6, body, 1, 2);
-
+  // claws: working, they snap up and down in turn; waiting, both wave
+  const f = st === "working" ? Math.floor(t * 8 + seed) % 2 : st === "waiting" ? Math.floor(t * 4) % 2 : 0;
+  CRAB.forEach((row, ry) => [...row].forEach((ch, cx) => {
+    if (ch !== "#") return;
+    const left = cx < 4, lift = ry < 3 ? (st === "working" ? (left ? f : 1 - f) : f) * 0.5 : 0;
+    px(cx, ry - lift, body);
+  }));
   const tt = t + seed;
   const blink = st === "idle" && tt % 4.5 < 0.15;
-  const wink = (st === "idle" || st === "working") && tired < 2 && tt % 6.5 < 0.4;
-  const yawn = tired >= 2 && st === "idle" && tt % 22 < 1.6;
   const lid = [0, 0.2, 0.5, 0.76][tired];
   for (const col of [3, 8]) {
-    if (st === "sleeping" || blink || yawn || (wink && col === 8)) {
-      px(col, 1.45, "#000", 1, 0.2);
-    } else if (st === "celebrate") {
-      ctx.strokeStyle = "#000"; ctx.lineWidth = Math.max(1.5, c / 3); ctx.beginPath();
-      ctx.moveTo(x + col * c, Y + 2 * c); ctx.lineTo(x + (col + 0.5) * c, Y + 1 * c);
-      ctx.lineTo(x + (col + 1) * c, Y + 2 * c); ctx.stroke();
+    if (st === "sleeping" || blink) px(col, 4.45, "#08080a", 1, 0.2);
+    else if (st === "celebrate") {
+      ctx.strokeStyle = "#08080a"; ctx.lineWidth = Math.max(1.5, c / 3); ctx.beginPath();
+      ctx.moveTo(x + col * c, Y + 5 * c); ctx.lineTo(x + (col + 0.5) * c, Y + 4 * c); ctx.lineTo(x + (col + 1) * c, Y + 5 * c); ctx.stroke();
     } else {
-      px(col + look * 0.3, 1, "#000");
-      if (lid) px(col + look * 0.3 - 0.05, 0.95, body, 1.1, lid + 0.05);
+      px(col + look * 0.3, 4, "#08080a");
+      if (lid) px(col + look * 0.3 - 0.05, 3.95, body, 1.1, lid + 0.05);
     }
-  }
-  if (yawn) px(5, 3, "#000", 2, 1.4);
-  if (tired === 3 && st !== "sleeping") {
-    const sx = x + 9.5 * c + Math.sin(t * 2) * 2;
-    ctx.fillStyle = "#7dcfff"; ctx.beginPath();
-    ctx.moveTo(sx, Y - 1.4 * c); ctx.lineTo(sx - 0.5 * c, Y - 0.3 * c); ctx.lineTo(sx + 0.5 * c, Y - 0.3 * c);
-    ctx.fill();
   }
   if (st === "sleeping") {
     ctx.fillStyle = spriteColor("muted"); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
@@ -65,7 +74,7 @@ function drawClawd(ctx, x, y, c, o) {
 
 // Clawd Bot's bots: each has its own pixel shape (# body, k darker accent, e eye).
 const BOT_SHAPES = {
-  crab:  ["..########..", "..#e####e#..", "############", "############", "..########..", "..########..", "..#.#..#.#..", "..#.#..#.#.."],
+  crab:  [".##......##.", "#.#......#.#", "###......###", ".#.######.#.", "..#e####e#..", "..########..", "..#.#..#.#..", ".##.#..#.##."],
   scout: ["...#....#...", "....#..#....", "..########..", ".#e######e#.", ".##########.", "..########..", "...#.##.#...", "..##....##.."],
   byte:  [".....kk.....", "..########..", ".##e####e##.", ".##########.", "#.########.#", "#.########.#", "..##....##..", "..##....##.."],
   muse:  ["...######...", "..########..", ".##e####e##.", ".##########.", ".##########.", ".##########.", ".##########.", ".##.##.##.##"],
@@ -77,6 +86,7 @@ const BOT_SHAPES = {
 };
 function drawBot(ctx, bot, x, y, c, o) {
   const { state = "idle", t = 0 } = o, rows = BOT_SHAPES[bot.shape] || BOT_SHAPES.crab;
+  bot = { ...bot, color: mono(bot.color) };
   const n = parseInt(bot.color.slice(1), 16), mix = (m, p) => `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (m - v) * p)).join(",")})`;
   const dark = mix(0, 0.4), bob = state === "working" ? Math.abs(Math.sin(t * 6)) * 0.35 : state === "waiting" ? Math.abs(Math.sin(t * 4)) * 0.5 : 0;
   const closed = state === "sleeping" || t % 4.5 < 0.15, Y = y - bob * c;
@@ -103,11 +113,11 @@ const NODE_ICONS = {
 function drawIcon(ctx, kind, x, y, c, o = {}) {
   const icon = NODE_ICONS[kind]; if (!icon) return;
   const { state = "idle", t = 0 } = o;
-  const n = parseInt(icon.color.slice(1), 16), dark = `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * 0.6)).join(",")})`;
+  const body = mono(icon.color), g = parseInt(body.match(/\d+/)[0], 10), dark = `rgb(${[g, g, g].map((v) => Math.round(v * 0.6)).join(",")})`;
   const bob = state === "working" || state === "waiting" ? Math.abs(Math.sin(t * 4)) * 0.4 : 0, Y = y - bob * c;
   icon.rows.forEach((row, ry) => [...row].forEach((ch, cx) => {
     if (ch === ".") return;
-    ctx.fillStyle = ch === "k" ? dark : icon.color;
+    ctx.fillStyle = ch === "k" ? dark : body;
     ctx.fillRect(Math.round(x + cx * c), Math.round(Y + ry * c), Math.ceil(c), Math.ceil(c));
   }));
 }

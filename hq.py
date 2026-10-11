@@ -88,7 +88,7 @@ BOT_ID_RE = re.compile(r"^[a-z0-9-]{1,32}$")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 STARTER_BOTS = [
-    {"id": "clawd", "name": "Claude", "tagline": "All-rounder", "shape": "crab", "color": "#D97757",
+    {"id": "clawd", "name": "Lith", "tagline": "All-rounder", "shape": "crab", "color": "#D97757",
      "instructions": PERSONA, "model": "", "web_search": True, "think": False,
      "starters": ["What's in the news today?", "Explain how async/await works, with a short example.",
                   "Brainstorm five side projects I could build with LLMs."]},
@@ -179,7 +179,7 @@ for _b in STARTER_BOTS:
 # instructions come from this file every time (so updates ship), and never go to the page.
 BUILTIN = {b["id"]: b for b in STARTER_BOTS}
 BUILTIN_EDITABLE = ("name", "model")
-OLD_DEFAULT_NAMES = {"clawd": ("Clawd", "Ace")}   # renamed built-ins: an old default name means "never renamed"
+OLD_DEFAULT_NAMES = {"clawd": ("Clawd", "Ace", "Claude")}   # renamed built-ins: an old default name means "never renamed"
 
 
 def load_bots():

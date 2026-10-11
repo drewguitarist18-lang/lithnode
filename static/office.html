@@ -461,12 +461,12 @@ function frame(ms) {
   document.querySelectorAll("#list .row").forEach((row, i) => {
     const x = stations[i], cv = row.querySelector("canvas"); if (!x || !cv) return;
     const c2 = cv.getContext("2d"); c2.clearRect(0, 0, cv.width, cv.height);
-    if (x.kind === "sub") drawClawd(c2, 6, 12, 9, { state: "working", t, body: subColor(x.a), seed: i });
+    if (x.kind === "sub") drawClawd(c2, 6, 12, 9, { state: "working", t, body: mono(subColor(x.a)), seed: i });
     else if (x.s.bot) drawBot(c2, x.s.bot, 6, 12, 9, { state: effState(x.s), t });
     else drawClawd(c2, 6, 12, 9, { state: effState(x.s), t, tired: tiredLevel(fill(x.s)), seed: hash(x.s.id) % 50 });
   });
   const lg = $("logo").getContext("2d"); lg.clearRect(0, 0, 108, 84);
-  drawClawd(lg, 9, 14, 7.5, { state: "idle", t, seed: 3 });
+  drawLogo(lg, 18, 13, 4.5);
   const ec = $("emptyClawd"); if ($("empty").classList.contains("show")) {
     const e2 = ec.getContext("2d"); e2.clearRect(0, 0, ec.width, ec.height);
     drawClawd(e2, 100, 70, 13, { state: "sleeping", t });

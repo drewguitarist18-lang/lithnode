@@ -90,7 +90,7 @@ try:
     bs = listing["bots"]
     check("starter bots seeded, every shape used", [b["id"] for b in bs] == ["clawd", "scout", "byte", "muse", "forge", "beetle", "sentinel", "probe", "atlas", "launch"]
           and set(listing["shapes"]) == {b["shape"] for b in bs} and len(listing["shapes"]) == 9)
-    check("the all-rounder is called Claude", bs[0]["name"] == "Claude")
+    check("the all-rounder is called Lith", bs[0]["name"] == "Lith")
     check("team bots carry their Flows tool level", {b["id"]: b["tools"] for b in bs}["forge"] == "edit"
           and {b["id"]: b["tools"] for b in bs}["probe"] == "full" and all(b["team"] for b in bs))
     check("built-in bots are marked, and their instructions never reach the page", all(b["builtin"] and b["instructions"] == "" for b in bs))
@@ -126,10 +126,10 @@ try:
     (Path(home) / "bots.json").unlink()   # back to the starter set
     check("starters come back if the file is gone", len(bots()) == 10)
     old = [{k: v for k, v in b.items() if k not in ("tools", "team")} for b in bots()[:4]]
-    for older in ("Clawd", "Ace"):
+    for older in ("Clawd", "Ace", "Claude"):
         (Path(home) / "bots.json").write_text(json.dumps({"bots": [{**b, "name": older} if b["id"] == "clawd" else b for b in old]}))
-        check(f"a built-in still on an old default name ({older}) becomes Claude", bots()[0]["name"] == "Claude"
-              and json.loads((Path(home) / "bots.json").read_text())["bots"][0]["name"] == "Claude")
+        check(f"a built-in still on an old default name ({older}) becomes Lith", bots()[0]["name"] == "Lith"
+              and json.loads((Path(home) / "bots.json").read_text())["bots"][0]["name"] == "Lith")
     old[0]["name"] = "My Claude"
     (Path(home) / "bots.json").write_text(json.dumps({"bots": old}))
     up = bots()

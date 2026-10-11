@@ -176,7 +176,7 @@ const lg = $("logo").getContext("2d");
 (function frame(ms) {
   requestAnimationFrame(frame);
   lg.clearRect(0, 0, 96, 72);
-  drawClawd(lg, 6, 12, 7, { state: "idle", t: ms / 1000, seed: 3 });
+  drawLogo(lg, 12, 9, 4.5);
 })(0);
 </script>
 </body>
