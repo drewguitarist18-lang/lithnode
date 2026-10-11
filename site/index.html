@@ -14,7 +14,7 @@
 <meta name="theme-color" content="#0a0a0a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap">
 <style>
   :root {
     --bg: #0a0a0a; --panel: #111111; --pad: #171717; --line: #262626; --line2: #333;
@@ -245,6 +245,62 @@
     .rv { opacity: 1; transform: none; }
     .marquee .track { animation: none; }
   }
+  /* ================================================================ the look: terminal / brutalist
+     One monospace face, black and white, one green. Square corners, 1px lines, no glow, no gradient, no shadow.
+     The only other color on the page is the app itself (the drawn flows, the bots, the film). */
+  :root { --accent: #5fd068; --accent-2: #5fd068; --display: var(--mono); --body: var(--mono); --line: #262624; --line2: #3a3a37; }
+  body { font-size: 15.5px; line-height: 1.65; }
+  .grain, .dl .glow, .card::before { display: none; }
+  h1, h2, h3 { font-family: var(--mono); letter-spacing: -.045em; font-weight: 800; }
+  .hero h1 { font-size: clamp(40px, 6.6vw, 92px); line-height: 1; max-width: 13ch; }
+  .hero h1 em { color: var(--accent); }
+  .hero p.lede { font-size: 16px; color: #a8a8a3; max-width: 58ch; }
+  .head h2 { font-size: clamp(32px, 4.6vw, 58px); line-height: 1.02; margin-top: 0; }
+  .head p { font-size: 15.5px; }
+  .dl h2 { font-size: clamp(38px, 6.4vw, 84px); line-height: 1; }
+  .dl p { font-size: 15.5px; }
+  .step h3 { font-size: 24px; } .card h3 { font-size: 18px; letter-spacing: -.03em; }
+  .step p, .card p, .how span { font-size: 14px; }
+
+  /* square, flat, outlined */
+  .btn, .film, .step, .step canvas, .bars, .bar .t, .bar .f, .apps span, .apps span.cli b, .card, .how div, .marquee span, .smart, .smart .bt,
+  .dlo .panel, .dlo .file, .dlo code, .dlo .x, .hero .oses a, .ospick, .ospick button, .dl p code, .scrollcue, .film button span { border-radius: 0; }
+  .btn { font: 700 14.5px var(--mono); padding: 13px 20px; background: transparent; border-color: var(--ink); }
+  .btn:hover { transform: none; background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #0a0a0a; box-shadow: none; }
+  .btn.primary:hover { background: #7be083; border-color: #7be083; box-shadow: none; color: #0a0a0a; }
+  nav.top .btn { padding: 8px 14px; font-size: 13px; }
+  nav.top.solid { background: var(--bg); backdrop-filter: none; }
+  nav.top .links a::before { content: "/"; color: var(--line2); margin-right: 2px; }
+  .film { box-shadow: none; transform: none !important; border-color: var(--line2); }
+  .film button span { box-shadow: none; color: #0a0a0a; font: 700 15px var(--mono); }
+  .step, .card, .how div, .bars, .apps span, .marquee span { background: transparent; border-color: var(--line2); }
+  .step canvas { border-color: var(--line); }
+  .card:hover { transform: none; border-color: var(--ink); }
+  .step .n, .how b { color: var(--accent); }
+  .marquee { mask-image: none; }
+  .marquee span { font: 500 13.5px var(--mono); color: #b8b8b3; }
+  .marquee span i { box-shadow: none; border-radius: 0; }
+  .bar.bad .f { background: #e5566e; } .bar.good .f { background: var(--accent); box-shadow: none; }
+  .bar b, .apps span { font-family: var(--mono); }
+  .apps span i { border-radius: 0; } .apps span i::after { border-radius: 0; }
+  .card p a, footer a { color: var(--ink); }
+  .scrollcue::after { border-radius: 0; }
+  .hero .oses a { font: 700 12px var(--mono); background: transparent; border-color: var(--line2); }
+  .hero .oses a:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .hero .oses a:hover::before { color: var(--bg); }
+  .ospick { background: transparent; border-color: var(--line2); }
+  .ospick button { font: 700 12.5px var(--mono); }
+  .ospick button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+  .reqs.usage { font: 400 12.5px/1.6 var(--mono); }
+  .dlo .panel { background: var(--bg); border-color: var(--line2); box-shadow: none; }
+  .dlo .arrow { filter: none; }
+  .dlo .bar::after { background: var(--accent); }
+  .dlo li > i { border-radius: 0; }
+  .dlo li.on > i { box-shadow: none; color: #0a0a0a; }
+  .dlo li.on .smart .hl { box-shadow: 0 0 0 2px var(--accent); }
+  .dlo li h4, .dlo .head b { font-family: var(--mono); }
+  footer { font-size: 12.5px; }
 </style>
 <!-- Vercel Web Analytics: anonymous visit counts, no cookies, nothing personal -->
 <script defer src="/_vercel/insights/script.js"></script>
@@ -263,7 +319,6 @@
 <header class="hero" id="top">
   <canvas id="heroCanvas" aria-hidden="true"></canvas>
   <div class="wrap">
-    <div class="eyebrow">For Claude Code, Codex and Cursor</div>
     <h1 style="margin-top:18px"><span class="line"><span>Build an AI team.</span></span><span class="line"><span><em>Watch it ship.</em></span></span></h1>
     <p class="lede">Draw a team of coding agents on Claude Code, Codex or Cursor, give each one your CLIs and connectors, and press run. They split big jobs, check each other's work and ship the result, on your own computer and your own Claude plan.</p>
     <div class="ctas">
@@ -289,7 +344,7 @@
 
 <section id="film">
   <div class="wrap">
-    <div class="head rv"><div class="eyebrow">31 seconds</div><h2>Split it. Check it. Ship it.</h2>
+    <div class="head rv"><h2>Split it. Check it. Ship it.</h2>
       <p>100,000 rows, start to finish: three workers split the job, a checker catches a missing chunk and sends it back, and a publisher ships it with gh and a docs connector. Then you tweak it and run it again.</p></div>
     <div class="film" id="filmBox">
       <video id="filmVideo" src="media/lithnode-film.mp4" poster="media/film-poster.jpg" playsinline preload="metadata"></video>
@@ -300,7 +355,7 @@
 
 <section id="how" style="padding-top:40px">
   <div class="wrap">
-    <div class="head rv"><div class="eyebrow">How it works</div><h2>Three moves. That's the whole thing.</h2></div>
+    <div class="head rv"><h2>Three moves. That's the whole thing.</h2></div>
     <div class="steps">
       <div class="step rv"><div class="n">01</div><h3>Draw the team</h3><p>Drop in bots, give each team a job, its CLIs and its connectors, and wire them up. Or describe the team in one line and Lithnode draws it.</p><canvas data-demo="draw"></canvas></div>
       <div class="step rv" style="--d:.12s"><div class="n">02</div><h3>Press run</h3><p>Every agent is a real Claude Code, Codex or Cursor session. Watch each one work live, with an approval step wherever you want a say.</p><canvas data-demo="run"></canvas></div>
@@ -312,9 +367,8 @@
 <section id="connectors">
   <div class="wrap split">
     <div class="rv">
-      <div class="eyebrow">CLIs and connectors</div>
       <h2 style="font-size:clamp(38px,5vw,64px);line-height:1;margin-top:14px">Your tools, without the bloat.</h2>
-      <p style="color:var(--muted);font-size:19px;margin:20px 0 0;max-width:52ch">Switch on the command-line tools a team may run, like git, gh, vercel or python, and the connectors it needs, like Notion or Vercel. Everything else stays blocked, and connector tools load only when an agent searches for one, so every agent starts lean.</p>
+      <p style="color:var(--muted);font-size:15.5px;margin:20px 0 0;max-width:56ch">Switch on the command-line tools a team may run, like git, gh, vercel or python, and the connectors it needs, like Notion or Vercel. Everything else stays blocked, and connector tools load only when an agent searches for one, so every agent starts lean.</p>
       <div class="apps" id="apps"><span data-app class="on cli"><i></i><b>&gt;_</b>gh</span><span data-app class="cli"><i></i><b>&gt;_</b>git</span><span data-app class="on cli"><i></i><b>&gt;_</b>python</span><span data-app class="cli"><i></i><b>&gt;_</b>vercel</span><span data-app class="on"><i></i>Notion</span><span data-app><i></i>Vercel</span><span data-app><i></i>Claude Docs</span></div>
     </div>
     <div class="bars rv" style="--d:.15s" id="bars">
@@ -327,7 +381,7 @@
 
 <section id="features" style="padding-top:60px">
   <div class="wrap">
-    <div class="head rv"><div class="eyebrow">Built in</div><h2>Everything a team needs.</h2></div>
+    <div class="head rv"><h2>Everything a team needs.</h2></div>
     <div class="grid">
       <div class="card rv"><canvas data-sprite="scout" data-color="#2fb5a0" width="12" height="8"></canvas><h3>Real coding agents, mixed</h3><p>Not a chat imitation. Every agent is a real Claude Code, Codex or Cursor session, and one flow can mix them, with the access you give it: read, web, edit, or only the CLIs you switch on.</p></div>
       <div class="card rv" style="--d:.08s"><canvas data-sprite="bug" data-color="#6cc070" width="12" height="8"></canvas><h3>Split it, then check it</h3><p>Cut one big job into parts that agents do side by side, then put a checker team after them to verify every part.</p></div>
@@ -342,7 +396,6 @@
 <section class="dl" id="download">
   <div class="glow" aria-hidden="true"></div>
   <div class="wrap">
-    <div class="eyebrow rv">Free download</div>
     <h2 class="rv" style="margin-top:16px">Your team is<br>waiting.</h2>
     <p class="rv" data-os-text="win">One installer. It sets up Lithnode, adds it to your Start menu and opens it. Tick <b>Claude Pet</b> and a little Clawd lives on your desktop, showing what Claude Code is doing.</p>
     <p class="rv" data-os-text="mac" hidden>One app. Drag it to Applications and open it. It finds Claude Code, Codex and Cursor on your Mac by itself.</p>
