@@ -109,6 +109,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.release }}
         run: |
+          # the Windows installer is built on Windows (installer/build.ps1) and uploaded by hand; carry it forward so
+          # lithnode.com's link to the latest release always has one
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern LithnodeSetup.exe --dir out || true
           ls -la out
           gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --title "Lithnode $VERSION" \
-            --notes "Linux: Lithnode.flatpak (any distro). Mac: the .dmg (Apple silicon). Windows: lithnode.com."
+            --notes "Linux: Lithnode.flatpak (any distro). Mac: the .dmg (Apple silicon). Windows: LithnodeSetup.exe."
