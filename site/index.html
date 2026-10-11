@@ -30,10 +30,16 @@
   html { background: var(--void); }
   body { margin: 0; color: var(--ink); font: 15px/1.65 var(--mono); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   a { color: inherit; }
-  /* the black hole lives at the top of the page and scrolls away with it; it fades into the page at the bottom */
-  #space { position: absolute; top: 0; left: 0; width: 100%; height: 100svh; z-index: 0; display: block; background: var(--void);
-           filter: blur(2px); transform: scale(1.01);   /* slightly soft, so the eye goes to the content */
-           -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+  /* the black hole: rendered once, ahead of time, by the same light-bending ray tracer at very high quality, then
+     shipped as an image. Sharp, instant, and no work for your computer. It lives at the top of the page, drifts very
+     slowly, shifts a touch with the mouse, and fades into the page at the bottom. */
+  .sky { position: absolute; top: 0; left: 0; width: 100%; height: 100svh; z-index: 0; overflow: hidden; background: var(--void);
+         -webkit-mask-image: linear-gradient(#000 72%, transparent); mask-image: linear-gradient(#000 72%, transparent); }
+  .sky picture { position: absolute; inset: -14px; display: block; transform: translate(var(--px, 0px), var(--py, 0px));
+                 transition: transform 1.4s cubic-bezier(.16,1,.3,1); }
+  .sky img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .92; animation: drift 46s ease-in-out infinite alternate; }
+  @keyframes drift { from { transform: scale(1); } to { transform: scale(1.04); } }
+  @media (prefers-reduced-motion: reduce) { .sky img { animation: none; } .sky picture { transition: none; } }
   main, nav, footer { position: relative; z-index: 1; }
   .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
 
@@ -70,7 +76,7 @@
 
   /* hero: centered, the black hole sits behind it */
   .hero { min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 76px 0 20vh; }   /* sits a little above the middle */
-  .hero .wrap > * { text-shadow: 0 2px 24px rgba(8,8,10,.9), 0 0 2px rgba(8,8,10,.6); }   /* readable over the bright disk */
+  .hero .wrap > * { text-shadow: 0 1px 10px rgba(8,8,10,.7), 0 0 2px rgba(8,8,10,.5); }   /* readable over the bright disk */
   #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block;
           transform: translateX(var(--lx, 0px)) rotate(var(--lean, 0deg)); transition: transform .5s cubic-bezier(.16,1,.3,1); }
   h1 { font: 700 clamp(40px, 7.4vw, 92px)/1.02 var(--pixel); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
@@ -214,7 +220,10 @@
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
-<canvas id="space" aria-hidden="true"></canvas>
+<div class="sky" id="sky" aria-hidden="true"><picture>
+  <source media="(max-aspect-ratio: 4/5)" srcset="media/black-hole-tall.webp">
+  <img src="media/black-hole-wide.webp" alt="" fetchpriority="high" decoding="async">
+</picture></div>
 
 <div id="top" aria-hidden="true"></div>
 <nav id="nav"><div class="wrap"><div class="bar">
@@ -314,128 +323,14 @@
 <script>
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// ---------------------------------------------------------------- the black hole
-// Ray traced on the GPU. Every pixel sends a ray of light from the camera and bends it step by step with the
-// Schwarzschild equation (a = -1.5 h^2 r / |r|^5, units where the event horizon is r = 1). Rays that fall in are black;
-// rays that cross the disk pick up its light; the rest show the stars, bent. So the far side of the disk lifts over
-// the top and under the bottom by itself, and the side spinning toward you is brighter (Doppler beaming).
-(() => {
-  const cv = document.getElementById("space");
-  const gl = cv.getContext("webgl", { antialias: false, alpha: false, depth: false, powerPreference: "high-performance" });
-  if (!gl) return;   // no WebGL: the page stays plain black
-  const VS = "attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }";
-  const FS = `
-    precision highp float;
-    uniform vec2 uRes; uniform float uT; uniform vec2 uLook; uniform float uZoom;
-    float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-    float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
-      return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
-    float fbm(vec2 p){ float v = 0., a = .5; for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= .5; } return v; }
-    // the sky, looked up by 3D direction so it has no seam for the lensing to bend into a ring
-    float hash3(vec3 p){ p = fract(p * .3183099 + .1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-    float noise3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
-      return mix(mix(mix(hash3(i), hash3(i + vec3(1,0,0)), f.x), mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x), f.y),
-                 mix(mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x), mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x), f.y), f.z); }
-    vec3 sky(vec3 d){
-      vec3 c = vec3(0.);
-      for (int L = 0; L < 3; L++) {
-        float sc = 70. + float(L) * 120.;
-        vec3 g = d * sc, id = floor(g);
-        float h = hash3(id + float(L) * 13.1);
-        if (h > .93) {
-          vec3 o = vec3(hash3(id + 1.3), hash3(id + 5.9), hash3(id + 9.4));
-          float r = length(g - id - o);
-          c += vec3(smoothstep(.16 - .04 * float(L), 0., r) * (h - .93) * 16.);
-        }
-      }
-      float haze = noise3(d * 3.) * .6 + noise3(d * 7.) * .3 + noise3(d * 15.) * .1;
-      c += vec3(.03) * pow(haze, 4.) * 4.;
-      return c;
-    }
-    void main(){
-      vec2 uv = (gl_FragCoord.xy - .5 * uRes) / uRes.y * uZoom;
-      float pitch = .11 + uLook.y, yaw = uLook.x;
-      vec3 ro = vec3(sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch)) * 28.;
-      vec3 fw = normalize(-ro), rt = normalize(cross(vec3(0., 1., 0.), fw)), up = cross(fw, rt);
-      vec3 pos = ro, vel = normalize(fw * 2. + rt * uv.x + up * uv.y);
-      float h2 = dot(cross(pos, vel), cross(pos, vel));
-      vec3 col = vec3(0.); float a = 0., glow = 0., haze = 0.; bool fell = false;
-      for (int i = 0; i < 240; i++) {
-        float r2 = dot(pos, pos), r = sqrt(r2);
-        if (r < 1.) { fell = true; break; }
-        float dt = clamp(.045 * r * r / (r + 2.), .012, 1.1);   // fine steps near the hole: a clean shadow edge
-        vec3 prev = pos;
-        vel += -1.5 * h2 * pos / (r2 * r2 * r) * dt;
-        pos += vel * dt;
-        // light that skims the photon sphere (r = 1.5) piles up into the thin bright ring around the shadow
-        glow += dt * exp(-pow((r - 1.52) * 7., 2.));
-        // a little light scattered just above and below the disk, so it blooms instead of ending in a hard line
-        float pr = length(pos.xz);
-        if (pr > 2.6 && pr < 11.) haze += dt * exp(-pos.y * pos.y * 30.) * pow(3. / pr, 3.);
-        if (prev.y * pos.y < 0.) {                                 // crossed the disk plane
-          vec3 q = mix(prev, pos, prev.y / (prev.y - pos.y));
-          float qr = length(q.xz);
-          if (qr > 2.45 && qr < 12.) {
-            float ang = atan(q.z, q.x) + uT * .9 * pow(qr, -1.5);  // inner gas orbits faster, so the streaks shear
-            vec2 cs = vec2(cos(ang), sin(ang));
-            // streaks that follow the orbit: fine in radius, long along the circle (sampled on the circle: no seam)
-            float streak = noise3(vec3(qr * 7., cs * 1.4)) * .6 + noise3(vec3(qr * 19., cs * 3.)) * .3 + noise3(vec3(qr * 48., cs * 6.)) * .1;
-            float x = (qr - 2.45) / 9.55;
-            float profile = smoothstep(0., .035, x) * pow(1. - x, 2.6);   // a sharp, hot inner edge fading outward
-            vec3 orbit = normalize(vec3(-q.z, 0., q.x));
-            float beta = sqrt(.5 / qr);
-            float dop = 1. / (1. - beta * dot(orbit, -normalize(vel)));
-            float lum = profile * (.3 + 1.2 * streak) * pow(dop, 2.4) * 1.25;
-            float op = clamp(profile * (.6 + .9 * streak) * 1.6, 0., 1.);
-            col += (1. - a) * op * vec3(lum);
-            a += (1. - a) * op;
-            if (a > .985) break;
-          }
-        }
-        if (r2 > 2500.) break;
-      }
-      if (!fell) col += (1. - a) * sky(normalize(vel));
-      if (!fell) col += vec3(glow * .3) * (1. - a * .7);        // the shadow stays black: light that falls in never comes out
-      col += vec3(haze * .016) * (1. - a * .6);
-      col = 1. - exp(-col * 1.45);
-      col = pow(col, vec3(.92)) * vec3(1., .988, .965);           // the page's off-white
-      gl_FragColor = vec4(col, 1.);
-    }`;
-  const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; };
-  const prog = gl.createProgram();
-  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
-  gl.useProgram(prog);
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-  const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = (n) => gl.getUniformLocation(prog, n);
-  const uRes = U("uRes"), uT = U("uT"), uLook = U("uLook"), uZoom = U("uZoom");
-  // resolution follows the GPU: it starts a little under the screen's and steps down if frames run slow
-  let scale = Math.min(devicePixelRatio || 1, 1.5) * .8, slow = 0;
-  function size() {
-    const w = cv.clientWidth, h = cv.clientHeight;
-    cv.width = Math.max(2, Math.round(w * scale)); cv.height = Math.max(2, Math.round(h * scale));
-    gl.viewport(0, 0, cv.width, cv.height);
-    gl.uniform2f(uRes, cv.width, cv.height);
-    gl.uniform1f(uZoom, Math.min(2.5, Math.max(1.35, .95 * h / (.44 * w))));   // the disk fills about 90% of the width
-  }
-  size(); addEventListener("resize", size);
-  let look = [0, 0], want = [0, 0];
-  addEventListener("pointermove", (e) => { want = [(e.clientX / innerWidth - .5) * .12, (e.clientY / innerHeight - .5) * -.05]; }, { passive: true });
-  let on = true, last = 0, t0 = performance.now();
-  new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on && !reduce) requestAnimationFrame(frame); }).observe(cv);
-  function frame(now) {
-    const dt = now - (last || now); last = now;
-    if (dt > 30 && ++slow > 20 && scale > .35) { scale *= .85; slow = 0; size(); }
-    look = look.map((v, i) => v + (want[i] - v) * .05);
-    gl.uniform1f(uT, reduce ? 6 : (now - t0) / 1000);
-    gl.uniform2f(uLook, look[0], look[1]);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    if (on && !reduce) requestAnimationFrame(frame); else last = 0;
-  }
-  requestAnimationFrame(frame);
-})();
+// ---------------------------------------------------------------- the black hole shifts a touch with the mouse
+if (!reduce) {
+  const sky = document.getElementById("sky");
+  addEventListener("pointermove", (e) => {
+    sky.style.setProperty("--px", ((e.clientX / innerWidth - .5) * -14).toFixed(1) + "px");
+    sky.style.setProperty("--py", ((e.clientY / innerHeight - .5) * -9).toFixed(1) + "px");
+  }, { passive: true });
+}
 
 // ---------------------------------------------------------------- pixel art
 const SPRITES = {
