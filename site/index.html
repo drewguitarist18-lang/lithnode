@@ -14,14 +14,14 @@
 <meta name="theme-color" content="#08080a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
 <style>
   /* Space, black and white. One accent: white. One radius: 14px soft glass. */
   :root {
     --void: #08080a; --ink: #ecebe6; --soft: #b1b0aa; --faint: #74736e;
     --glass: rgba(236, 235, 230, .045); --glass-hi: rgba(236, 235, 230, .085); --edge: rgba(236, 235, 230, .13);
     --r: 14px;
-    --pixel: "Silkscreen", "Geist Mono", ui-monospace, monospace;
+    --pixel: "Pixelify Sans", "Geist Mono", ui-monospace, monospace;
     --mono: "Geist Mono", ui-monospace, Menlo, Consolas, monospace;
     color-scheme: dark;
   }
@@ -82,7 +82,7 @@
                         background: radial-gradient(closest-side, rgba(8,8,10,.6), rgba(8,8,10,.35) 55%, rgba(8,8,10,0)); }   /* readable over the bright disk */
   #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block; }
   h1 { font: 700 clamp(40px, 7.4vw, 92px)/1.02 var(--pixel); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
-  h1 .dim { color: #c9c8c2; font-weight: 400; }
+  h1 .dim { color: var(--ink); font-weight: 700; }
   .sub { color: #c4c3bd; max-width: 46ch; margin: 24px auto 32px; font-size: clamp(15.4px, 1.55vw, 17.5px); }
   .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   .fine { margin-top: 18px; color: var(--faint); font-size: 13.4px; }
