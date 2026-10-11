@@ -82,8 +82,9 @@
                         background: radial-gradient(closest-side, rgba(8,8,10,.6), rgba(8,8,10,.35) 55%, rgba(8,8,10,0)); }   /* readable over the bright disk */
   #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block; }
   h1 { font: 700 clamp(40px, 7.4vw, 92px)/1.02 var(--pixel); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
-  /* the headline: a clean sans; the pixel face stays for section titles, the logo and the bots */
-  .hero h1, .hero h1 .dim { font-family: "Geist", system-ui, sans-serif; font-weight: 400; letter-spacing: -0.035em; }
+  /* the headline: a clean sans line over a pixel line; the pixel face stays for section titles, the logo and the bots */
+  .hero h1 { font-family: "Geist", system-ui, sans-serif; font-weight: 400; letter-spacing: -0.035em; }
+  .hero h1 .dim { font-family: var(--pixel); font-weight: 600; letter-spacing: 0; font-size: .92em; }   /* the pixel line */
   .hero h1 { font-size: clamp(42px, 6.4vw, 84px); line-height: 1.05; }
   h1 .dim { color: var(--ink); font-weight: 700; }
   .sub { color: #c4c3bd; max-width: 46ch; margin: 24px auto 32px; font-size: clamp(15.4px, 1.55vw, 17.5px); }
