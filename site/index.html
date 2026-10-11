@@ -109,7 +109,8 @@
                  mask-image: radial-gradient(ellipse 75% 70% at 50% 55%, #000 55%, transparent); }
   .live .wrap { position: relative; padding-top: 56px; text-align: center; pointer-events: none; }
   .live h2 { margin-bottom: 8px; }
-  h2 { font: 700 clamp(28px, 3.8vw, 44px)/1.08 var(--pixel); margin: 0 0 14px; letter-spacing: -.01em; text-wrap: balance; }
+  h2 { font: 400 clamp(30px, 4.2vw, 50px)/1.08 "Geist", system-ui, sans-serif; margin: 0 0 14px; letter-spacing: -.035em; text-wrap: balance; }
+  h2 .px, h3 .px { font-family: var(--pixel); font-weight: 600; letter-spacing: 0; font-size: 1.1em; line-height: 1; }   /* the key word, in pixels */
   .lead { color: var(--soft); max-width: 60ch; margin: 0; }
   .center { text-align: center; } .center .lead { margin-inline: auto; }
 
@@ -277,12 +278,12 @@
 
 <section class="live" id="live" aria-label="A run, drawn live">
   <canvas id="flowCanvas" aria-hidden="true"></canvas>
-  <div class="wrap"><h2 class="rv">One job. A whole team on it.</h2>
+  <div class="wrap"><h2 class="rv">One job. A whole <span class="px">team</span> on it.</h2>
     <p class="lead rv">Three agents split the rows, a checker verifies every part, and it waits for you before it ships.</p></div>
 </section>
 
 <section id="film"><div class="wrap center">
-  <h2 class="rv">Watch one run, start to finish.</h2>
+  <h2 class="rv">Watch one run, start to <span class="px">finish.</span></h2>
   <p class="lead rv">A 100,000-row job, split three ways, checked, then shipped with gh. 31 seconds.</p>
   <div class="film glass rv"><div class="frame">
     <video id="video" src="media/lithnode-film.mp4" poster="media/film-poster.jpg" playsinline preload="metadata"></video>
@@ -299,7 +300,7 @@
 </div></section>
 
 <section id="how"><div class="wrap">
-  <h2 class="rv">Three moves.</h2>
+  <h2 class="rv">Three <span class="px">moves.</span></h2>
   <div class="rows">
     <div class="row rv"><b>Draw</b><p>Drop in bots, give each team a job, its command-line tools and connectors, and wire them up. Or describe the team in one line and it gets drawn for you.</p></div>
     <div class="row rv"><b>Run</b><p>Every agent is a real Claude Code, Codex or Cursor session on your machine. Watch each one work, live, in the folder you picked.</p></div>
@@ -308,7 +309,7 @@
 </div></section>
 
 <section id="features"><div class="wrap">
-  <h2 class="rv">What a team gets.</h2>
+  <h2 class="rv">What a team <span class="px">gets.</span></h2>
   <div class="bento">
     <div class="cell wide glass rv">
       <div class="parts" aria-hidden="true">
@@ -327,7 +328,7 @@
 </div></section>
 
 <section id="download"><div class="wrap">
-  <h2 class="rv">Download.</h2>
+  <h2 class="rv"><span class="px">Download.</span></h2>
   <p class="lead rv">Free and MIT licensed. Needs Claude Code, Codex or Cursor installed and signed in.</p>
   <div class="dl glass rv">
     <a class="os" data-os="win" href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/LithnodeSetup.exe"><b><svg class="os-i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8.4v8.4H3zM12.6 3H21v8.4h-8.4zM3 12.6h8.4V21H3zM12.6 12.6H21V21h-8.4z"/></svg>Windows</b><span>LithnodeSetup.exe, Windows 10 or 11</span><em>Download</em></a>
