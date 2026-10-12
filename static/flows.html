@@ -1532,6 +1532,9 @@ $("canvas").addEventListener("mousedown", (e) => {
 });
 window.addEventListener("mousemove", (e) => {
   if (!drag) return;
+  // the button came up where we never heard it (over the title bar, outside the window): end the drag here
+  if (!(e.buttons & 1)) return endDrag(e);
+  drag.last = e;
   if (drag.kind === "pan") { view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; applyView(); }
   else if (drag.kind === "node") {
     const n = nodeById(drag.id), p = toWorld(e.clientX, e.clientY);
@@ -1546,8 +1549,12 @@ window.addEventListener("mousemove", (e) => {
     renderWires();
   }
 });
-window.addEventListener("mouseup", (e) => {
+window.addEventListener("mouseup", (e) => endDrag(e));
+window.addEventListener("blur", () => endDrag());
+document.addEventListener("dragstart", (e) => { if (drag) e.preventDefault(); });   // a native drag would swallow the mouseup
+function endDrag(e) {
   if (!drag) return;
+  e = e || drag.last || { clientX: -1, clientY: -1 };
   const d = drag; drag = null; $("canvas").classList.remove("panning");
   if (d.kind === "node" && d.moved) {
     if (flow.auto !== false) { flow.auto = false; toast("Auto-arrange is off for this flow, so your layout stays. Turn it back on any time."); }
@@ -1562,7 +1569,7 @@ window.addEventListener("mouseup", (e) => {
     else renderWires();
     if (d.detached) { changed(); if (!target) toast("Disconnected."); }   // the pulled-off wire is gone for good
   }
-});
+}
 // right-click menus: on a node, on a wire, or on empty canvas
 $("canvas").addEventListener("contextmenu", (e) => {
   e.preventDefault();
