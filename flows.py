@@ -425,12 +425,14 @@ def merge_items(lists):
     return [merged[k] for k in order][:MAX_ITEMS]
 
 
-ITEMS_NOTE = ('If your stage produces or judges a list of things (parts of a job, records, ideas, leads, options), also put the list '
+ITEMS_NOTE = ('Only if your stage produces or judges a list of things (parts of a job, records, ideas, leads, options), also put the list '
               'in your REPORT as a fenced block that starts with ```items and holds a JSON array, one object per thing: '
               '{"title", "subtitle", "price", "rating" (0-5), "url", "image" (a direct https image URL, only if you found one), '
               '"facts" {"short label": "value"}, "verdict" ("pass" or "cut", only when your job is to judge them), '
               '"reason" (a few words)}. When you judge a list, return every thing you were given. At most '
-              f'{MAX_ITEMS} things; the block doesn\'t count toward the word limit.')
+              f'{MAX_ITEMS} things; the block doesn\'t count toward the word limit.'
+              'Never use it for bugs, findings, issues or review comments: write those in plain sentences in your REPORT, '
+              'most important first.')
 
 
 # ----------------------------------------------------------------- templates
@@ -1127,9 +1129,13 @@ class Run:
         if node.get("mode") != "summarize" or not handoff:
             st["output"], st["status"] = handoff, "done"
             return
-        system = ("You merge reports from several AI agents into one handoff for the next stage. Remove "
-                  "duplicates, keep every concrete finding (with file names), drop filler. End with a section "
-                  "starting with \"REPORT:\" containing the merged handoff, under 400 words.")
+        system = ("You merge reports from several AI agents into one short handoff that a busy person can read in a minute. "
+                  "Write plain sentences, no jargon, no confidence percentages, no tables. Start with one line: the "
+                  "bottom line (what you'd do first, or whether it's good to go). Then the 5 things that matter most, "
+                  "most important first, each as one or two sentences: what's wrong or found, why it matters, and the "
+                  "file where it lives. Merge duplicates. Put everything minor into one last line starting \"Also:\". "
+                  "Keep concrete details like file names. Don't repeat the reports' own headings. End with a section "
+                  "starting with \"REPORT:\" containing the handoff, under 250 words.")
         rec = self._agent(node, st, "Merger", model=node.get("model", SUMMARY_MODEL), effort="low", tools="none",
                           system=system, prompt=f"# Task\n{self.task}\n\n# Reports\n{handoff}",
                           shape="muse", color="#8d93a8")

@@ -102,7 +102,7 @@ def report_of(text, limit):
     text = (text or "").strip()
     marker = text.upper().rfind("REPORT:")
     if marker >= 0:
-        text = text[marker + len("REPORT:"):].strip()
+        text = text[marker + len("REPORT:"):].lstrip("*_ 	").strip()   # "**REPORT:**" leaves its closing ** behind
     return text if len(text) <= limit else text[:limit].rstrip() + "\n[...cut to save credits]"
 
 

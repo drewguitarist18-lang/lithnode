@@ -669,6 +669,23 @@
   .rp-agent > .doc { padding: 0 18px 14px; background: var(--pad); border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; }
   @media (max-width: 860px) { .rp-body { grid-template-columns: 1fr; } .rp-nav { display: none; } .rp-main { padding: 16px 16px 50px; }
     .rp-top { padding: 10px 16px; flex-wrap: wrap; } .rp-top .tools { width: 100%; } .rp-top .tools button { flex: 1; } .rp-sec > .doc { padding: 4px 16px 18px; } .rp-stage { padding: 4px 16px 8px; } }
+  /* the result page reads like a document, not a terminal: plain type for sentences, mono stays for code */
+  html body .rp-main .doc, html body .rp-main .doc :where(p, li, h1, h2, h3, h4, b, i, td, th, a, strong, em) { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  html body .rp-main .doc code, html body .rp-main .doc pre, html body .rp-main .doc pre * { font-family: var(--mono); }
+  .rp-bottom { border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, var(--pad));
+               border-radius: 16px; padding: 16px 22px; margin-bottom: 18px; }
+  .rp-bottom small { display: block; color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; margin-bottom: 5px; }
+  .rp-bottom p { margin: 0; font-size: 17px; line-height: 1.5; font-weight: 600; }
+  html body .rp-bottom p { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .finds { display: grid; gap: 10px; padding: 14px 24px 8px; }
+  .rfind { display: grid; grid-template-columns: 30px 1fr; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .rfind > i { font-style: normal; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 13px;
+              background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+  .rfind .doc { padding: 0; font-size: 14.5px; } .rfind .doc > :first-child { margin-top: 0; } .rfind .doc p { margin: 0; }
+  .rfind .doc b:first-child { display: block; font-size: 15.5px; margin-bottom: 3px; }
+  .rp-more { padding: 6px 24px 20px; color: var(--muted); }
+  .rp-more .doc { font-size: 13.5px; color: var(--muted); padding: 0; }
+  @media (max-width: 860px) { .finds, .rp-more { padding-left: 14px; padding-right: 14px; } }
   /* readable documents: used by the result page and report previews */
   .doc { font-size: 14px; line-height: 1.65; color: var(--ink); word-break: break-word; }
   .doc h1, .doc h2, .doc h3, .doc h4 { line-height: 1.3; margin: 1.3em 0 .45em; text-transform: none; letter-spacing: normal; color: var(--ink); font-weight: 650; }
@@ -845,7 +862,7 @@
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
-function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML.replace(/"/g, "&quot;"); }   // quotes too: esc() also fills attributes
 const theme = {};
 function readTheme() { for (const n of ["muted", "waiting", "running", "done", "failed", "approval"]) theme[n] = getComputedStyle(document.documentElement).getPropertyValue("--" + n).trim(); }
 readTheme(); matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTheme);
@@ -2321,13 +2338,36 @@ function downloadResult(r) {
   a.href = url; a.download = (r.flow_name || "result").replace(/[^\w -]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() + ".md";
   a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+// The final result as a short read: bottom line up top, numbered points as cards, the rest underneath.
+function resultView(text) {
+  let t = String(text || "").trim(), bottom = "";
+  t = t.replace(/^[ 	]*(?:\*\*)?Bottom line:?(?:\*\*)?:?[ 	]*(.+)$/im, (_, line) => { bottom = line.replace(/\*\*/g, "").trim(); return ""; }).trim();
+  const lines = t.split("\n"), items = [], head = [], tail = [];
+  let cur = null, seenList = false;
+  for (const ln of lines) {
+    const m = /^\s*(\d+)[.)]\s+(.*)$/.exec(ln);
+    if (m) { cur = [m[2]]; items.push(cur); seenList = true; }
+    else if (cur && /^\s+\S/.test(ln)) cur.push(ln.trim());   // a wrapped line belongs to the point above
+    else if (cur && !ln.trim()) cur = cur;                     // a blank line inside the list
+    else { cur = null; (seenList ? tail : head).push(ln); }
+  }
+  const lead = bottom ? `<div class="rp-bottom"><small>The short version</small><p>${md(bottom).replace(/^<p>|<\/p>$/g, "")}</p></div>` : "";
+  if (items.length < 2) return lead + `<section class="rp-sec" id="rp-result"><h3>Result<span class="grow"></span><button id="sheetCopy">Copy</button></h3><div class="doc">${md(t || "No result yet.")}</div></section>`;
+  const intro = head.join("\n").trim(), more = tail.join("\n").trim();
+  return lead + `<section class="rp-sec" id="rp-result"><h3>What matters, in order<span class="grow"></span><button id="sheetCopy">Copy</button></h3>`
+    + (intro ? `<div class="doc" style="padding:6px 24px 0">${md(intro)}</div>` : "")
+    + `<div class="finds">${items.map((it, i) => `<div class="rfind"><i>${i + 1}</i><div class="doc">${md(it.join(" "))}</div></div>`).join("")}</div>`
+    + (more ? `<div class="rp-more"><div class="doc">${md(more)}</div></div>` : "") + `</section>`;
+}
 function openSheet(r) {
   const m = runMeta(r), ok = r.status === "done", stages = reportStages(r);
   const nReports = stages.reduce((n, g) => n + g.agents.length, 0);
   const nav = [], body = [];
   nav.push(`<h5>Result</h5><a href="#rp-result">Summary</a><div id="rpToc"></div>`);
-  body.push(`<section class="rp-sec" id="rp-result"><h3>Result<span class="grow"></span><button id="sheetCopy">Copy</button></h3>
-    <div class="doc">${md(r.final || "No result yet.")}</div></section>`);
+  body.push(`<div class="rp-stats"><div><small>Took</small><b>${dur(m.took)}</b></div><div><small>Agents</small><b>${m.agents}</b></div>
+    <div><small>Steps</small><b>${m.fin} of ${m.states.length}</b></div>${r.cost ? `<div><small>Usage</small><b>$${Number(r.cost).toFixed(2)}</b></div>` : ""}
+    <div><small>Worked in</small><b class="path" title="${esc(r.folder || "")}">${esc((r.folder || "its own folder").split(/[\/]/).filter(Boolean).pop() || r.folder || "its own folder")}</b></div></div>`);
+  body.push(resultView(r.final));
   const lastItems = itemNodes(r).pop();
   if (lastItems) {
     const its = r.nodes[lastItems.id].items;
