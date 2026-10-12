@@ -148,6 +148,7 @@ class Agent:
         self.text = ""
         self.error = None
         self.cost = 0.0
+        self.tokens = 0   # everything the session read and wrote, as Claude Code counts it
         self.turns = 0
         self.proc = None
         self.stopped = False
@@ -253,6 +254,8 @@ class Agent:
         if final:
             self.cost = float(final.get("total_cost_usd") or 0)
             self.turns = int(final.get("num_turns") or 0)
+            use = final.get("usage") if isinstance(final.get("usage"), dict) else {}
+            self.tokens = sum(int(use.get(k) or 0) for k in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
             result = final.get("result") if isinstance(final.get("result"), str) else ""
             if final.get("is_error") or str(final.get("subtype", "")).startswith("error"):
                 self.error = self.error or result or str(final.get("subtype")) or "Claude Code reported an error."

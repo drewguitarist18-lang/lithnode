@@ -2230,6 +2230,7 @@ function ago(t) { const s = Math.max(0, Date.now() / 1000 - t); return s < 60 ? 
 
 let lastPanel = "";
 const STATUS_WORD = { running: "Running", waiting: "Waiting for you", done: "Finished", failed: "Failed", stopped: "Stopped", interrupted: "Interrupted" };
+function tokenWord(n) { return n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n); }
 function dur(sec) { sec = Math.max(0, Math.round(sec)); return sec < 60 ? `${sec}s` : sec < 3600 ? `${Math.floor(sec / 60)}m ${sec % 60}s` : `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`; }
 function runMeta(r) {
   const states = Object.values(r.nodes), fin = states.filter((x) => ["done", "failed", "stopped", "skipped"].includes(x.status)).length;
@@ -2365,8 +2366,8 @@ function openSheet(r) {
   const nav = [], body = [];
   nav.push(`<h5>Result</h5><a href="#rp-result">Summary</a><div id="rpToc"></div>`);
   body.push(`<div class="rp-stats"><div><small>Took</small><b>${dur(m.took)}</b></div><div><small>Agents</small><b>${m.agents}</b></div>
-    <div><small>Steps</small><b>${m.fin} of ${m.states.length}</b></div>${r.cost ? `<div><small>Usage</small><b>$${Number(r.cost).toFixed(2)}</b></div>` : ""}
-    <div><small>Worked in</small><b class="path" title="${esc(r.folder || "")}">${esc((r.folder || "its own folder").split(/[\/]/).filter(Boolean).pop() || r.folder || "its own folder")}</b></div></div>`);
+    <div><small>Steps</small><b>${m.fin} of ${m.states.length}</b></div>${r.tokens ? `<div><small>Tokens</small><b>${tokenWord(r.tokens)}</b></div>` : ""}
+    <div><small>Worked in</small><b class="path" title="${esc(r.folder || "")}">${esc((r.folder || "its own folder").split(/[\\/]/).filter(Boolean).pop() || "its own folder")}</b></div></div>`);
   body.push(resultView(r.final));
   const lastItems = itemNodes(r).pop();
   if (lastItems) {

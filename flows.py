@@ -779,12 +779,16 @@ class Run:
     def cost(self):
         return round(sum(a["cost"] for s in self.nodes.values() for a in s["agents"]), 4)
 
+    @property
+    def tokens(self):
+        return sum(a.get("tokens", 0) for s in self.nodes.values() for a in s["agents"])
+
     def snapshot(self):
         with self.lock:
             return {
                 "id": self.id, "flow_id": self.flow["id"], "flow_name": self.flow["name"], "flow": self.flow,
                 "task": self.task, "folder": str(self.folder), "status": self.status, "started": self.started,
-                "ended": self.ended, "cost": self.cost, "brief": self.brief, "log": list(self.log),
+                "ended": self.ended, "cost": self.cost, "tokens": self.tokens, "brief": self.brief, "log": list(self.log),
                 "nodes": json.loads(json.dumps(self.nodes)),
                 "final": self.final_output(),
             }
@@ -1016,7 +1020,7 @@ class Run:
             rec.update(status="done" if ok else ("stopped" if agent.stopped else "failed"),
                        report=agents.report_of(strip_items(agent.text), REPORT_LIMIT) if ok else "",
                        items=parse_items(agent.text) if ok else [],
-                       error=agent.error or "", cost=round(agent.cost, 4), turns=agent.turns,
+                       error=agent.error or "", cost=round(agent.cost, 4), tokens=agent.tokens, turns=agent.turns,
                        step=agent.step, ended=time.time())
         self.changed(force=True)
         return rec
