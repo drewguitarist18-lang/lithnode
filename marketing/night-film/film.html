@@ -1,0 +1,459 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Lithnode Night Film</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>html,body{margin:0;background:#08080a}canvas{display:block;width:100vw;height:auto}</style></head>
+<body><canvas id="cv" width="1920" height="1080"></canvas>
+<script>
+// A 30-second film of the real app and site: footage/*.mp4 recorded by capture.js, composited over the night sky.
+// render.js serves the repo, calls renderFrame(t) for each of 900 frames, then renderAudio() for the score.
+// Open film.html?t=12.5 for a still of any moment.
+const W = 1920, H = 1080, LENGTH = 30;
+const cv = document.getElementById("cv"), g = cv.getContext("2d");
+const C = { void: "#08080a", ink: "#ecebe6", soft: "#b1b0aa", faint: "#74736e" };
+const F = { pix: "'Pixelify Sans', monospace", mono: "'Geist Mono', ui-monospace, monospace" };
+const LOGO = [".##..........##.", "#.#..........#.#", "###..........###", ".#............#.", ".#............#.", ".##.########.##.", "..############..", "..##.######.##..", "..############..", "...##########...", "...#.#....#.#...", "...#.#....#.#...", "..##.##..##.##.."];
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const span = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const lerp = (a, b, k) => a + (b - a) * k;
+const eio = (k) => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const eout = (k) => 1 - Math.pow(1 - k, 3);
+const back = (k) => { const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function rr(x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+function text(s, x, y, font, color, align = "center", alpha = 1) { g.save(); g.globalAlpha *= alpha; g.font = font; g.fillStyle = color; g.textAlign = align; g.textBaseline = "alphabetic"; g.fillText(s, x, y); g.restore(); }
+
+// ============================================================================ footage
+// each scene plays one clip: `map` is [film time, clip time] knots (sped up between them), `cam` is [film time, centre x, centre y, zoom]
+const SCENES = [
+  { id: "describe", clip: "describe", t0: 2.8, t1: 8, map: [[3, 2.2], [6, 8.3], [8, 15.6]],
+    cam: [[2.8, 960, 290, 1.9], [5.7, 960, 290, 1.9], [6.6, 960, 540, 1.0], [8, 960, 560, 1.08]],
+    cap: ["Describe the team.", "One line in. A flow of agents out."] },
+  { id: "run", clip: "run", t0: 8, t1: 14, map: [[8, 2.6], [9.6, 11.0], [14, 29.6]],
+    cam: [[8, 960, 560, 1.18], [9.5, 960, 560, 1.18], [10.4, 800, 560, 1.3], [14, 790, 560, 1.38]],
+    cap: ["Hit run. They split the work.", "Real Claude Code, Codex and Cursor sessions, on your machine."] },
+  { id: "office", clip: "office", t0: 14, t1: 18, map: [[14, 18.0], [18, 24.0]],
+    cam: [[14, 930, 330, 1.62], [18, 940, 300, 1.86]],
+    cap: ["Watch every agent work.", "The Office shows each session, live."] },
+  { id: "approve", clip: "run", t0: 18, t1: 22, map: [[18, 30.6], [20.6, 33.95], [21.15, 41.6], [21.25, 43.2], [22, 45.7]],
+    cam: [[18, 1420, 430, 1.9], [20.55, 1480, 400, 2.25], [20.95, 960, 540, 1.0], [21.24, 960, 540, 1.0], [21.25, 960, 520, 1.0], [22, 1000, 440, 1.14]],
+    cap: ["Nothing ships without your go.", "Approve, reject, or leave a note for the next stage."] },
+  { id: "site", clip: "site", t0: 22, t1: 26.3, map: [[22, .3], [23.4, 1.7], [26, 9.3]],
+    cam: [[22, 960, 540, 1.0]], browser: true,
+    cap: ["Free. Local. Yours.", "MIT licensed · no telemetry · runs on your own Claude Code"] },
+];
+const CLIPS = ["describe", "run", "office", "site"];
+const vids = {}, logs = {};
+function mapTime(m, t) {
+  if (t <= m[0][0]) return m[0][1];
+  for (let i = 1; i < m.length; i++) if (t <= m[i][0]) return lerp(m[i - 1][1], m[i][1], (t - m[i - 1][0]) / (m[i][0] - m[i - 1][0]));
+  return m[m.length - 1][1];
+}
+function rateAt(m, t) { for (let i = 1; i < m.length; i++) if (t <= m[i][0]) return (m[i][1] - m[i - 1][1]) / (m[i][0] - m[i - 1][0]); return 1; }
+function camAt(c, t) {
+  if (t <= c[0][0]) return c[0].slice(1);
+  for (let i = 1; i < c.length; i++) if (t <= c[i][0]) { const k = eio((t - c[i - 1][0]) / (c[i][0] - c[i - 1][0])); return [1, 2, 3].map((j) => lerp(c[i - 1][j], c[i][j], k)); }
+  return c[c.length - 1].slice(1);
+}
+// the part of the 1920x1080 recording the camera sees
+function crop(cam) {
+  const [cx, cy, z] = cam, sw = W / z, sh = H / z;
+  return { sx: clamp(cx - sw / 2, 0, W - sw), sy: clamp(cy - sh / 2, 0, H - sh), sw, sh };
+}
+// pointer and clicks from the capture log, as film-time events (for the cursor's ripples and the sound)
+const EVENTS = [];
+function buildEvents() {
+  for (const s of SCENES) {
+    const L = logs[s.clip] || [];
+    for (const e of L) {
+      if (e.kind !== "down" && e.kind !== "key") continue;
+      for (let i = 1; i < s.map.length; i++) {
+        const [fa, ca] = s.map[i - 1], [fb, cb] = s.map[i];
+        if (e.t >= ca && e.t < cb) { const ft = fa + (e.t - ca) / (cb - ca) * (fb - fa); if (ft >= s.t0 && ft < s.t1) EVENTS.push({ ft, kind: e.kind, clip: s.clip, x: e.x, y: e.y }); }
+      }
+    }
+  }
+  EVENTS.sort((a, b) => a.ft - b.ft);
+}
+function pointerAt(clip, t) {
+  const L = (logs[clip] || []).filter((e) => e.kind === "move" || e.kind === "down");
+  if (!L.length || t < L[0].t - .4) return null;
+  let i = 0; while (i + 1 < L.length && L[i + 1].t <= t) i++;
+  const a = L[i], b = L[i + 1];
+  if (b && t > a.t && b.t - a.t < .1) { const k = (t - a.t) / (b.t - a.t); return [lerp(a.x, b.x, k), lerp(a.y, b.y, k)]; }
+  return [a.x, a.y];
+}
+
+// ============================================================================ the night sky
+const rnd = mulberry(18);
+const STARS = Array.from({ length: 520 }, () => ({ x: rnd() * W, y: rnd() * H, r: rnd() < .08 ? 1.6 + rnd() : .5 + rnd() * .8, a: .25 + rnd() * .7, f: .5 + rnd() * 2.5, p: rnd() * 7, d: .2 + rnd() }));
+const grain = (() => {
+  const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), im = x.createImageData(256, 256), r = mulberry(4);
+  for (let i = 0; i < im.data.length; i += 4) { const v = r() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
+  x.putImageData(im, 0, 0); return c;
+})();
+function sky(t) {
+  g.fillStyle = C.void; g.fillRect(0, 0, W, H);
+  const neb = (x, y, r, col, a) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, col.replace("A", a)); gr.addColorStop(1, col.replace("A", 0)); g.fillStyle = gr; g.fillRect(0, 0, W, H); };
+  neb(380 + Math.sin(t * .11) * 60, 180, 900, "rgba(60,80,150,A)", .16);
+  neb(1600 + Math.cos(t * .09) * 50, 900, 1000, "rgba(110,70,160,A)", .14);
+  neb(1100, 120, 600, "rgba(150,110,90,A)", .05);
+  for (const s of STARS) {
+    const x = (s.x - t * 6 * s.d + W) % W, tw = .55 + .45 * Math.sin(t * s.f + s.p);
+    g.globalAlpha = s.a * tw; g.fillStyle = s.r > 1.5 ? "#dfe6ff" : C.ink;
+    g.fillRect(x, s.y, s.r, s.r);
+  }
+  g.globalAlpha = 1;
+}
+const bh = document.createElement("video");
+function hush(y, r, a) {   // a soft dark pool so type reads over the bright disk
+  const gr = g.createRadialGradient(W / 2, y, 0, W / 2, y, r);
+  gr.addColorStop(0, `rgba(8,8,10,${a})`); gr.addColorStop(.55, `rgba(8,8,10,${a * .7})`); gr.addColorStop(1, "rgba(8,8,10,0)");
+  g.save(); g.translate(W / 2, y); g.scale(1.5, 1); g.translate(-W / 2, -y); g.fillStyle = gr; g.fillRect(-W, 0, W * 3, H); g.restore();
+}
+function blackHole(t, src, alpha, scale = 1) {   // the site's ray-traced black hole, 1920x1200, cropped to the frame
+  if (alpha <= 0) return;
+  g.save(); g.globalAlpha = alpha; g.translate(W / 2, H / 2); g.scale(scale, scale);
+  g.drawImage(bh, 0, 60, 1920, 1080, -W / 2, -H / 2, W, H); g.restore();
+}
+
+// ============================================================================ pieces
+function crab(cx, top, cell, t, from, spread, seed = 7) {   // Lithnode's logo; each pixel pops in on its own beat
+  const r = mulberry(seed), w = LOGO[0].length * cell, x0 = cx - w / 2;
+  g.save(); g.shadowColor = "rgba(236,235,230,.55)"; g.shadowBlur = cell * 1.6;
+  LOGO.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch !== "#") return;
+    const at = from + r() * spread, k = span(t, at, at + .22);
+    if (k <= 0) return;
+    const s = back(k), x = x0 + i * cell + cell / 2, y = top + j * cell + cell / 2;
+    g.globalAlpha = Math.min(1, k * 2); g.fillStyle = k < 1 ? "#ffffff" : C.ink;
+    g.fillRect(x - cell * s / 2, y - cell * s / 2, cell * s, cell * s);
+  }));
+  g.restore();
+}
+function crabPops(from, spread, seed = 7) { const r = mulberry(seed), out = []; LOGO.forEach((row) => [...row].forEach((ch) => { if (ch === "#") out.push(from + r() * spread); })); return out; }
+function caption(t, s, big, small) {   // words rise in, one after another, then fade before the cut
+  const tin = s.t0 + .2, out = 1 - span(t, s.t1 - .35, s.t1 - .05);
+  if (t < tin || out <= 0) return;
+  g.save(); g.font = `600 58px ${F.pix}`;
+  const words = big.split(" "), widths = words.map((w) => g.measureText(w + " ").width), total = widths.reduce((a, b) => a + b, 0) - g.measureText(" ").width;
+  let x = W / 2 - total / 2;
+  words.forEach((w, i) => {
+    const k = eout(span(t, tin + i * .06, tin + i * .06 + .4));
+    text(w, x, 112 + (1 - k) * 22, `600 58px ${F.pix}`, C.ink, "left", k * out); x += widths[i];
+  });
+  const k2 = eout(span(t, tin + .35, tin + .8));
+  text(small, W / 2, 158 + (1 - k2) * 10, `400 22px ${F.mono}`, C.soft, "center", k2 * out);
+  g.restore();
+}
+function cursor(x, y, s, press) {
+  g.save(); g.translate(x, y); g.scale(s * (press ? .86 : 1), s * (press ? .86 : 1));
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 22); g.lineTo(5.5, 17); g.lineTo(9.5, 26); g.lineTo(13, 24.5); g.lineTo(9, 16); g.lineTo(16, 16); g.closePath();
+  g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 6; g.shadowOffsetY = 2;
+  g.fillStyle = "#fff"; g.fill(); g.shadowColor = "transparent"; g.lineWidth = 1.4; g.strokeStyle = "#111"; g.stroke(); g.restore();
+}
+const WIN = { x: 210, y: 196, w: 1500, h: 844 };
+// one window of footage: the clip, cropped by the camera, with its cursor and click ripples on top
+function footageWindow(s, t, { scale = 1, alpha = 1, dy = 0 } = {}) {
+  const v = vids[s.clip], cam = camAt(s.cam, t), c = crop(cam), ct = mapTime(s.map, t);
+  let { x, y, w, h } = WIN; const bar = s.browser ? 46 : 0;
+  if (s.browser) { w = 1400; h = 788 + bar; x = (W - w) / 2; y = 1040 - h; }
+  y += dy + Math.sin(t * .7) * 3;
+  g.save(); g.globalAlpha = alpha;
+  g.translate(x + w / 2, y + h / 2); g.scale(scale, scale); g.translate(-(x + w / 2), -(y + h / 2));
+  // shadow and a faint starlight rim
+  g.save(); rr(x, y, w, h, 16); g.shadowColor = "rgba(0,0,0,.75)"; g.shadowBlur = 90; g.shadowOffsetY = 34; g.fillStyle = "#0b0b0e"; g.fill();
+  g.shadowColor = "rgba(170,185,255,.16)"; g.shadowBlur = 50; g.shadowOffsetY = 0; g.fill(); g.restore();
+  g.save(); rr(x, y, w, h, 16); g.clip();
+  if (s.browser) {
+    g.fillStyle = "#151518"; g.fillRect(x, y, w, bar);
+    ["#ff5f57", "#febc2e", "#28c840"].forEach((col, i) => { g.fillStyle = col; g.beginPath(); g.arc(x + 26 + i * 22, y + bar / 2, 6.5, 0, 7); g.fill(); });
+    rr(x + w / 2 - 230, y + 10, 460, bar - 20, 13); g.fillStyle = "#0b0b0e"; g.fill();
+    text("lithnode.com", x + w / 2, y + bar / 2 + 6, `500 17px ${F.mono}`, C.soft);
+    g.fillStyle = "#26262b"; g.fillRect(x, y + bar - 1, w, 1);
+  }
+  g.drawImage(v, c.sx, c.sy, c.sw, c.sh, x, y + bar, w, h - bar);
+  // the pointer, mapped through the camera
+  const toWin = (px, py) => [x + (px - c.sx) / c.sw * w, y + bar + (py - c.sy) / c.sh * (h - bar)];
+  for (const e of EVENTS) {
+    if (e.clip !== s.clip || e.kind !== "down" || t < e.ft || t > e.ft + .55) continue;
+    const k = (t - e.ft) / .55, [rx, ry] = toWin(e.x, e.y);
+    g.beginPath(); g.arc(rx, ry, 8 + eout(k) * 46, 0, 7); g.strokeStyle = `rgba(236,235,230,${.75 * (1 - k)})`; g.lineWidth = 3 * (1 - k) + 1; g.stroke();
+  }
+  const p = pointerAt(s.clip, ct);
+  if (p) {
+    const pressed = EVENTS.some((e) => e.clip === s.clip && e.kind === "down" && t >= e.ft && t < e.ft + .1);
+    const [px, py] = toWin(...p); cursor(px, py, clamp(.9 + cam[2] * .35, 1.2, 1.7), pressed);
+  }
+  g.restore();
+  rr(x + .5, y + .5, w - 1, h - 1, 16); g.strokeStyle = "rgba(236,235,230,.16)"; g.lineWidth = 1; g.stroke();
+  // honest about time-lapse
+  const rate = rateAt(s.map, t);
+  if (rate > 1.4 && t > s.t0 + .1) {
+    const label = `${rate < 10 ? rate.toFixed(rate < 3 ? 1 : 0) : Math.round(rate)}× speed`;
+    g.font = `500 15px ${F.mono}`; const tw = g.measureText(label).width + 26;
+    rr(x + w - tw - 18, y + h - 48, tw, 30, 15); g.fillStyle = "rgba(8,8,10,.78)"; g.fill(); g.strokeStyle = "rgba(236,235,230,.18)"; g.stroke();
+    text(label, x + w - 18 - tw / 2, y + h - 28, `500 15px ${F.mono}`, C.soft);
+  }
+  g.restore();
+}
+
+// ============================================================================ scenes
+function open(t) {   // 0–3: the black hole, the crab assembling, the name
+  if (t > 3.2) return;
+  const out = span(t, 2.6, 3.1), sc = 1 + eio(out) * .18;
+  blackHole(t, t, .62 * span(t, 0, 1.1) * (1 - out), 1.06 - t * .015);
+  hush(560, 520, .55 * (1 - out));
+  g.save(); g.globalAlpha = 1 - eio(out); g.translate(W / 2, 470); g.scale(sc, sc); g.translate(-W / 2, -470);
+  crab(W / 2, 236, 14, t, .2, .95);
+  const word = "Lithnode", font = `700 140px ${F.pix}`; g.font = font;
+  const full = g.measureText(word).width; let x = W / 2 - full / 2;
+  [...word].forEach((ch, i) => {
+    const at = 1.05 + i * .06, k = span(t, at, at + .12);
+    if (k > 0) text(ch, x, 590, font, k < 1 ? "#ffffff" : C.ink, "left", k);
+    x += g.measureText(ch).width;
+  });
+  const k = eout(span(t, 1.75, 2.2));
+  text("Your AI team. Managed.", W / 2, 668 + (1 - k) * 14, `500 42px ${F.pix}`, C.soft, "center", k);
+  g.restore();
+}
+function scenes(t) {
+  for (const s of SCENES) {
+    if (t < s.t0 || t >= s.t1) continue;
+    let o = {};
+    if (s.id === "describe") { const k = eout(span(t, 2.8, 3.35)); o = { dy: (1 - k) * 260, scale: .88 + .12 * k, alpha: k }; }
+    else if (s.id === "site") { const k = eio(span(t, 25.75, 26.3)); o = { scale: 1 - .1 * k, alpha: 1 - k }; }
+    else { const k = eout(span(t, s.t0, s.t0 + .3)); o = { scale: 1.025 - .025 * k }; }
+    footageWindow(s, t, o);
+    if (s.id !== "site" || t < 25.9) caption(t, s, ...s.cap);
+  }
+}
+function endCard(t) {   // 26–30
+  if (t < 25.8) return;
+  const a = span(t, 25.8, 26.6);
+  blackHole(t, t, .8 * a, 1.12 - (t - 26) * .02);
+  hush(560, 640, .78 * a);
+  const fade = 1 - span(t, 29.4, 30);
+  g.save(); g.globalAlpha = fade;
+  crab(W / 2, 214, 11, t, 26.05, .5, 11);
+  const k1 = eout(span(t, 26.35, 26.8));
+  text("Lithnode", W / 2, 498 + (1 - k1) * 20, `700 150px ${F.pix}`, C.ink, "center", k1);
+  const k2 = eout(span(t, 26.65, 27.1));
+  text("Your AI team. Managed.", W / 2, 580 + (1 - k2) * 14, `500 46px ${F.pix}`, C.soft, "center", k2);
+  const k3 = eout(span(t, 27.0, 27.45));
+  text("Free  ·  MIT licensed  ·  Windows  ·  Mac  ·  Linux", W / 2, 650 + (1 - k3) * 10, `400 24px ${F.mono}`, "#9b9a94", "center", k3);
+  const k4 = back(span(t, 27.35, 27.75));
+  if (k4 > 0) {
+    g.save(); g.translate(W / 2, 752); g.scale(k4, k4);
+    rr(-170, -36, 340, 72, 36); g.fillStyle = C.ink; g.shadowColor = "rgba(236,235,230,.35)"; g.shadowBlur = 40; g.fill(); g.restore();
+    text("lithnode.com", W / 2, 762, `600 30px ${F.mono}`, C.void, "center", Math.min(1, k4));
+  }
+  g.restore();
+}
+function flash(t, at, len = .16, a = .28) { const k = span(t, at, at + len); if (k <= 0 || k >= 1) return; g.fillStyle = `rgba(236,235,230,${a * (1 - k)})`; g.fillRect(0, 0, W, H); }
+function post(t) {
+  const v = g.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * 1.05); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.55)");
+  g.fillStyle = v; g.fillRect(0, 0, W, H);
+  g.save(); g.globalCompositeOperation = "overlay"; g.globalAlpha = .06;
+  const r = mulberry(Math.floor(t * 30) + 1); g.translate(-r() * 256, -r() * 256);
+  g.fillStyle = g.createPattern(grain, "repeat"); g.fillRect(0, 0, W + 256, H + 256); g.restore();
+}
+const APPROVE_AT = 18 + (33.91 - 30.6) / (33.95 - 30.6) * 2.6;
+function draw(t) {
+  sky(t);
+  open(t);
+  scenes(t);
+  endCard(t);
+  [8, 14, 18, 22].forEach((c) => flash(t, c));
+  flash(t, APPROVE_AT, .3, .35);
+  post(t);
+}
+
+// ============================================================================ loading and seeking
+function seek(v, s) {
+  s = clamp(s, 0, v.duration - .04); const target = (Math.floor(s * 30) + .5) / 30;
+  if (Math.abs(v.currentTime - target) < 1e-3 && v.readyState >= 2) return Promise.resolve();
+  return new Promise((r) => { v.addEventListener("seeked", r, { once: true }); v.currentTime = target; });
+}
+async function prepare(t) {
+  const jobs = [];
+  for (const s of SCENES) if (t >= s.t0 - .05 && t < s.t1) jobs.push(seek(vids[s.clip], mapTime(s.map, t)));
+  if (t < 3.2) jobs.push(seek(bh, t + 2));
+  if (t >= 25.8) jobs.push(seek(bh, t - 25.8 + 6));
+  await Promise.all(jobs);
+}
+window.renderFrame = async (t) => { await prepare(t); draw(t); };
+window.ready = (async () => {
+  const load = (v, src) => new Promise((r, j) => { v.muted = true; v.preload = "auto"; v.oncanplaythrough = r; v.onerror = () => j(new Error(src)); v.src = src; v.load(); });
+  const jobs = [load(bh, "../../site/media/black-hole-wide.mp4")];
+  for (const c of CLIPS) { vids[c] = document.createElement("video"); jobs.push(load(vids[c], `footage/${c}.mp4`)); jobs.push(fetch(`footage/${c}.json`).then((r) => r.json()).then((j) => { logs[c] = j.log; })); }
+  jobs.push(...[`700 140px ${F.pix}`, `600 58px ${F.pix}`, `500 42px ${F.pix}`, `400 22px ${F.mono}`, `500 15px ${F.mono}`, `600 30px ${F.mono}`].map((f) => document.fonts.load(f)));
+  await Promise.all(jobs); buildEvents();
+  const q = new URLSearchParams(location.search).get("t");
+  if (q !== null) await window.renderFrame(+q);
+  return true;
+})();
+
+// ============================================================================ the music: night synthwave, 120 BPM, A minor (Am F C G)
+// a real arrangement: supersaw pads ducked by the kick, octave bass, drums, a lead melody, bells; reverb and a ping-pong delay
+let ac, out, bus, duck, revIn, dlyIn, noiseBuf;
+const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+const BEAT = .5, BAR = 2;
+function noise() {
+  if (noiseBuf) return noiseBuf;
+  noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noiseBuf.getChannelData(0), r = mulberry(5);
+  for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1; return noiseBuf;
+}
+function studio() {
+  // master: glue compressor, then a limiter
+  const glue = ac.createDynamicsCompressor(); glue.threshold.value = -16; glue.ratio.value = 3; glue.attack.value = .01; glue.release.value = .25;
+  const lim = ac.createDynamicsCompressor(); lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = .001; lim.release.value = .08;
+  out = ac.createGain(); out.gain.value = .9;
+  out.connect(glue); glue.connect(lim); lim.connect(ac.destination);
+  // the music bus pumps with the kick
+  bus = ac.createGain(); duck = ac.createGain(); bus.connect(duck); duck.connect(out);
+  // a long dark hall
+  const conv = ac.createConvolver(), len = ac.sampleRate * 3.2, ir = ac.createBuffer(2, len, ac.sampleRate), r = mulberry(9);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (r() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+  conv.buffer = ir; revIn = ac.createGain(); const revLp = ac.createBiquadFilter(); revLp.type = "lowpass"; revLp.frequency.value = 5200;
+  const revOut = ac.createGain(); revOut.gain.value = .55; revIn.connect(conv); conv.connect(revLp); revLp.connect(revOut); revOut.connect(out);
+  // a ping-pong dotted-eighth delay
+  dlyIn = ac.createGain();
+  const dl = ac.createDelay(2), dr = ac.createDelay(2), fb = ac.createGain(), tone = ac.createBiquadFilter(), pl = ac.createStereoPanner(), pr = ac.createStereoPanner();
+  dl.delayTime.value = BEAT * .75; dr.delayTime.value = BEAT * .75; fb.gain.value = .38; tone.type = "lowpass"; tone.frequency.value = 3200; pl.pan.value = -.7; pr.pan.value = .7;
+  dlyIn.connect(dl); dl.connect(tone); tone.connect(dr); dr.connect(fb); fb.connect(dl);
+  const dOut = ac.createGain(); dOut.gain.value = .5; tone.connect(pl); dr.connect(pr); pl.connect(dOut); pr.connect(dOut); dOut.connect(out); dOut.connect(revIn);
+}
+function pump(at, depth = .55) { duck.gain.setValueAtTime(1 - depth, at); duck.gain.setTargetAtTime(1, at + .02, .09); }
+// one synth voice: stacked detuned oscillators, a filter with its own sweep, an envelope, and sends
+function voice(at, midi, dur, o = {}) {
+  const v = o.vol ?? .1, a = o.a ?? .01, rel = o.r ?? .2, det = o.det ?? [0], type = o.type || "sawtooth";
+  const f = ac.createBiquadFilter(); f.type = "lowpass"; f.Q.value = o.q ?? .7;
+  const lp = o.lp ?? 3000; f.frequency.setValueAtTime(o.lpFrom ?? lp, at); if (o.lpFrom) f.frequency.exponentialRampToValueAtTime(lp, at + (o.lpTime ?? dur));
+  if (o.pluck) { f.frequency.setValueAtTime(o.pluck, at); f.frequency.exponentialRampToValueAtTime(lp, at + .18); }
+  const gn = ac.createGain(), pan = ac.createStereoPanner(); pan.pan.value = o.pan || 0;
+  gn.gain.setValueAtTime(0, at); gn.gain.linearRampToValueAtTime(v, at + a);
+  if (o.decay) gn.gain.setTargetAtTime(v * (o.sus ?? .3), at + a, o.decay);
+  gn.gain.setValueAtTime(o.decay ? v * (o.sus ?? .3) : v, at + Math.max(a, dur)); gn.gain.linearRampToValueAtTime(0, at + Math.max(a, dur) + rel);
+  det.forEach((d, i) => {
+    const osc = ac.createOscillator(); osc.type = type; osc.frequency.value = hz(midi); osc.detune.value = d;
+    if (o.vib) { const lfo = ac.createOscillator(), lg = ac.createGain(); lfo.frequency.value = 5.2; lg.gain.setValueAtTime(0, at); lg.gain.linearRampToValueAtTime(o.vib, at + .35); lfo.connect(lg); lg.connect(osc.detune); lfo.start(at); lfo.stop(at + dur + rel + .1); }
+    if (o.glideFrom) { osc.frequency.setValueAtTime(hz(o.glideFrom), at); osc.frequency.exponentialRampToValueAtTime(hz(midi), at + .06); }
+    const sg = ac.createGain(); sg.gain.value = 1 / Math.sqrt(det.length); osc.connect(sg); sg.connect(f);
+    osc.start(at); osc.stop(at + dur + rel + .1);
+  });
+  f.connect(gn); gn.connect(pan); pan.connect(bus);
+  if (o.rev) { const s = ac.createGain(); s.gain.value = o.rev; pan.connect(s); s.connect(revIn); }
+  if (o.dly) { const s = ac.createGain(); s.gain.value = o.dly; pan.connect(s); s.connect(dlyIn); }
+}
+const SAW = [-14, -7, 0, 7, 14];
+function nz(at, v, len, { type = "highpass", f = 8000, q = .7, pan = 0, rev = 0, a = .001 } = {}) {
+  const s = ac.createBufferSource(), fl = ac.createBiquadFilter(), gn = ac.createGain(), p = ac.createStereoPanner();
+  s.buffer = noise(); fl.type = type; fl.frequency.value = f; fl.Q.value = q; p.pan.value = pan;
+  gn.gain.setValueAtTime(0, at); gn.gain.linearRampToValueAtTime(v, at + a); gn.gain.setTargetAtTime(0, at + a, len / 4);
+  s.connect(fl); fl.connect(gn); gn.connect(p); p.connect(out); if (rev) { const r = ac.createGain(); r.gain.value = rev; p.connect(r); r.connect(revIn); }
+  s.start(at, (at * 7.31) % 1.2); s.stop(at + len * 2 + .1);
+}
+function kick(at, v = .95) {
+  const o = ac.createOscillator(), gn = ac.createGain(); o.frequency.setValueAtTime(140, at); o.frequency.exponentialRampToValueAtTime(48, at + .09);
+  gn.gain.setValueAtTime(v, at); gn.gain.setTargetAtTime(0, at + .04, .11); o.connect(gn); gn.connect(out); o.start(at); o.stop(at + .6);
+  nz(at, .12 * v, .012, { f: 3000 }); pump(at);
+}
+function snare(at, v = .3) {
+  nz(at, v, .14, { type: "bandpass", f: 2000, q: .8, rev: .25 });
+  const o = ac.createOscillator(), gn = ac.createGain(); o.type = "triangle"; o.frequency.setValueAtTime(220, at); o.frequency.exponentialRampToValueAtTime(160, at + .08);
+  gn.gain.setValueAtTime(v * .7, at); gn.gain.setTargetAtTime(0, at, .04); o.connect(gn); gn.connect(out); o.start(at); o.stop(at + .3);
+}
+const hat = (at, v = .05, open = false) => nz(at, v, open ? .22 : .035, { f: 9000, pan: .2 });
+function swell(at, dur, v = .12) {   // a reversed-cymbal rise into a downbeat
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gn = ac.createGain(); s.buffer = noise(); s.loop = true;
+  f.type = "highpass"; f.frequency.setValueAtTime(1500, at); f.frequency.exponentialRampToValueAtTime(7000, at + dur);
+  gn.gain.setValueAtTime(.0001, at); gn.gain.exponentialRampToValueAtTime(v, at + dur - .02); gn.gain.linearRampToValueAtTime(0, at + dur);
+  s.connect(f); f.connect(gn); gn.connect(out); const r = ac.createGain(); r.gain.value = .15; gn.connect(r); r.connect(revIn); s.start(at); s.stop(at + dur + .05);
+}
+function crash(at, v = .045) { nz(at, v, .9, { f: 7000, rev: .25 }); }
+function bell(at, midi, v = .06, pan = 0) {   // two sines a twelfth apart, ringing into the hall
+  voice(at, midi, .05, { type: "sine", vol: v, a: .003, r: 1.8, rev: .7, dly: .35, pan });
+  voice(at, midi + 19, .02, { type: "sine", vol: v * .25, a: .002, r: .6, rev: .5, pan });
+}
+
+const PADS = [[57, 60, 64, 69], [53, 57, 60, 65], [55, 60, 64, 67], [55, 59, 62, 67]];
+const ROOTS = [33, 29, 36, 31];
+const MELODY = [   // [beat in bar, midi, beats] for Am F C G
+  [[0, 76, 1], [1, 79, .5], [1.5, 81, 1.5], [3, 79, .5], [3.5, 76, .5]],
+  [[0, 77, 1], [1, 76, .5], [1.5, 72, 1.5], [3, 74, 1]],
+  [[0, 76, 1], [1, 79, .5], [1.5, 84, 1.5], [3, 83, .5], [3.5, 79, .5]],
+  [[0, 79, 1], [1, 81, .5], [1.5, 79, .5], [2, 74, 2]],
+];
+const chordIdx = (t) => Math.floor(t / BAR + 1e-6) % 4;
+function score() {
+  // 0–3: the hall opens; a filtered pad swells and bells trace the chord as the crab assembles
+  voice(0, 33, 3, { type: "sine", vol: .16, a: 1.2, r: .4 });
+  PADS[0].forEach((m, i) => voice(0, m, 2.9, { det: SAW, vol: .045, a: 1.4, r: .6, lpFrom: 300, lp: 1800, lpTime: 2.9, rev: .5, pan: (i - 1.5) * .3 }));
+  [[.3, 81], [.75, 84], [1.2, 88], [1.65, 86], [2.1, 81]].forEach(([t, m], i) => bell(t, m, .05, (i % 2 ? .4 : -.4)));
+  swell(2.0, 1.0, .03);
+  // 3–30: bar by bar
+  for (let t = 2; t < 30 - 1e-6; t += BAR) {
+    const c = chordIdx(t), from = Math.max(t, 3);
+    const sec = t < 8 ? "verse" : t < 18 ? "groove" : t < 20 ? "break" : t < 26 ? "drop" : "outro";
+    const end = t + BAR;
+    if (sec === "outro") break;
+    // pads: wide supersaws, brighter as the film builds
+    const lp = { verse: 1400, groove: 2200, break: 900, drop: 3200 }[sec];
+    PADS[c].forEach((m, i) => voice(from, m, end - from - .05, { det: SAW, vol: sec === "break" ? .04 : .035, a: sec === "break" ? .6 : .05, r: .3, lp, rev: .35, pan: (i - 1.5) * .35 }));
+    // arp: sixteenth-note plucks through the delay
+    if (sec !== "break") for (let s = from; s < end - 1e-6; s += BEAT / 2) {
+      const k = Math.round((s - t) / (BEAT / 2)), notes = PADS[c];
+      voice(s, notes[[0, 1, 2, 3, 2, 1, 3, 2][k % 8]] + 12, .1, { type: "square", vol: sec === "verse" ? .028 : .022, a: .002, r: .08, pluck: 4500, lp: 900, dly: .45, rev: .2, pan: k % 2 ? .3 : -.3 });
+    }
+    // bass: a sub on the root, an octave pulse on the eighths once the beat is in
+    if (sec === "verse") voice(from, ROOTS[c], end - from - .05, { type: "sine", vol: .2, a: .05, r: .1 });
+    if (sec === "groove" || sec === "drop") for (let s = t; s < end - 1e-6; s += BEAT / 2) {
+      const k = Math.round((s - t) / (BEAT / 2)), oct = k % 2 ? 12 : 0;
+      voice(s, ROOTS[c] + 12 + oct, BEAT / 2 - .03, { det: [-6, 6], vol: .085, a: .004, r: .04, lp: sec === "drop" ? 900 : 650, pluck: 2000 });
+      if (k % 2 === 0) voice(s, ROOTS[c], BEAT / 2, { type: "sine", vol: .16, a: .003, r: .05 });
+    }
+    if (sec === "break") voice(t, ROOTS[c], BAR, { type: "sine", vol: .18, a: .3, r: .3 });
+    // drums
+    if (sec === "verse" && t >= 4) for (let b = 0; b < 4; b++) { hat(t + b * BEAT + BEAT / 2, .035); }
+    if (sec === "groove" || sec === "drop") for (let b = 0; b < 4; b++) {
+      const at = t + b * BEAT; kick(at);
+      if (b % 2 === 1 && (t >= 10 || sec === "drop")) snare(at, .26);
+      hat(at + BEAT / 2, .06, sec === "drop" && b % 2 === 1);
+      if (t >= 12 || sec === "drop") { hat(at + BEAT / 4, .022); hat(at + 3 * BEAT / 4, .022); }
+    }
+    // lead melody: from the second groove phrase, and an octave up in the drop
+    if ((sec === "groove" && t >= 10) || sec === "drop") {
+      const up = sec === "drop" ? 12 : 0;
+      MELODY[c].forEach(([b, m, len]) => voice(t + b * BEAT, m + up - 12, len * BEAT - .04, { det: [-8, 8], vol: .05, a: .015, r: .18, lp: 2600, q: 2, vib: 14, dly: .35, rev: .35 }));
+    }
+  }
+  // transitions: a rise into each cut, a crash on it
+  [[7.2, 8], [13.4, 14], [25, 26]].forEach(([a, b]) => swell(a, b - a, .03));
+  [8, 14, 26].forEach((t) => crash(t));
+  // the break: the run waits for you; a bell ticks like a clock, a long rise into the approval
+  [18.5, 19.0, 19.5, 20.0].forEach((t, i) => bell(t, [81, 84, 81, 88][i], .035, i % 2 ? .3 : -.3));
+  swell(18.6, APPROVE_AT - 18.6, .04);
+  // the approval: everything lands; a fill brings the drop in on the next beat
+  kick(APPROVE_AT, 1); crash(APPROVE_AT, .06);
+  [69, 72, 76, 81].forEach((m, i) => voice(APPROVE_AT, m, .9, { det: SAW, vol: .045, a: .005, r: .8, lp: 3500, rev: .5, pan: (i - 1.5) * .3 }));
+  for (let s = 20.75; s < 21; s += .125) snare(s, .14 + (s - 20.75) * .4);
+  for (let b = 0; b < 2; b++) kick(21 - BEAT * 2 + b * BEAT, .8);
+  // 26: the end card: a wide Am(add9), a low hit, bells, the hall ringing out
+  kick(26, 1); voice(26, 21, 2.5, { type: "sine", vol: .22, a: .005, r: 1.2, glideFrom: 33 });
+  [45, 52, 57, 60, 64, 71].forEach((m, i) => voice(26, m, 3.2, { det: SAW, vol: .04, a: .02, r: .8, lpFrom: 4000, lp: 900, lpTime: 3.2, rev: .6, pan: (i - 2.5) * .25 }));
+  [[26.3, 76], [26.6, 81], [26.9, 84], [27.3, 88], [27.8, 83], [28.4, 81]].forEach(([t, m], i) => bell(t, m, .055, (i % 2 ? .35 : -.35)));
+}
+window.renderAudio = async () => {
+  await window.ready;
+  const rate = 48000, off = new OfflineAudioContext(2, Math.ceil(rate * LENGTH), rate);
+  ac = off; noiseBuf = null; studio();
+  out.gain.setValueAtTime(.9, LENGTH - 1.2); out.gain.linearRampToValueAtTime(0, LENGTH);   // fade the tail
+  score();
+  const buf = await off.startRendering(), n = buf.length, L = buf.getChannelData(0), R = buf.getChannelData(1);
+  const pcm = new Int16Array(n * 2); for (let i = 0; i < n; i++) { pcm[i * 2] = clamp(L[i], -1, 1) * 32767; pcm[i * 2 + 1] = clamp(R[i], -1, 1) * 32767; }
+  let s = ""; const u8 = new Uint8Array(pcm.buffer); for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);   // raw 16-bit stereo at 48 kHz
+};
+</script>
+</body></html>

@@ -22,3 +22,6 @@ packaging/linux/.flatpak-builder/
 installer/app/lithnode.png
 marketing/black-hole/*.png
 marketing/black-hole/frames-*/
+marketing/night-film/footage/*.mp4
+marketing/night-film/frames/
+marketing/night-film/stills/

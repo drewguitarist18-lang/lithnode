@@ -1,0 +1,19 @@
+# Night film
+
+A 30-second film of the real app and site, cut together over the night sky and the site's black hole.
+
+1. **Capture** (`capture.js`): records real footage into `footage/`. It needs:
+   - the demo Lithnode on 8795, with mock engines so runs cost nothing;
+   - the site served on 8797: `python -m http.server 8797 -d site`.
+
+   Each clip gets a `.json` log of every pointer move, click and key. The film uses it to draw the cursor and time the click sounds.
+2. **Compose** (`film.html`): the canvas compositor and the 120 BPM score.
+   - `SCENES` sets which clip plays when.
+   - `map` sets how fast it plays. Anything faster than 1.4× shows a "× speed" chip.
+   - `cam` sets where the camera looks.
+   - Open `film.html?t=12` through any local server for a still.
+3. **Render** (`render.js`): serves the repo itself.
+   - `node render.js` writes `../lithnode-night.mp4`.
+   - `node render.js --stills 3 12 20` writes PNGs to check.
+
+Both scripts use `puppeteer-core` (set `NODE_PATH`) with installed Edge, and ffmpeg (`FFMPEG` or on PATH). MP4s stay out of git.
