@@ -636,22 +636,9 @@
   .rp-top .meta { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
   .rp-top .who { min-width: 0; flex: 1; }
   .rp-top .tools { display: flex; gap: 8px; flex: none; }
-  .rp-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px 1fr; }
-  .rp-nav { border-right: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 16px 10px 30px; }
-  .rp-nav h5 { margin: 14px 10px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
-  .rp-nav h5:first-child { margin-top: 0; }
-  .rp-nav a { display: block; padding: 5px 10px; border-radius: 7px; color: var(--ink); text-decoration: none; font-size: 13px;
-              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rp-nav a.sub { padding-left: 22px; color: var(--muted); font-size: 12.5px; }
-  .rp-nav a:hover { background: var(--hover); }
-  .rp-nav a.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
-  .rp-main { overflow-y: auto; padding: 26px 32px 60px; }
-  .rp-col { max-width: 940px; margin: 0 auto; }
-  .rp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
-  .rp-stats div { background: var(--pad); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-width: 0; }
-  .rp-stats small { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
-  .rp-stats b { display: block; font-size: 17px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rp-stats b.path { font-size: 13px; font-family: ui-monospace, Consolas, monospace; font-weight: 500; padding-top: 4px; }
+  .rp-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .rp-main { flex: 1; overflow-y: auto; padding: 34px 32px 60px; }
+  .rp-col { max-width: 720px; margin: 0 auto; }
   .rp-sec { background: var(--pad); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 18px; scroll-margin-top: 16px; }
   .rp-sec > h3 { margin: 0; padding: 14px 24px; border-bottom: 1px solid var(--line); font-size: 13px; text-transform: uppercase;
                  letter-spacing: .6px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
@@ -667,7 +654,7 @@
   .rp-agent > summary::before { content: "▸"; color: var(--muted); } .rp-agent[open] > summary::before { content: "▾"; }
   .rp-agent > summary .meta { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 12px; }
   .rp-agent > .doc { padding: 0 18px 14px; background: var(--pad); border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; }
-  @media (max-width: 860px) { .rp-body { grid-template-columns: 1fr; } .rp-nav { display: none; } .rp-main { padding: 16px 16px 50px; }
+  @media (max-width: 860px) { .rp-main { padding: 16px 16px 50px; }
     .rp-top { padding: 10px 16px; flex-wrap: wrap; } .rp-top .tools { width: 100%; } .rp-top .tools button { flex: 1; } .rp-sec > .doc { padding: 4px 16px 18px; } .rp-stage { padding: 4px 16px 8px; } }
   /* the result page reads like a document, not a terminal: plain type for sentences, mono stays for code */
   html body .rp-main .doc, html body .rp-main .doc :where(p, li, h1, h2, h3, h4, b, i, td, th, a, strong, em) { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
@@ -677,15 +664,19 @@
   .rp-bottom small { display: block; color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; margin-bottom: 5px; }
   .rp-bottom p { margin: 0; font-size: 17px; line-height: 1.5; font-weight: 600; }
   html body .rp-bottom p { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
-  .finds { display: grid; gap: 10px; padding: 14px 24px 8px; }
+  .finds { display: grid; gap: 10px; margin-bottom: 18px; }
   .rfind { display: grid; grid-template-columns: 30px 1fr; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
   .rfind > i { font-style: normal; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 13px;
               background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
   .rfind .doc { padding: 0; font-size: 14.5px; } .rfind .doc > :first-child { margin-top: 0; } .rfind .doc p { margin: 0; }
   .rfind .doc b:first-child { display: block; font-size: 15.5px; margin-bottom: 3px; }
-  .rp-more { padding: 6px 24px 20px; color: var(--muted); }
+  .rp-more { padding: 0 4px 18px; color: var(--muted); }
   .rp-more .doc { font-size: 13.5px; color: var(--muted); padding: 0; }
   @media (max-width: 860px) { .finds, .rp-more { padding-left: 14px; padding-right: 14px; } }
+  .rp-plain { background: var(--pad); border: 1px solid var(--line); border-radius: 16px; padding: 4px 24px 18px; margin-bottom: 18px; font-size: 15px; }
+  .rp-details > summary { cursor: pointer; list-style: none; color: var(--muted); font-size: 13px; padding: 10px 4px; margin-bottom: 8px; }
+  .rp-details > summary::before { content: "▸  "; } .rp-details[open] > summary::before { content: "▾  "; }
+  .rp-details > summary:hover { color: var(--ink); }
   /* readable documents: used by the result page and report previews */
   .doc { font-size: 14px; line-height: 1.65; color: var(--ink); word-break: break-word; }
   .doc h1, .doc h2, .doc h3, .doc h4 { line-height: 1.3; margin: 1.3em 0 .45em; text-transform: none; letter-spacing: normal; color: var(--ink); font-weight: 650; }
@@ -2352,78 +2343,52 @@ function resultView(text) {
     else if (cur && !ln.trim()) cur = cur;                     // a blank line inside the list
     else { cur = null; (seenList ? tail : head).push(ln); }
   }
-  const lead = bottom ? `<div class="rp-bottom"><small>The short version</small><p>${md(bottom).replace(/^<p>|<\/p>$/g, "")}</p></div>` : "";
-  if (items.length < 2) return lead + `<section class="rp-sec" id="rp-result"><h3>Result<span class="grow"></span><button id="sheetCopy">Copy</button></h3><div class="doc">${md(t || "No result yet.")}</div></section>`;
+  const lead = bottom ? `<div class="rp-bottom"><p>${md(bottom).replace(/^<p>|<\/p>$/g, "")}</p></div>` : "";
+  if (items.length < 2) return lead + (t ? `<div class="rp-plain doc">${md(t)}</div>` : (lead ? "" : `<div class="rp-plain doc"><p>No result yet.</p></div>`));
   const intro = head.join("\n").trim(), more = tail.join("\n").trim();
-  return lead + `<section class="rp-sec" id="rp-result"><h3>What matters, in order<span class="grow"></span><button id="sheetCopy">Copy</button></h3>`
-    + (intro ? `<div class="doc" style="padding:6px 24px 0">${md(intro)}</div>` : "")
+  return lead + (intro ? `<div class="rp-more"><div class="doc">${md(intro)}</div></div>` : "")
     + `<div class="finds">${items.map((it, i) => `<div class="rfind"><i>${i + 1}</i><div class="doc">${md(it.join(" "))}</div></div>`).join("")}</div>`
-    + (more ? `<div class="rp-more"><div class="doc">${md(more)}</div></div>` : "") + `</section>`;
+    + (more ? `<div class="rp-more"><div class="doc">${md(more)}</div></div>` : "");
 }
 function openSheet(r) {
   const m = runMeta(r), ok = r.status === "done", stages = reportStages(r);
   const nReports = stages.reduce((n, g) => n + g.agents.length, 0);
-  const nav = [], body = [];
-  nav.push(`<h5>Result</h5><a href="#rp-result">Summary</a><div id="rpToc"></div>`);
-  body.push(`<div class="rp-stats"><div><small>Took</small><b>${dur(m.took)}</b></div><div><small>Agents</small><b>${m.agents}</b></div>
-    <div><small>Steps</small><b>${m.fin} of ${m.states.length}</b></div>${r.tokens ? `<div><small>Tokens</small><b>${tokenWord(r.tokens)}</b></div>` : ""}
-    <div><small>Worked in</small><b class="path" title="${esc(r.folder || "")}">${esc((r.folder || "its own folder").split(/[\\/]/).filter(Boolean).pop() || "its own folder")}</b></div></div>`);
-  body.push(resultView(r.final));
+  const more = [], what = [];
   const lastItems = itemNodes(r).pop();
   if (lastItems) {
     const its = r.nodes[lastItems.id].items;
-    nav.splice(1, 0, `<a href="#rp-items">Items · ${its.length}</a>`);
-    body.push(`<section class="rp-sec" id="rp-items"><h3>Items from ${esc(lastItems.name)} <span class="hint" style="font-weight:500;font-size:13px;margin-left:6px">${itemSummary(its)}</span><span class="grow"></span><button id="sheetItems">Copy as table</button></h3>
+    what.push(`${its.length} items`);
+    more.push(`<section class="rp-sec"><h3>Items from ${esc(lastItems.name)}<span class="grow"></span><button id="sheetItems">Copy as table</button></h3>
       <div class="items-grid">${its.map((it) => itemCard(it, "sheet" + r.id, { animate: false })).join("")}</div></section>`);
   }
   if (stages.length) {
-    nav.push(`<h5>Agent reports · ${nReports}</h5>`);
-    body.push(`<section class="rp-sec" id="rp-reports"><h3>Agent reports · ${nReports}<span class="grow"></span><button id="sheetExpand">Expand all</button></h3>`
-      + stages.map((g, gi) => {
-        nav.push(`<a href="#rp-st${gi}">${esc(g.node.name)}</a>` + (g.agents.length > 1 ? g.agents.map((a, ai) => `<a class="sub" href="#rp-a${gi}-${ai}">${esc(a.name)}</a>`).join("") : ""));
-        return `<div class="rp-stage" id="rp-st${gi}"><h4>${esc(g.node.name)}</h4>` + g.agents.map((a, ai) =>
-          `<details class="rp-agent" id="rp-a${gi}-${ai}"${g.agents.length === 1 && nReports <= 3 ? " open" : ""}><summary>${esc(a.name)}<span class="meta">${esc(modelLabel(a.model))} · ${a.turns || 0} turns</span></summary>
-          <div class="doc">${md(a.report)}</div></details>`).join("") + `</div>`;
-      }).join("") + `</section>`);
+    what.push(`${nReports} agent report${nReports === 1 ? "" : "s"}`);
+    more.push(`<section class="rp-sec"><h3>Agent reports<span class="grow"></span><button id="sheetExpand">Expand all</button></h3>`
+      + stages.map((g) => `<div class="rp-stage"><h4>${esc(g.node.name)}</h4>` + g.agents.map((a) =>
+          `<details class="rp-agent"><summary>${esc(a.name)}<span class="meta">${esc(modelLabel(a.model))} · ${a.turns || 0} turns</span></summary>
+          <div class="doc">${md(a.report)}</div></details>`).join("") + `</div>`).join("") + `</section>`);
   }
-  nav.push(`<h5>Context</h5>`);
-  if (r.brief) { nav.push(`<a href="#rp-plan">The plan</a>`); body.push(`<section class="rp-sec" id="rp-plan"><h3>The plan everyone got</h3><div class="doc">${md(r.brief)}</div></section>`); }
-  nav.push(`<a href="#rp-task">Your task</a>`);
-  body.push(`<section class="rp-sec" id="rp-task"><h3>Your task</h3><div class="ask">${esc(r.task)}</div></section>`);
+  if (r.brief) { what.push("the plan"); more.push(`<section class="rp-sec"><h3>The plan everyone got</h3><div class="doc">${md(r.brief)}</div></section>`); }
+  what.push("your task");
+  more.push(`<section class="rp-sec"><h3>Your task</h3><div class="ask">${esc(r.task)}</div></section>
+    <p class="hint"><button id="sheetDl">Download everything as .md</button></p>`);
+  const folder = r.folder ? r.folder.split(/[\\/]/).filter(Boolean).pop() || "" : "";
 
   $("sheet").innerHTML = `<div class="rp-top">
       <button id="sheetClose" title="Back to the flow (Esc)">← Back</button>
       <div class="badge-big${ok ? "" : " failed"}">${ok ? "✓" : "!"}</div>
-      <div class="who"><h2>${esc(r.flow_name)}</h2><div class="meta">${esc(STATUS_WORD[r.status] || r.status)} in ${dur(m.took)} · ${m.agents} agent${m.agents === 1 ? "" : "s"} · ${m.fin} of ${m.states.length} steps · ${new Date(r.started * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}${r.folder ? ` · <span class="mono" title="${esc(r.folder)}">${esc(r.folder.split(/[\\/]/).filter(Boolean).pop() || r.folder)}</span>` : ""}</div></div>
-      <div class="tools"><button id="sheetDl" title="Save the result and every report as one Markdown file">Download .md</button><button class="primary" id="sheetCopyAll">Copy all</button></div>
+      <div class="who"><h2>${esc(r.flow_name)}</h2><div class="meta">${esc(STATUS_WORD[r.status] || r.status)} in ${dur(m.took)}${r.tokens ? ` · ${tokenWord(r.tokens)} tokens` : ""}${folder ? ` · <span class="mono" title="${esc(folder)}">${esc(folder)}</span>` : ""}</div></div>
+      <div class="tools"><button class="primary" id="sheetCopy">Copy</button></div>
     </div>
-    <div class="rp-body"><nav class="rp-nav">${nav.join("")}</nav>
-      <div class="rp-main"><div class="rp-col">
-        ${body.join("")}
-      </div></div></div>`;
+    <div class="rp-body"><div class="rp-main"><div class="rp-col">
+      ${resultView(r.final)}
+      <details class="rp-details"><summary>Details: ${what.join(", ")}</summary>${more.join("")}</details>
+    </div></div></div>`;
 
-  // contents for the result: its own headings
-  const heads = [...$("sheet").querySelectorAll("#rp-result .doc h1, #rp-result .doc h2, #rp-result .doc h3")];
-  heads.forEach((h, i) => { h.id = "rp-h" + i; h.style.scrollMarginTop = "16px"; });
-  $("rpToc").innerHTML = heads.map((h, i) => `<a class="sub" href="#rp-h${i}">${esc(h.textContent)}</a>`).join("");
-
-  const main = $("sheet").querySelector(".rp-main"), links = [...$("sheet").querySelectorAll(".rp-nav a")];
-  links.forEach((a) => a.onclick = (e) => {
-    e.preventDefault();
-    const t = $(a.getAttribute("href").slice(1));
-    if (t.tagName === "DETAILS") t.open = true;
-    t.scrollIntoView({ block: "start" });
-    links.forEach((x) => x.classList.toggle("on", x === a));
-  });
-  main.onscroll = () => {   // highlight where you are
-    let cur = links[0];
-    for (const a of links) { const t = $(a.getAttribute("href").slice(1)); if (t && t.getBoundingClientRect().top - main.getBoundingClientRect().top < 80) cur = a; }
-    links.forEach((a) => a.classList.toggle("on", a === cur));
-  };
-  $("sheet").classList.add("show"); main.scrollTop = 0; main.onscroll();
+  const main = $("sheet").querySelector(".rp-main");
+  $("sheet").classList.add("show"); main.scrollTop = 0;
   $("sheetCopy").onclick = () => copyText(r.final || "");
-  if ($("sheetItems")) $("sheetItems").onclick = () => copyText(itemsMarkdown(r.nodes[itemNodes(r).pop().id].items));
-  $("sheetCopyAll").onclick = () => copyText(resultMarkdown(r));
+  if ($("sheetItems")) $("sheetItems").onclick = () => copyText(itemsMarkdown(r.nodes[lastItems.id].items));
   $("sheetDl").onclick = () => downloadResult(r);
   $("sheetClose").onclick = closeSheet;
   if ($("sheetExpand")) $("sheetExpand").onclick = (e) => {

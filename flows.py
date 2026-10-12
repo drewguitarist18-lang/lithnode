@@ -1133,13 +1133,11 @@ class Run:
         if node.get("mode") != "summarize" or not handoff:
             st["output"], st["status"] = handoff, "done"
             return
-        system = ("You merge reports from several AI agents into one short handoff that a busy person can read in a minute. "
-                  "Write plain sentences, no jargon, no confidence percentages, no tables. Start with one line: the "
-                  "bottom line (what you'd do first, or whether it's good to go). Then the 5 things that matter most, "
-                  "most important first, each as one or two sentences: what's wrong or found, why it matters, and the "
-                  "file where it lives. Merge duplicates. Put everything minor into one last line starting \"Also:\". "
-                  "Keep concrete details like file names. Don't repeat the reports' own headings. End with a section "
-                  "starting with \"REPORT:\" containing the handoff, under 250 words.")
+        system = ("You merge reports from several AI agents into a note a busy person reads in 20 seconds. "
+                  "Plain words, no jargon, no headings, no tables, no percentages. First line: \"Bottom line:\" and one "
+                  "sentence (the answer, or what to do first). Then at most 3 numbered points, one short sentence each, "
+                  "naming the file when there is one. Merge duplicates and leave out anything minor. Under 90 words. "
+                  "Output nothing else: start your reply with \"REPORT:\" on its own line, then the note.")
         rec = self._agent(node, st, "Merger", model=node.get("model", SUMMARY_MODEL), effort="low", tools="none",
                           system=system, prompt=f"# Task\n{self.task}\n\n# Reports\n{handoff}",
                           shape="muse", color="#8d93a8")
