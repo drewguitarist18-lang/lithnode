@@ -1,0 +1,60 @@
+# Emails Drew when any release file's download count goes up, including downloads straight from GitHub.
+# Runs every 15 minutes (GitHub may run it a little late). The last counts are kept in the Actions cache.
+# Secrets: GMAIL_USER, GMAIL_APP_PASSWORD (a Google app password), NOTIFY_TO.
+name: download alerts
+
+on:
+  schedule: [{ cron: "*/15 * * * *" }]
+  workflow_dispatch:
+    inputs:
+      test: { description: "Send an email even if nothing changed, to check it works", type: boolean, default: false }
+
+permissions:
+  contents: read
+  actions: write   # to save the counts in the cache
+
+concurrency: download-alerts
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache/restore@v4
+        with:
+          path: counts.json
+          key: dl-counts-${{ github.run_id }}
+          restore-keys: dl-counts-
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/download_diff.py
+          sparse-checkout-cone-mode: false
+          path: repo
+      - id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases?per_page=100" | python3 repo/.github/download_diff.py > new.txt
+          if [ "${{ inputs.test }}" = "true" ] && [ ! -s new.txt ]; then
+            echo "Test email: download alerts are working. No new downloads since the last check." > new.txt
+          fi
+          cat new.txt
+          if [ -s new.txt ]; then
+            echo "found=1" >> "$GITHUB_OUTPUT"
+            { echo "lines<<EOF"; cat new.txt; echo EOF; } >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/cache/save@v4
+        with:
+          path: counts.json
+          key: dl-counts-${{ github.run_id }}
+      - if: steps.diff.outputs.found == '1'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          from: Lithnode alerts <${{ secrets.GMAIL_USER }}>
+          to: ${{ secrets.NOTIFY_TO }}
+          subject: "Lithnode: someone downloaded it"
+          body: ${{ steps.diff.outputs.lines }}

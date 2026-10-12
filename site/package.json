@@ -1,0 +1,8 @@
+{
+  "name": "lithnode-site",
+  "private": true,
+  "description": "lithnode.com: a static page, plus api/hit.js, which emails Drew on views and download clicks",
+  "dependencies": {
+    "nodemailer": "6.9.16"
+  }
+}

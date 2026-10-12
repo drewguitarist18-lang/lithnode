@@ -151,6 +151,12 @@
   .film .seek:hover .knob, .film .seek.drag .knob, .film .seek:focus-visible .knob { transform: scale(1); }
   .film .seek:hover .track, .film .seek:hover .buf, .film .seek:hover .fill { height: 5px; }
   .film .seek:focus-visible { outline: none; } .film .seek:focus-visible .track { box-shadow: 0 0 0 2px var(--ink); }
+  /* playing on its own, muted: one glass chip to turn the score on */
+  .film .sound { position: absolute; top: 12px; right: 12px; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px 0 11px;
+                 border: 1px solid rgba(236,235,230,.16); border-radius: 999px; background: rgba(12,14,22,.55); backdrop-filter: blur(12px);
+                 color: var(--ink); font: 500 12.5px var(--mono); cursor: pointer; transition: background .2s, transform .2s; }
+  .film .sound:hover { background: rgba(236,235,230,.16); transform: scale(1.04); }
+  .film .sound svg { width: 16px; height: 16px; }
   @media (max-width: 600px) { .film .time .total { display: none; } .film .start span { height: 54px; } .film .start span small { display: none; } }
 
   /* below the hero: the same night sky keeps going (a fixed field of stars), with faint colored nebulas behind sections.
@@ -400,8 +406,9 @@
   <h2 class="rv">Watch one run, start to finish.</h2>
   <p class="lead rv">Describe a team, run it, watch it work, approve it. The real app, 30 seconds.</p>
   <div class="film glass rv"><div class="frame">
-    <video id="video" src="media/lithnode-film.mp4" poster="media/film-poster.jpg" playsinline preload="metadata"></video>
+    <video id="video" src="media/lithnode-film.mp4" poster="media/film-poster.jpg" muted playsinline preload="metadata"></video>
     <button class="start" id="start" type="button" aria-label="Play the film with sound"><span><i><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.8v14.4a1 1 0 0 0 1.5.86l12-7.2a1 1 0 0 0 0-1.72l-12-7.2A1 1 0 0 0 7 4.8z"/></svg></i><b id="startLabel">Play with sound</b><small>0:30</small></span></button>
+    <button class="sound" id="vSound" type="button" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>Tap for sound</button>
     <div class="bar" id="vbar" hidden>
       <button type="button" id="vPlay" aria-label="Pause"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path id="vPlayIcon" d="M7 4h3.5v16H7zM13.5 4H17v16h-3.5z"/></svg></button>
       <span class="time"><span id="vNow">0:00</span><span class="total"> / <span id="vDur">0:30</span></span></span>
@@ -662,6 +669,20 @@ const OS_ICON = {"win": "<svg class=\"os-i\" viewBox=\"0 0 24 24\" fill=\"curren
   main.dataset.os = os;
 })();
 
+// ---------------------------------------------------------------- a ping per visit and per download click (api/hit.js emails Drew; it stores nothing)
+// Open the site once with ?me and your own visits stop counting on that browser.
+(() => {
+  let me = false;
+  try { if (/[?&]me\b/.test(location.search)) localStorage.setItem("lithnode-me", "1"); me = localStorage.getItem("lithnode-me") === "1"; } catch (e) {}
+  if (me || !/^(www\.)?lithnode\.com$/.test(location.hostname)) return;
+  const hit = (d) => { try { navigator.sendBeacon("/api/hit", JSON.stringify(d)); } catch (e) {} };
+  hit({ kind: "view", ref: document.referrer });
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href*="/releases/latest/download/"]');
+    if (a) hit({ kind: "download", os: a.dataset.os || (/\.dmg$/.test(a.href) ? "mac" : /\.flatpak$/.test(a.href) ? "linux" : "win") });
+  });
+})();
+
 // ---------------------------------------------------------------- after Download: the steps for that computer
 (() => {
   const STEPS = {
@@ -831,15 +852,30 @@ new IntersectionObserver(([e]) => document.getElementById("nav").classList.toggl
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   let idle = 0;
   const wake = () => { frame.classList.remove("idle"); clearTimeout(idle); if (!v.paused) idle = setTimeout(() => frame.classList.add("idle"), 2200); };
-  const go = () => { start.hidden = true; bar.hidden = false; v.muted = false; v.play(); wake(); };
+  let auto = true;   // plays muted on its own when it scrolls into view, until the viewer takes over
+  const sound = $("vSound");
+  const go = () => { auto = false; sound.hidden = true; start.hidden = true; bar.hidden = false; v.muted = false; v.play(); wake(); };
   start.onclick = () => { if (v.ended) v.currentTime = 0; go(); };
-  const toggle = () => (v.paused ? v.play() : v.pause());
-  v.onclick = () => { if (start.hidden) toggle(); };
+  const toggle = () => { auto = false; v.paused ? v.play() : v.pause(); };
+  const unmute = () => { auto = false; v.muted = false; v.currentTime = 0; v.play(); wake(); };   // from the top, so the score starts with the film
+  let tapped = false;   // a click or key anywhere on the page: browsers then allow sound without a tap on the video
+  ["pointerdown", "keydown", "touchstart"].forEach((n) => addEventListener(n, () => { tapped = true; }, { once: true, passive: true }));
+  const active = () => tapped || !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
+  sound.onclick = unmute;
+  v.onclick = () => { if (!start.hidden) return; if (auto && v.muted) unmute(); else toggle(); };
   $("vPlay").onclick = toggle;
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) new IntersectionObserver(([e]) => {
+    if (!auto) return;
+    if (!e.isIntersecting) return v.paused || v.pause();
+    if (!v.paused || v.ended) return;
+    const on = () => { start.hidden = true; bar.hidden = false; sound.hidden = !v.muted; muteIcon(); wake(); };
+    v.muted = !active();   // already clicked somewhere: try with sound, and fall back to muted if the browser says no
+    v.play().then(on).catch(() => { v.muted = true; v.play().then(on).catch(() => {}); });
+  }, { threshold: 0.6 }).observe(frame);
   v.onplay = v.onpause = () => {
     $("vPlayIcon").setAttribute("d", v.paused ? PLAY : PAUSE); $("vPlay").setAttribute("aria-label", v.paused ? "Play" : "Pause"); wake();
   };
-  v.onended = () => { bar.hidden = true; start.hidden = false; $("startLabel").textContent = "Watch again"; frame.classList.remove("idle"); };
+  v.onended = () => { auto = false; sound.hidden = true; bar.hidden = true; start.hidden = false; $("startLabel").textContent = "Watch again"; frame.classList.remove("idle"); };
   v.onloadedmetadata = () => { $("vDur").textContent = fmt(v.duration); seek.setAttribute("aria-valuemax", Math.round(v.duration)); };
   const show = () => {
     const f = v.duration ? v.currentTime / v.duration : 0;
@@ -853,8 +889,8 @@ new IntersectionObserver(([e]) => document.getElementById("nav").classList.toggl
   seek.onpointermove = (e) => { if (seek.classList.contains("drag")) to(e.clientX); };
   seek.onpointerup = seek.onpointercancel = () => seek.classList.remove("drag");
   const muteIcon = () => { $("vWave").style.display = v.muted ? "none" : ""; $("vMute").setAttribute("aria-label", v.muted ? "Unmute" : "Mute"); };
-  $("vMute").onclick = () => { v.muted = !v.muted; muteIcon(); };
-  v.onvolumechange = muteIcon;
+  $("vMute").onclick = () => { auto = false; v.muted = !v.muted; muteIcon(); };
+  v.onvolumechange = () => { muteIcon(); if (!v.muted) sound.hidden = true; };
   $("vFull").onclick = () => (document.fullscreenElement ? document.exitFullscreen() : (frame.requestFullscreen || frame.webkitRequestFullscreen).call(frame));
   frame.addEventListener("pointermove", wake);
   frame.addEventListener("keydown", (e) => {
