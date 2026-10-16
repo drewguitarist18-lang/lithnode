@@ -31,15 +31,16 @@
   html { background: var(--void); }
   body { margin: 0; color: var(--ink); font: 430 15.4px/1.66 var(--mono); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   a { color: inherit; }
-  /* the black hole: rendered once, ahead of time, by the same light-bending ray tracer at very high quality, then
-     shipped as an image. Sharp, instant, and no work for your computer. It lives at the top of the page, shifts a touch
-     with the mouse, and fades into the page at the bottom. */
+  /* the black hole: ray traced live by black-hole.js, the camera easing toward the cursor. It fades in from black;
+     without WebGL a still picture shows instead. It lives at the top of the page and fades into it at the bottom. */
   .sky { position: absolute; top: 0; left: 0; width: 100%; height: 100svh; z-index: 0; overflow: hidden; background: var(--void);
          -webkit-mask-image: linear-gradient(#000 72%, transparent); mask-image: linear-gradient(#000 72%, transparent); }
-  .sky .layer { position: absolute; inset: -14px -14px calc(-14px - 8vh); display: block; transform: translate(var(--px, 0px), calc(var(--py, 0px) - 8vh));   /* the bright band sits behind the headline, not the small text */
-                 transition: transform 1.4s cubic-bezier(.16,1,.3,1); }
-  .sky video { width: 100%; height: 100%; object-fit: cover; display: block; }
-  @media (prefers-reduced-motion: reduce) { .sky .layer { transition: none; } }
+  .sky .layer { position: absolute; inset: 0; }
+  .sky .layer.still { background: url(media/black-hole-wide.webp) center 30% / cover no-repeat; }
+  @media (max-aspect-ratio: 4/5) { .sky .layer.still { background-image: url(media/black-hole-tall.webp); } }
+  .sky canvas { width: 100%; height: 100%; display: block; opacity: 0; }
+  .sky canvas.on { opacity: 1; animation: hole-in 2.4s cubic-bezier(.16,1,.3,1); }
+  @keyframes hole-in { from { opacity: 0; transform: scale(1.12); } }
   main, nav, footer { position: relative; z-index: 1; }
   .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
 
@@ -372,10 +373,11 @@
   }
 </style>
 <script defer src="/_vercel/insights/script.js"></script>
+<script defer src="black-hole.js"></script>
 </head>
 <body>
 <div class="sky" id="sky" aria-hidden="true"><div class="layer">
-  <video id="skyVideo" muted loop playsinline preload="auto" poster="media/black-hole-wide.webp"></video>
+  <canvas id="hole"></canvas>
 </div></div>
 
 <div id="top" aria-hidden="true"></div>
@@ -532,28 +534,6 @@
 
 <script>
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-// ---------------------------------------------------------------- the black hole: a looping film of the disk turning
-// Rendered ahead of time by the same light-bending ray tracer (marketing/black-hole). Phones get the tall cut; with
-// reduced motion it stays a still picture.
-(() => {
-  const v = document.getElementById("skyVideo"), tall = matchMedia("(max-aspect-ratio: 4/5)").matches;
-  v.poster = tall ? "media/black-hole-tall.webp" : "media/black-hole-wide.webp";
-  if (reduce) return;
-  const cut = tall ? "tall" : "wide";
-  v.innerHTML = `<source src="media/black-hole-${cut}.webm" type="video/webm"><source src="media/black-hole-${cut}.mp4" type="video/mp4">`;
-  v.load(); v.play().catch(() => {});
-  // stop decoding once it's scrolled away
-  new IntersectionObserver(([e]) => (e.isIntersecting ? v.play().catch(() => {}) : v.pause())).observe(v);
-})();
-// ---------------------------------------------------------------- the black hole shifts a touch with the mouse
-if (!reduce) {
-  const sky = document.getElementById("sky");
-  addEventListener("pointermove", (e) => {
-    sky.style.setProperty("--px", Math.round((e.clientX / innerWidth - .5) * -14) + "px");   // whole pixels: the image never resamples soft
-    sky.style.setProperty("--py", Math.round((e.clientY / innerHeight - .5) * -9) + "px");
-  }, { passive: true });
-}
 
 // ---------------------------------------------------------------- pixel bots
 // Every bot on the page watches your cursor (its pupils move toward it) and can be petted: click it and it closes

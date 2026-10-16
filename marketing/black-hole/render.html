@@ -3,7 +3,7 @@
 <script>
 const FS = `
     precision highp float;
-    uniform vec2 uRes; uniform float uT; uniform vec2 uLook; uniform float uZoom; uniform float uSpin; uniform float uRoll;
+    uniform vec2 uRes; uniform float uT; uniform vec2 uLook; uniform float uZoom; uniform float uSpin; uniform float uRoll; uniform float uShift;
     float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
     float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
       return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
@@ -13,16 +13,17 @@ const FS = `
     float noise3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
       return mix(mix(mix(hash3(i), hash3(i + vec3(1,0,0)), f.x), mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x), f.y),
                  mix(mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x), mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+    float shash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }   // a better spread for star places
     vec3 sky(vec3 d){
       vec3 c = vec3(0.);
       for (int L = 0; L < 3; L++) {
-        float sc = 70. + float(L) * 120.;
+        float sc = 150. + float(L) * 190.;
         vec3 g = d * sc, id = floor(g);
-        float h = hash3(id + float(L) * 13.1);
-        if (h > .9) {
-          vec3 o = vec3(hash3(id + 1.3), hash3(id + 5.9), hash3(id + 9.4));
-          float r = length(g - id - o);
-          c += vec3(smoothstep(.075, .0, r) * (.25 + (h - .9) * 18.));
+        float h = shash(id + float(L) * 13.1);
+        if (h > .72) {
+          vec3 o = vec3(shash(id + 1.3), shash(id + 5.9), shash(id + 9.4));
+          float r = length(d - normalize(id + o)) * sc;   // distance across the sky, so stars stay round
+          c += vec3(smoothstep(.1, .0, r) * (.35 + (h - .72) * 5.));
         }
       }
       float haze = noise3(d * 3.) * .6 + noise3(d * 7.) * .3 + noise3(d * 15.) * .1;
@@ -30,59 +31,54 @@ const FS = `
       return c;
     }
     void main(){
-      vec2 uv = (gl_FragCoord.xy - .5 * uRes) / uRes.y * uZoom;
-      uv = mat2(cos(uRoll), sin(uRoll), -sin(uRoll), cos(uRoll)) * uv;   // tilted a little to the right
-      float pitch = .2 + uLook.y, yaw = uLook.x;
-      vec3 ro = vec3(sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch)) * 52.;   // farther back: room for a long disk
+      vec2 uv = (gl_FragCoord.xy - .5 * uRes) / uRes.y;
+      uv.y -= uShift;                                              // the hole sits above the middle, the words go under it
+      uv *= uZoom;
+      uv = mat2(cos(uRoll), sin(uRoll), -sin(uRoll), cos(uRoll)) * uv;   // tilted: the band falls to the right
+      float pitch = .055 + uLook.y, yaw = uLook.x;
+      vec3 ro = vec3(sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch)) * 160.;   // far back, so stars away from the hole are only gently lensed
       vec3 fw = normalize(-ro), rt = normalize(cross(vec3(0., 1., 0.), fw)), up = cross(fw, rt);
       vec3 pos = ro, vel = normalize(fw * 2. + rt * uv.x + up * uv.y);
       float h2 = dot(cross(pos, vel), cross(pos, vel));
-      vec3 col = vec3(0.); float a = 0., glow = 0., haze = 0.; bool fell = false;
-      for (int i = 0; i < 900; i++) {
+      vec3 col = vec3(0.); float a = 0., glow = 0.; bool fell = false;
+      for (int i = 0; i < 1200; i++) {
         float r2 = dot(pos, pos), r = sqrt(r2);
         if (r < 1.) { fell = true; break; }
-        float dt = clamp(.016 * r * r / (r + 2.), .004, .5);   // fine steps near the hole: a clean shadow edge
-        vec3 prev = pos;
+        float pr = length(pos.xz);
+        float th = .14 + .008 * pr;                                // the gas gets thicker farther out
+        bool inGas = abs(pos.y) < th * 3. && pr < 64.;
+        float dt = clamp(.016 * r * r / (r + 2.), .004, inGas ? .12 + .02 * pr : 2.);
         vel += -1.5 * h2 * pos / (r2 * r2 * r) * dt;
         pos += vel * dt;
         // light that skims the photon sphere (r = 1.5) piles up into the thin bright ring around the shadow
-        glow += dt * exp(-pow((r - 1.52) * 7., 2.));
-        // a little light scattered just above and below the disk, so it blooms instead of ending in a hard line
-        float pr = length(pos.xz);
-        if (pr > 2.6 && pr < 11.) haze += dt * exp(-pos.y * pos.y * 30.) * pow(3. / pr, 3.);
-        if (prev.y * pos.y < 0.) {                                 // crossed the disk plane
-          vec3 q = mix(prev, pos, prev.y / (prev.y - pos.y));
-          float qr = length(q.xz);
-          if (qr > 2.45 && qr < 26.) {
-            float ang = atan(q.z, q.x) + uSpin;   // the whole disk turns, so a loop of the animation has no seam
-            vec2 cs = vec2(cos(ang), sin(ang));
-            // streaks that follow the orbit: fine in radius, long along the circle (sampled on the circle: no seam)
-            // blended gas, not strands: broad bands and clumps that mix (a warped lookup keeps it swirling, not striped)
-            vec3 w = vec3(qr * 2.2, cs * 1.8);
-            vec3 warp = vec3(noise3(w), noise3(w + 7.1), noise3(w + 3.7)) - .5;
-            float streak = noise3(vec3(qr * 3.6, cs * 2.4) + warp * 1.6) * .55 + noise3(vec3(qr * 8.5, cs * 4.5) + warp) * .3 + noise3(vec3(qr * 18., cs * 8.)) * .15;
-            streak = mix(.55, streak, .75);
-            float x = (qr - 2.45) / 23.55;
-            float profile = smoothstep(0., .01, x) * (pow(1. - x, 3.2) * .85 + .15 * pow(1. - x, 1.2)) * smoothstep(1., .7, x);   // a hot inner edge, a long faint reach outward   // a sharp, hot inner edge fading outward
-            vec3 orbit = normalize(vec3(-q.z, 0., q.x));
-            float beta = sqrt(.5 / qr);
-            float dop = 1. / (1. - beta * dot(orbit, -normalize(vel)));
-            float lum = profile * (.3 + 1.2 * streak) * pow(dop, 2.4) * 1.25;
-            float op = clamp(profile * (.6 + .9 * streak) * 1.6, 0., 1.);
-            float under = prev.y < 0. ? .16 : 1.;   // the disk seen from below (the arc under the hole) stays quieter
-            col += (1. - a) * op * vec3(lum * under);
-            a += (1. - a) * op;
-            if (a > .985) break;
-          }
+        glow += dt * exp(-pow((r - 1.53) * 9., 2.));
+        // the disk is a soft slab of glowing gas, not a sheet: light builds up through it, so it blurs at the edges
+        pr = length(pos.xz);
+        if (pr > 1.6 && pr < 64. && abs(pos.y) < th * 3.) {
+          float ang = atan(pos.z, pos.x) + uSpin;                  // the whole disk turns, so a loop has no seam
+          vec2 cs = vec2(cos(ang), sin(ang));
+          // gas smeared along the orbit: soft in radius, long along the circle (sampled on the circle: no seam)
+          float streak = noise3(vec3(pr * 1.6, cs * 2.2)) * .45 + noise3(vec3(pr * 6., cs * 3.5)) * .35 + noise3(vec3(pr * 14., cs * 5.)) * .2;   // fine rings, like gas in lanes
+          streak = mix(.6, streak, .7);
+          float x = pr - 1.6;
+          // a bright inner ring close to the hole, then a long faint reach out to the edges of the frame
+          float prof = smoothstep(0., .2, x) * (exp(-pow((x - .55) / .6, 2.)) * 3.2 + exp(-x / 6.) * .32 + exp(-x / 22.) * .012) * smoothstep(64., 30., pr);
+          float dens = exp(-pow(pos.y / th, 2.)) * prof;
+          vec3 orbit = normalize(vec3(-pos.z, 0., pos.x));
+          float beta = sqrt(.5 / pr);
+          float dop = 1. / (1. - beta * dot(orbit, -normalize(vel)));
+          float lum = dens * (.4 + streak) * pow(dop, 1.3) * .14;
+          float op = clamp(dens * (.5 + streak) * .08 * dt / th, 0., 1.);
+          col += (1. - a) * lum * dt / th * vec3(1.);
+          a += (1. - a) * op;
+          if (a > .985) break;
         }
-        if (r2 > 9000. && dot(pos, vel) > 0.) break;   // far out and heading away: it escaped
+        if (r2 > 40000. && dot(pos, vel) > 0.) break;              // far out and heading away: it escaped
       }
       if (!fell) col += (1. - a) * sky(normalize(vel));
-      if (!fell) col += vec3(glow * .16) * (1. - a * .7);        // the shadow stays black: light that falls in never comes out
-      
-      col = 1. - exp(-col * 1.45);
-      col = smoothstep(.02, .97, col);                              // more white and black, less grey
-      col *= vec3(1., .988, .965);           // the page's off-white
+      if (!fell) col += vec3(glow * .5) * (1. - a * .8);        // the shadow stays black: light that falls in never comes out
+      col = 1. - exp(-col * 1.35);
+      col *= vec3(.97, .975, 1.);                                  // a faintly cool white, like the reference
       gl_FragColor = vec4(col, 1.);
     }`;
 const VS = "attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }";
@@ -94,7 +90,7 @@ window.render = (W, H, zoom) => {
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), gl.STATIC_DRAW);
   const l = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, 2, gl.FLOAT, false, 0, 0);
   const U = (n) => gl.getUniformLocation(pr, n);
-  gl.viewport(0, 0, W, H); gl.uniform2f(U("uRes"), W, H); gl.uniform1f(U("uT"), 6.); gl.uniform2f(U("uLook"), 0, 0); gl.uniform1f(U("uZoom"), zoom); gl.uniform1f(U("uSpin"), window.SPIN || 0.); gl.uniform1f(U("uRoll"), window.ROLL ?? .1);
+  gl.viewport(0, 0, W, H); gl.uniform2f(U("uRes"), W, H); gl.uniform1f(U("uT"), 6.); gl.uniform2f(U("uLook"), 0, 0); gl.uniform1f(U("uZoom"), zoom); gl.uniform1f(U("uSpin"), window.SPIN || 0.); gl.uniform1f(U("uRoll"), window.ROLL ?? .2); gl.uniform1f(U("uShift"), window.SHIFT ?? .12);
   gl.enable(gl.SCISSOR_TEST);
   const strip = 64;                                   // small strips, so the GPU never stalls long enough to reset
   for (let y = 0; y < H; y += strip) { gl.scissor(0, y, W, strip); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.finish(); }
