@@ -120,6 +120,7 @@ project = Path(tempfile.mkdtemp(prefix="hq-project-"))
 # leave no test folders behind, even if a check crashes
 atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in (hq_home, bot_home, pet_home, cli_dir, project)])
 (project / "app.py").write_text("print('hi')\n")
+os.utime(project / "app.py", (time.time() - 3600, time.time() - 3600))   # older than any run, so no run counts it as its own
 Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True}))
 server = start_server()
 try:

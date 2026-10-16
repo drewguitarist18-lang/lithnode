@@ -157,7 +157,10 @@ def _capture(exe, url, out, budget_ms, size, wait_for=None):
             time.sleep(0.25)
         time.sleep(0.3)   # let it finish writing
     except subprocess.TimeoutExpired:
-        raise RuntimeError("The browser took too long to draw the page.")
+        # some headless Chromes (seen on macOS) never exit after a page that reported back: if the picture
+        # and the report both landed, the work is done and the hang doesn't matter
+        if not (out.exists() and out.stat().st_size > 0 and (wait_for is None or wait_for.is_set())):
+            raise RuntimeError("The browser took too long to draw the page.")
     finally:
         shutil.rmtree(profile, ignore_errors=True)
     if not out.exists():
