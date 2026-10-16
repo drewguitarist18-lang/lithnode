@@ -85,7 +85,7 @@
               float vy = max(abs(d.y), .02);
               float s = gas(pr, atan(pc.z, pc.x) + float(k) * 1.7, trav * uPix / vy);
               float wk = k == 0 ? 1. : (k == 1 || k == -1) ? .5 : .25;
-              float prof = smoothstep(0., .8, x) * (exp(-x / .85) + exp(-x / 8.) * .27) * smoothstep(22., 2., pr) * wk;
+              float prof = smoothstep(0., .8, x) * (exp(-x / .85) + exp(-x / 8.) * .27 * mix(1., smoothstep(.25, .06, vy), smoothstep(0., 3., dot(pc.xz, normalize(ro.xz))))) * smoothstep(22., 2., pr) * wk;
               float al = 1. - exp(-prof * (.35 + .8 * s * s) * .3 / pow(vy, 1.5));   // seen edge-on a sheet is thick: denser, brighter
               vec3 orbit = normalize(vec3(-pc.z, 0., pc.x));
               float dop = 1. / (1. - sqrt(.5 / pr) * dot(orbit, -d));
@@ -98,7 +98,7 @@
         if (r > 40. && dot(pos, vel) > 0.) break;
       }
       // the sky is only partly bent: full bending smears every star on the screen into an arc
-      if (!fell) col += (1. - a) * (sky(normalize(mix(v0, normalize(vel), .12))) + vec3(1., .95, .87) * glow * .25);
+      if (!fell) col += (1. - a) * (sky(normalize(mix(v0, normalize(vel), .12))) * smoothstep(.8, .32, length(normalize(vel) - v0)) + vec3(1., .95, .87) * glow * .25);
       col = 1. - exp(-col * 1.);
       gl_FragColor = vec4(col * vec3(.93, .95, .98), 1.);   // a cool silver, not a pure white
     }`;
