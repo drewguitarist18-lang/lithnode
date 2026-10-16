@@ -151,6 +151,12 @@ if "--append-system-prompt" in flags:
             {"type": "tool_use", "id": "toolu_r", "name": "Read", "input": {"file_path": os.path.join(os.getcwd(), "app.py")}}]}, **base})
         out({"type": "user", "message": {"role": "user", "content": [
             {"type": "tool_result", "tool_use_id": "toolu_r", "content": "print('hi')"}]}, **base})
+    if "NOUSAGE" in system:   # the plan is out of usage: Claude Code says so in its own notice
+        out({"type": "assistant", "message": {"model": "<synthetic>", "role": "assistant", "content": [
+            {"type": "text", "text": "You've hit your usage limit · resets 3pm"}]}, **base})
+        out({"type": "result", "subtype": "success", "is_error": True, "result": "You've hit your usage limit · resets 3pm",
+             "total_cost_usd": 0, "num_turns": 1, **base})
+        sys.exit(1)
     if "FAILSTAGE" in system or "FAILME" in prompt:
         out({"type": "result", "subtype": "error_during_execution", "is_error": True, "result": "Mock agent blew up",
              "total_cost_usd": 0.005, "num_turns": 1, **base})
@@ -197,8 +203,9 @@ if "--append-system-prompt" in flags:
                      if not any(w in i["title"] for w in ("Posture", "LED", "Earbuds"))]
         text = (f"Done.\n\nREPORT: {stage}: {len(items)} products.\n\n```items\n" + json.dumps(items) + "\n```")
     out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
+    used = {"usage": {"input_tokens": 1200, "output_tokens": 800, "cache_read_input_tokens": 30000 + len(text) * 40}} if os.environ.get("CLAWD_MOCK_RICH") else {}
     out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": 0.01,
-         "num_turns": 2, "terminal_reason": "completed", **base})
+         "num_turns": 2, "terminal_reason": "completed", **used, **base})
     log({"end": session, "t": time.time()})
     sys.exit(0)
 

@@ -567,7 +567,18 @@
   details.more[open] > summary::before { content: "▾ "; }
   details.more[open] { padding-bottom: 4px; }
   .folder { display: flex; gap: 6px; }
+  .limit { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .limit select { flex: none; width: auto; } .limit .sub { margin: 0; flex: 1; min-width: 200px; }
   .folder input { flex: 1; min-width: 0; }
+  .spend { display: grid; gap: 8px; max-width: 560px; padding: 14px 22px 18px; }
+  .spend div { display: grid; grid-template-columns: 96px 1fr 52px; gap: 10px; align-items: center; font-size: 12.5px; }
+  .spend i { height: 8px; border-radius: 4px; background: var(--line); position: relative; overflow: hidden; }
+  .spend i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--accent); border-radius: 4px; }
+  .spend b { text-align: right; font-variant-numeric: tabular-nums; }
+  .roles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .roles label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .roles span { font-size: 11.5px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+  .roles select { width: 100%; min-width: 0; }
+  @media (max-width: 480px) { .roles { grid-template-columns: 1fr; } }
   .progress { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 8px 0 4px; }
   .progress i { display: block; height: 100%; background: var(--running); transition: width .4s ease; }
   .progress.done i { background: var(--done); } .progress.failed i { background: var(--failed); }
@@ -664,6 +675,15 @@
   .rp-bottom small { display: block; color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; margin-bottom: 5px; }
   .rp-bottom p { margin: 0; font-size: 17px; line-height: 1.5; font-weight: 600; }
   html body .rp-bottom p { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .rp-files { margin-bottom: 18px; }
+  .rp-files > small { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; margin: 0 4px 8px; }
+  .rp-files > small button { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; padding: 3px 10px; }
+  .rp-files .list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rfile { display: inline-flex; align-items: baseline; gap: 8px; max-width: 100%; padding: 8px 12px; border-radius: 10px; text-align: left;
+           background: var(--panel); border: 1px solid var(--line); cursor: pointer; font-size: 13.5px; }
+  .rfile:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  .rfile b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rfile span { color: var(--muted); font-size: 12px; white-space: nowrap; }
   .finds { display: grid; gap: 10px; margin-bottom: 18px; }
   .rfind { display: grid; grid-template-columns: 30px 1fr; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
   .rfind > i { font-style: normal; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 13px;
@@ -810,6 +830,18 @@
       <button type="button" data-browse="folderIn">Browse…</button></div>
       <div class="recent" id="recentChips"></div>
       <div class="sub">Agents work here. Reviewers only read it; builders can change it.</div></div>
+    <div class="field"><label for="limitIn">Token limit</label>
+      <div class="limit"><select id="limitIn">
+        <option value="250000">250k tokens</option><option value="500000">500k tokens</option>
+        <option value="1000000">1M tokens</option><option value="2000000">2M tokens</option>
+        <option value="5000000">5M tokens</option><option value="0">No limit</option></select>
+        <span class="sub" id="limitSub"></span></div></div>
+    <div class="field"><label>Models</label>
+      <div class="roles">
+        <label><span>Think</span><select id="roleThink" data-role="think"></select></label>
+        <label><span>Build</span><select id="roleBuild" data-role="build"></select></label>
+        <label><span>Run</span><select id="roleRun" data-role="run"></select></label></div>
+      <div class="sub" id="rolesSub"></div></div>
     <label id="riskBox" class="risk" hidden><input type="checkbox" id="riskOk"> <span id="riskText"></span></label>
     <div id="runWarn" class="hint" style="color:var(--failed)"></div>
   </div>
@@ -917,6 +949,11 @@ const TOOL_INFO = {
   edit: "Read and edit files", full: "Edit files and run commands",
 };
 const TYPE_LABEL = { master: "Start", cluster: "Team", checkpoint: "Checkpoint", approval: "Approval", done: "Done" };
+// Stages take a role, and the flow says which model fills it (flows.py DEFAULT_MODELS)
+const DEFAULT_MODELS = { think: "claude-opus-5-5", build: "claude-sonnet-5-5", run: "claude-haiku-4-5" };
+const ROLE_NAME = { think: "Think", build: "Build", run: "Run" };
+const ROLE_OF = { "claude-opus-5-5": "think", "claude-sonnet-5-5": "build", "claude-haiku-4-5": "run" };
+const roleModel = (role) => ((flow && flow.models) || DEFAULT_MODELS)[role] || DEFAULT_MODELS[role];
 const modelLabel = (id) => (meta.models.find((m) => m.id === id) || {}).label || ENGINE_NAME[id] || id;
 const locked = () => !!run;
 const shown = () => (run ? run.flow : flow);     // the run view draws the flow as it was when it ran
@@ -1123,11 +1160,11 @@ function addNode(type, x, y, botId) {
   if (existing) { select({ kind: "node", id: existing.id }); return toast("A flow has one Done step. Wire your last steps into this one."); }
   const n = { id: newId(type), type, x: Math.round(x), y: Math.round(y), name: { cluster: "Team", checkpoint: "Checkpoint", approval: "Approval", done: "Done" }[type] };
   if (type === "cluster") {
-    Object.assign(n, { count: 1, model: "claude-sonnet-5-5", tools: "read", effort: "low", instructions: "", focuses: "", shape: "crab", color: "#ecebe6", max_turns: 0 });
+    Object.assign(n, { count: 1, role: "build", model: roleModel("build"), tools: "read", effort: "low", instructions: "", focuses: "", shape: "crab", color: "#ecebe6", max_turns: 0 });
     const b = bots.find((x) => x.id === botId);
     if (b) applyBot(n, b);
   }
-  if (type === "checkpoint") Object.assign(n, { mode: "pass", model: "claude-haiku-4-5", on_error: "stop" });
+  if (type === "checkpoint") Object.assign(n, { mode: "pass", role: "run", model: roleModel("run"), on_error: "stop" });
   if (type === "approval") Object.assign(n, { message: "", webhook: "" });
   flow.nodes.push(n);
   sel = { kind: "node", id: n.id };
@@ -1137,7 +1174,7 @@ const builtinOf = (n) => { const b = bots.find((x) => x.id === n.bot); return b 
 const teamBots = () => bots.filter((b) => b.team !== false);   // bots set to chat-only stay out of Flows
 function applyBot(n, b) {
   Object.assign(n, { name: b.name, bot: b.id, shape: b.shape, color: b.color, instructions: b.instructions || "",
-                     model: b.model || n.model, tools: b.tools || (b.web_search ? "web" : "read") });
+                     model: b.model || n.model, role: ROLE_OF[b.model || n.model] || "", tools: b.tools || (b.web_search ? "web" : "read") });
 }
 
 // ------------------------------------------------------------------ canvas math
@@ -1239,13 +1276,16 @@ function layoutFlow(direction, f = flow) {
   if (direction === "tb") return layoutAt(direction, f, 2100);
   const r = $("canvas").getBoundingClientRect(), ch = r.height - 108;
   if (r.width < 200 || ch < 120) return layoutAt(direction, f, 2100);
+  layoutAt(direction, f, Infinity);   // a short flow reads best as one straight line, even if it draws a bit smaller
+  const wired = new Set(f.edges.flatMap((e) => [e.from, e.to]));
+  if (new Set(f.nodes.filter((n) => wired.has(n.id) || n.type === "master").map((n) => n.x)).size <= 5) return;
   let best = 2100, bestK = -1;
   for (let w = 2100; w >= 700; w -= 140) {   // widest first: when two fit as big, fewer rows wins
     layoutAt(direction, f, w);
     const bx = f.nodes.map((n) => ({ n, ...nodeSize(n) }));
     const W = Math.max(...bx.map((b) => b.n.x + b.w)) - Math.min(...bx.map((b) => b.n.x)) + 80;
     const H = Math.max(...bx.map((b) => b.n.y + b.h)) - Math.min(...bx.map((b) => b.n.y)) + 80;
-    const k = Math.min(1, r.width / W, ch / H);
+    const k = Math.min(1, r.width / W, ch / H) * Math.pow(.85, (rowGaps.get(f.id) || []).length);   // each extra row must earn its place
     if (k > bestK + .02) { bestK = k; best = w; }
   }
   layoutAt(direction, f, best);
@@ -1491,7 +1531,7 @@ function renderChips() {
   $("estChip").hidden = !e;
   if (e) {
     const per = Object.entries(e.per_model).map(([m, c]) => `${c}× ${modelLabel(m)}`).join(", ");
-    const steps = flow.nodes.filter((n) => n.type !== "done" && n.type !== "master").length;
+    const steps = stepCount(flow);
     $("estChip").textContent = `${e.sessions} agent${e.sessions === 1 ? "" : "s"} · ${steps} step${steps === 1 ? "" : "s"}`;
     $("estChip").title = per ? per + "." : "";
   }
@@ -1795,7 +1835,7 @@ function renderInspector() {
   box.classList.remove("padded");
   const n = sel && sel.kind === "node" ? nodeById(sel.id) : null;
   if (!n) {
-    const steps = flow.nodes.filter((x) => x.type !== "done").length;
+    const steps = stepCount(flow);
     box.innerHTML = `<div class="isec" style="padding-top:18px">
         <div class="big">${esc(flow.name)}</div>
         <div class="stats"><span>${est ? est.sessions : 0} agent${est && est.sessions === 1 ? "" : "s"}</span><span>${steps} step${steps === 1 ? "" : "s"}</span>
@@ -1847,6 +1887,13 @@ function renderInspector() {
       `<button type="button" data-effort="${v}" class="${j <= k ? "lit" : ""}" style="height:${30 + j * 17.5}%" title="${l}" aria-label="Effort: ${l}"></button>`).join("")}</div>
       <div class="lbl"><span>Effort</span><b>${off ? "Haiku doesn't use effort" : EFFORTS[k][1]}</b></div></div>`;
   };
+  const ROLE_TIPS = { think: "Planning, design, writing, judgment", build: "Making and changing things", run: "Checks, tests, merges, deploys" };
+  const modelPick = (node) => {   // a role (the Run menu says which model fills it) or a model picked by hand
+    const role = node.role || "";
+    return seg("role", [["think", "Think", ROLE_TIPS.think], ["build", "Build", ROLE_TIPS.build], ["run", "Run", ROLE_TIPS.run], ["", "Pick a model"]], role)
+      + (role ? `<div class="sub">${esc(ROLE_TIPS[role])}. Uses <b>${esc(modelLabel(roleModel(role)))}</b>; change which model fills ${ROLE_NAME[role]} in the Run menu.</div>`
+              : models(node.model));
+  };
   const modelNote = (value) => { const m = meta.models.find((x) => x.id === value); return m ? `<div class="sub">${esc(m.label)}: ${esc(m.blurb.toLowerCase())}</div>` : ""; };
   const ACCESS = [["none", "Think only"], ["read", "Read files"], ["web", "Web"], ["research", "Read + web"], ["edit", "Edit files"], ["full", "Edit + run code"]];
   const ACCESS_NOTE = { none: "No tools: works only from what it's given.", read: "Can read the project, can't change anything.", web: "Can search and read the web.",
@@ -1863,7 +1910,7 @@ function renderInspector() {
     html += `<div class="isec"><h4>Start</h4><p class="hint" style="margin:0">Every run starts here: your task goes in, then flows down the wires.</p>
         <label class="switch"><span><b>Write a plan first</b><small>${n.mode === "pass" ? "Off: your task goes straight to the first team. Free." : "On: one agent turns your task into a short plan every team reads."}</small></span>
           <input type="checkbox" id="planSw"${n.mode === "pass" ? "" : " checked"}></label></div>`;
-    if (n.mode !== "pass") html += `<div class="isec"><h4>Model</h4>${models(n.model)}${modelNote(n.model)}${effortBar(n)}</div>
+    if (n.mode !== "pass") html += `<div class="isec"><h4>Model</h4>${modelPick(n)}${n.role ? "" : modelNote(n.model)}${effortBar(n)}</div>
       <div class="isec"><h4>Always tell the team</h4><textarea data-k="instructions" rows="3" placeholder="e.g. Use TypeScript. Keep changes small.">${esc(n.instructions || "")}</textarea></div>
       <div class="isec">${more(`<div class="field"><label>It can</label>${chips("tools", ACCESS, n.tools)}</div>`)}</div>`;
   }
@@ -1879,7 +1926,7 @@ function renderInspector() {
         ${n.count > 1 ? `<label class="switch"><span><b>Split the job</b><small>${n.split ? `One job, cut into ${n.count} parts, done at once` : "Off: every agent does the whole job"}</small></span>
           <input type="checkbox" id="splitSw"${n.split ? " checked" : ""}></label>` : ""}</div>
       <div class="isec"><h4>Engine</h4>${engineCards(n)}
-        ${claude ? `${models(n.model)}${modelNote(n.model)}${effortBar(n)}`
+        ${claude ? `${modelPick(n)}${n.role ? "" : modelNote(n.model)}${effortBar(n)}`
           : `<div class="field"><label>Model</label>${engineModels(n)}</div>`}</div>
       <div class="isec"><h4>Access</h4>${chips("tools", ACCESS, n.tools)}
         <div class="sub">${esc(n.split && n.count > 1 && n.tools === "edit" ? "Can change files. With Split the job on, each agent writes only its own part." : ACCESS_NOTE[n.tools] || "")}</div>
@@ -1895,7 +1942,7 @@ function renderInspector() {
   if (n.type === "checkpoint") {
     html += `<div class="isec"><h4>When everything before it is done</h4>${seg("mode", [["pass", "Pass reports on"], ["summarize", "Merge into one"]], n.mode)}
         <div class="sub">${n.mode === "summarize" ? "One agent merges the reports into a short handoff. Keeps later steps lean." : "Free: every report goes to the next step as is."}</div></div>`;
-    if (n.mode === "summarize") html += `<div class="isec"><h4>Model</h4>${models(n.model)}</div>
+    if (n.mode === "summarize") html += `<div class="isec"><h4>Model</h4>${modelPick(n)}</div>
       <div class="isec"><h4>If merging fails</h4>${seg("on_error", [["stop", "Stop the run"], ["continue", "Pass reports on"]], n.on_error)}</div>`;
   }
   if (n.type === "approval") {
@@ -1921,19 +1968,21 @@ function renderInspector() {
     });
   });
   box.querySelectorAll("[data-seg] button").forEach((b) => b.addEventListener("click", () => {
-    n[b.parentElement.dataset.seg] = b.dataset.v; changed(false); renderInspector();
+    n[b.parentElement.dataset.seg] = b.dataset.v;
+    if (b.parentElement.dataset.seg === "role" && b.dataset.v) n.model = roleModel(b.dataset.v);
+    changed(false); renderInspector();
   }));
   const range = $("mRange");
   if (range) {
     range.addEventListener("input", () => {   // live while dragging; full redraw when let go
       const m = ordered[Number(range.value)];
-      n.model = m.id; range.style.setProperty("--fill", `${(Number(range.value) / (ordered.length - 1)) * 100}%`);
+      n.model = m.id; n.role = ""; range.style.setProperty("--fill", `${(Number(range.value) / (ordered.length - 1)) * 100}%`);
       box.querySelectorAll("[data-model-i]").forEach((b) => b.classList.toggle("on", Number(b.dataset.modelI) === Number(range.value)));
       changed(false);
     });
     range.addEventListener("change", () => renderInspector());
   }
-  box.querySelectorAll("[data-model-i]").forEach((b) => b.addEventListener("click", () => { n.model = ordered[Number(b.dataset.modelI)].id; changed(false); renderInspector(); }));
+  box.querySelectorAll("[data-model-i]").forEach((b) => b.addEventListener("click", () => { n.model = ordered[Number(b.dataset.modelI)].id; n.role = ""; changed(false); renderInspector(); }));
   box.querySelectorAll("[data-effort]").forEach((b) => b.addEventListener("click", () => { n.effort = b.dataset.effort; changed(false); renderInspector(); }));
   if ($("planSw")) $("planSw").onchange = (e) => { n.mode = e.target.checked ? "brief" : "pass"; changed(false); renderInspector(); };
   box.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => {
@@ -2004,6 +2053,20 @@ $("runBtn").onclick = () => {
   ].filter(Boolean).join(" ");
   const ready = () => { $("goBtn").disabled = problems.length > 0 || (careful && !$("riskOk").checked); };
   $("riskOk").onchange = ready; ready();
+  const lim = String(flow.limit ?? 1000000);
+  if (![...$("limitIn").options].some((o) => o.value === lim)) $("limitIn").add(new Option(lim === "0" ? "No limit" : `${tokenWord(+lim)} tokens`, lim));
+  $("limitIn").value = lim;
+  const limitNote = () => {
+    const n = +$("limitIn").value;
+    $("limitSub").textContent = n ? `The run stops if its agents use more, and no one agent may use over ${tokenWord(n / 2)}.` : "Agents run until they finish. Big flows can use a lot of your plan.";
+  };
+  $("limitIn").onchange = limitNote; limitNote();
+  const roleSelects = [...document.querySelectorAll("#runDlg [data-role]")];
+  roleSelects.forEach((el) => { el.innerHTML = opt(meta.models.map((m) => [m.id, m.label]), roleModel(el.dataset.role)); el.value = roleModel(el.dataset.role); });
+  const roleCount = (r) => flow.nodes.filter((n) => n.role === r && !(n.type === "master" && n.mode === "pass") && !(n.type === "checkpoint" && n.mode !== "summarize")).length;
+  const counts = ["think", "build", "run"].map((r) => [ROLE_NAME[r], roleCount(r)]).filter(([, c]) => c);
+  $("rolesSub").textContent = (counts.length ? `Stages in this flow: ${counts.map(([r, c]) => `${c} ${r}`).join(", ")}. ` : "No stage uses a role yet. ")
+    + "A stage with a model picked by hand keeps it. Each stage stays on one model, so nothing is paid for twice.";
   $("runDlg").showModal(); $("taskIn").focus(); $("taskIn").select();
 };
 // whose plan this run uses, so nobody is surprised by their usage
@@ -2030,7 +2093,7 @@ function flowOrder(f) {
 function renderRunTeam() {   // the team in running order, as little avatars
   const order = flowOrder(flow);
   const members = order.filter((n) => n.type === "cluster" || n.type === "master" || n.type === "approval");
-  const steps = flow.nodes.filter((n) => n.type !== "done").length;
+  const steps = stepCount(flow);
   $("runTeam").innerHTML = members.map((n, i) => {
     const look = n.type === "cluster" ? { shape: n.shape, color: n.color } : n.type === "master" ? { shape: "owl", color: "#7aa2f7" } : { icon: "approval", color: "#e0a23c" };
     return (i ? '<span class="arrow">›</span>' : "") + `<span class="m" title="${esc(n.name)}" style="--c:${esc(look.color)}"><canvas width="96" height="72" ${look.icon ? `data-icon="${look.icon}"` : `data-shape="${esc(look.shape)}" data-color="${esc(look.color)}"`}></canvas>${n.count > 1 ? `<i>×${n.count}</i>` : ""}</span>`;
@@ -2048,8 +2111,12 @@ $("goBtn").onclick = async () => {
   if (starting) return;
   starting = true;
   try {
+    const picked = Object.fromEntries([...document.querySelectorAll("#runDlg [data-role]")].map((el) => [el.dataset.role, el.value]));
+    flow.models = picked;
+    flow.nodes.forEach((n) => { if (n.role) n.model = roleModel(n.role); });
     if (!(await save())) { $("runWarn").textContent = "Your latest changes aren't saved yet, so the run didn't start. Try again."; return; }
-    const d = await api(`/api/flows/${flow.id}/run`, { method: "POST", body: { task: $("taskIn").value, folder: $("folderIn").value } });
+    const d = await api(`/api/flows/${flow.id}/run`, { method: "POST", body: { task: $("taskIn").value, folder: $("folderIn").value, limit: +$("limitIn").value, models: picked } });
+    flow.limit = +$("limitIn").value;
     flow.folder = $("folderIn").value.trim().replace(/^"|"$/g, "");
     flow.task = $("taskIn").value.trim().slice(0, 4000);
     $("runDlg").close(); $("taskIn").value = "";
@@ -2155,7 +2222,7 @@ function renderBanner() {
   b.classList.toggle("show", !!run);
   if (!run) return;
   const live = run.status === "running" || run.status === "waiting";
-  const st = Object.values(run.nodes), fin = st.filter((x) => ["done", "failed", "stopped", "skipped"].includes(x.status)).length;
+  const { states: st, fin } = runMeta(run);
   const took = dur(((run.ended || Date.now() / 1000) - run.started));
   $("bannerText").textContent = ({ running: "Running", waiting: "Needs you", done: "✓ Done", failed: "Failed", stopped: "Stopped", interrupted: "Interrupted" }[run.status] || run.status)
     + ` · ${took}` + (live ? ` · ${fin}/${st.length} steps` : "");
@@ -2223,8 +2290,11 @@ let lastPanel = "";
 const STATUS_WORD = { running: "Running", waiting: "Waiting for you", done: "Finished", failed: "Failed", stopped: "Stopped", interrupted: "Interrupted" };
 function tokenWord(n) { return n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n); }
 function dur(sec) { sec = Math.max(0, Math.round(sec)); return sec < 60 ? `${sec}s` : sec < 3600 ? `${Math.floor(sec / 60)}m ${sec % 60}s` : `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`; }
+// A step is any node a run works through: everything but Done. Every count in the app uses this.
+function stepCount(f) { return f.nodes.filter((n) => n.type !== "done").length; }
 function runMeta(r) {
-  const states = Object.values(r.nodes), fin = states.filter((x) => ["done", "failed", "stopped", "skipped"].includes(x.status)).length;
+  const ids = new Set(r.flow.nodes.filter((n) => n.type !== "done").map((n) => n.id));
+  const states = Object.entries(r.nodes).filter(([id]) => ids.has(id)).map(([, s]) => s), fin = states.filter((x) => ["done", "failed", "stopped", "skipped"].includes(x.status)).length;
   const agents = states.reduce((n, x) => n + x.agents.length, 0);
   return { states, fin, agents, took: (r.ended || Date.now() / 1000) - r.started };
 }
@@ -2264,7 +2334,8 @@ function renderRunPanel() {
   if (r.final) html += `<div class="card result-card"><h4>✓ Result</h4><div class="peek doc">${md(r.final)}</div>
       <div class="acts"><button id="copyFinal">Copy</button><button class="primary" id="openFinal">Open full result</button></div></div>`;
   else if (!live && r.status !== "done") html += `<div class="card"><h4 style="margin:0 0 6px;font-size:13px">No result</h4>
-      <p class="hint" style="margin:0">${esc(Object.values(r.nodes).map((x) => x.error).find(Boolean) || "The run ended before the last step.")}</p></div>`;
+      <p class="hint" style="margin:0">${esc((r.status === "stopped" && (r.log || []).map((l) => l.text).reverse().find((t) => /^Stopped/.test(t)))
+        || Object.values(r.nodes).map((x) => x.error).find(Boolean) || "The run ended before the last step.")}</p></div>`;
 
   const n = sel && sel.kind === "node" ? r.flow.nodes.find((x) => x.id === sel.id) : null;
   if (n) {
@@ -2331,7 +2402,7 @@ function downloadResult(r) {
   a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 // The final result as a short read: bottom line up top, numbered points as cards, the rest underneath.
-function resultView(text) {
+function resultView(text, files = "") {
   let t = String(text || "").trim(), bottom = "";
   t = t.replace(/^[ 	]*(?:\*\*)?Bottom line:?(?:\*\*)?:?[ 	]*(.+)$/im, (_, line) => { bottom = line.replace(/\*\*/g, "").trim(); return ""; }).trim();
   const lines = t.split("\n"), items = [], head = [], tail = [];
@@ -2344,11 +2415,29 @@ function resultView(text) {
     else { cur = null; (seenList ? tail : head).push(ln); }
   }
   const lead = bottom ? `<div class="rp-bottom"><p>${md(bottom).replace(/^<p>|<\/p>$/g, "")}</p></div>` : "";
-  if (items.length < 2) return lead + (t ? `<div class="rp-plain doc">${md(t)}</div>` : (lead ? "" : `<div class="rp-plain doc"><p>No result yet.</p></div>`));
+  if (items.length < 2) return lead + files + (t ? `<div class="rp-plain doc">${md(t)}</div>` : (lead ? "" : `<div class="rp-plain doc"><p>No result yet.</p></div>`));
   const intro = head.join("\n").trim(), more = tail.join("\n").trim();
-  return lead + (intro ? `<div class="rp-more"><div class="doc">${md(intro)}</div></div>` : "")
+  return lead + files + (intro ? `<div class="rp-more"><div class="doc">${md(intro)}</div></div>` : "")
     + `<div class="finds">${items.map((it, i) => `<div class="rfind"><i>${i + 1}</i><div class="doc">${md(it.join(" "))}</div></div>`).join("")}</div>`
     + (more ? `<div class="rp-more"><div class="doc">${md(more)}</div></div>` : "");
+}
+// The files a run made, as buttons that open them (documents open, anything runnable is shown in its folder).
+const OPENS = /\.(html?|md|txt|png|jpe?g|gif|webp|svg|pdf|csv|json)$/i;
+function filesView(r) {
+  const files = r.files || [];
+  if (!files.length) return "";
+  const shown = files.slice(0, 12), rest = files.length - shown.length;
+  return `<div class="rp-files"><small>Files it made or changed<button id="sheetFolder">Open folder</button></small><div class="list">`
+    + shown.map((f) => {
+        const parts = f.split("/"), name = parts.pop();
+        return `<button class="rfile" data-file="${esc(f)}" title="${OPENS.test(f) ? "Open" : "Show in folder"}: ${esc(f)}"><b>${esc(name)}</b>`
+          + `${parts.length ? `<span>${esc(parts.join("/"))}</span>` : ""}<span>${OPENS.test(f) ? "Open" : "Show"}</span></button>`;
+      }).join("")
+    + (rest > 0 ? `<span class="hint">and ${rest} more</span>` : "") + `</div></div>`;
+}
+async function openRunFile(r, file) {
+  try { await api(`/api/runs/${r.id}/open`, { method: "POST", body: { file } }); }
+  catch (e) { toast(e.message || "Couldn't open it."); }
 }
 function openSheet(r) {
   const m = runMeta(r), ok = r.status === "done", stages = reportStages(r);
@@ -2365,8 +2454,16 @@ function openSheet(r) {
     what.push(`${nReports} agent report${nReports === 1 ? "" : "s"}`);
     more.push(`<section class="rp-sec"><h3>Agent reports<span class="grow"></span><button id="sheetExpand">Expand all</button></h3>`
       + stages.map((g) => `<div class="rp-stage"><h4>${esc(g.node.name)}</h4>` + g.agents.map((a) =>
-          `<details class="rp-agent"><summary>${esc(a.name)}<span class="meta">${esc(modelLabel(a.model))} · ${a.turns || 0} turns</span></summary>
+          `<details class="rp-agent"><summary>${esc(a.name)}<span class="meta">${esc(modelLabel(a.model))} · ${a.turns || 0} turns${a.tokens ? ` · ${tokenWord(a.tokens)} tokens` : ""}</span></summary>
           <div class="doc">${md(a.report)}</div></details>`).join("") + `</div>`).join("") + `</section>`);
+  }
+  const byModel = {};   // tokens per model, so you can see where the plan went
+  Object.values(r.nodes || {}).flatMap((st) => st.agents || []).forEach((a) => { if (a.tokens) byModel[a.model] = (byModel[a.model] || 0) + a.tokens; });
+  const spent = Object.entries(byModel).sort((a, b) => b[1] - a[1]);
+  if (spent.length) {
+    what.push("tokens by model");
+    more.push(`<section class="rp-sec"><h3>Tokens by model</h3><div class="spend">${spent.map(([mdl, t]) =>
+      `<div><span>${esc(modelLabel(mdl))}</span><i style="--w:${Math.max(2, (t / spent[0][1]) * 100)}%"></i><b>${tokenWord(t)}</b></div>`).join("")}</div></section>`);
   }
   if (r.brief) { what.push("the plan"); more.push(`<section class="rp-sec"><h3>The plan everyone got</h3><div class="doc">${md(r.brief)}</div></section>`); }
   what.push("your task");
@@ -2381,7 +2478,7 @@ function openSheet(r) {
       <div class="tools"><button class="primary" id="sheetCopy">Copy</button></div>
     </div>
     <div class="rp-body"><div class="rp-main"><div class="rp-col">
-      ${resultView(r.final)}
+      ${resultView(r.final, filesView(r))}
       <details class="rp-details"><summary>Details: ${what.join(", ")}</summary>${more.join("")}</details>
     </div></div></div>`;
 
@@ -2390,6 +2487,8 @@ function openSheet(r) {
   $("sheetCopy").onclick = () => copyText(r.final || "");
   if ($("sheetItems")) $("sheetItems").onclick = () => copyText(itemsMarkdown(r.nodes[lastItems.id].items));
   $("sheetDl").onclick = () => downloadResult(r);
+  $("sheet").querySelectorAll(".rfile").forEach((b) => b.onclick = () => openRunFile(r, b.dataset.file));
+  if ($("sheetFolder")) $("sheetFolder").onclick = () => openRunFile(r, "");
   $("sheetClose").onclick = closeSheet;
   if ($("sheetExpand")) $("sheetExpand").onclick = (e) => {
     const all = [...$("sheet").querySelectorAll(".rp-agent")], open = !all.every((d) => d.open);
@@ -2430,12 +2529,21 @@ $("ask").addEventListener("submit", async (e) => {
 });
 
 // ------------------------------------------------------------------ toolbar
-$("flowPick").onchange = async (e) => { await save(); openFlow(e.target.value); };
+// Before leaving this flow: save it, and if that fails, ask rather than drop the edits.
+async function leaveFlow() {
+  if (await save()) return true;
+  return ui.confirm({ title: "Your last edits aren't saved", text: "Lithnode couldn't save this flow. Leave anyway and lose those edits?", ok: "Leave without saving", danger: true });
+}
+$("flowPick").onchange = async (e) => {
+  const to = e.target.value;
+  if (!(await leaveFlow())) { e.target.value = flow.id; return; }
+  dirty = false; openFlow(to);
+};
 $("flowName").oninput = (e) => { flow.name = e.target.value || "Untitled flow"; changed(false); };
-$("newBtn").onclick = async () => { await save(); await createFlow(null); toast("New blank flow. Describe a team above, or drag nodes in from the left."); };
+$("newBtn").onclick = async () => { if (!(await leaveFlow())) return; dirty = false; await createFlow(null); toast("New blank flow. Describe a team above, or drag nodes in from the left."); };
 $("newDlg").addEventListener("click", async (e) => {
   const t = e.target.closest("[data-tpl]"); if (!t) return;
-  $("newDlg").close(); await save(); await createFlow(t.dataset.tpl || null);
+  $("newDlg").close(); if (!(await leaveFlow())) return; dirty = false; await createFlow(t.dataset.tpl || null);
 });
 $("delBtn").onclick = (e) => {
   const r = e.currentTarget.getBoundingClientRect();
@@ -2450,7 +2558,7 @@ $("delBtn").onclick = (e) => {
   ]);
 };
 async function duplicateFlow() {
-  await save();
+  if (!(await leaveFlow())) return;
   const d = await api("/api/flows", { method: "POST", body: {} });
   const copy = { ...JSON.parse(JSON.stringify(flow)), id: d.flow.id, name: (flow.name + " copy").slice(0, 60) };
   await api("/api/flows/" + copy.id, { method: "POST", body: copy });
@@ -2459,6 +2567,7 @@ async function duplicateFlow() {
 }
 async function deleteFlow() {
   if (!(await ui.confirm({ title: `Delete "${flow.name}"?`, text: "The flow is removed. Its past runs stay in the Runs list.", ok: "Delete flow", danger: true }))) return;
+  clearTimeout(saveTimer); while (saving) await saving; dirty = false;   // no pending save may bring it back
   await api("/api/flows/" + flow.id, { method: "DELETE" });
   await refreshFlows();
   if (flows.length) openFlow(flows[0].id); else createFlow("ship-it");

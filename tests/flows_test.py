@@ -64,7 +64,7 @@ AGENT_TIMEOUT = 20   # seconds; every mock agent but HANGSTAGE finishes well ins
 
 
 def server_env():
-    return {**os.environ, "LITHNODE_PORT": str(APP), "LITHNODE_HOME": str(hq_home), "CLAWD_BOT_HOME": str(bot_home),
+    return {**os.environ, "LITHNODE_PORT": str(APP), "LITHNODE_WEBHOOK_LOCAL": "1", "LITHNODE_HOME": str(hq_home), "CLAWD_BOT_HOME": str(bot_home),
             "CLAWD_PET_HOME": str(pet_home), "LITHNODE_PICKER": str(project), "LITHNODE_AGENT_TIMEOUT": str(AGENT_TIMEOUT),
             "CLAWD_BOT_CLAUDE_CMD": json.dumps([sys.executable, str(ROOT / "tests" / "mock_claude.py")]),
             "CLAWD_MOCK_STATE": str(Path(cli_dir, "state.json")), "CLAWD_MOCK_LOG": str(Path(cli_dir, "calls.jsonl")),
@@ -142,8 +142,8 @@ try:
           and by["master"]["x"] < by["build"]["x"] < by["bugs"]["x"] == by["sec"]["x"] < by["cp2"]["x"] < by["ok"]["x"] < by["prod"]["x"] < by["done"]["x"]
           and mid(by["bugs"]) < mid(by["master"]) < mid(by["sec"]) and max(abs(mid(by[k]) - mid(by["master"])) for k in ("build", "cp1", "cp2", "ok", "prod", "done")) <= 1,
           {k: (v["x"], v["y"]) for k, v in by.items()})
-    check("estimate counts every agent session; the template is lean (no planning step, no Opus)", d["estimate"]["sessions"] == 6
-          and d["estimate"]["per_model"] == {"claude-sonnet-5-5": 5, "claude-haiku-4-5": 1}, d["estimate"])
+    check("estimate counts every agent session; the template is lean (no planning step, Opus only for the final verdict)", d["estimate"]["sessions"] == 6
+          and d["estimate"]["per_model"] == {"claude-sonnet-5-5": 4, "claude-haiku-4-5": 1, "claude-opus-5-5": 1}, d["estimate"])
     s, blank = call("/api/flows", {}, "POST")
     check("a blank flow says what's missing", any("cluster" in p for p in blank["problems"]), blank["problems"])
     two = {**blank["flow"], "nodes": blank["flow"]["nodes"] + [{"id": "done-2", "type": "done", "x": 0, "y": 0}],
@@ -183,6 +183,77 @@ try:
     m = next(n for n in r["flow"]["nodes"] if n["id"] == "m")
     check("odd model names and NaN positions are cleaned", m["model"] == "claude-sonnet-5-5" and m["x"] == 0, m)
     call(f"/api/flows/{fid}", base, "POST")
+    # a deleted flow stays deleted, even if a late save from the page arrives
+    _, gone = call("/api/flows", {}, "POST")
+    call(f"/api/flows/{gone['flow']['id']}", None, "DELETE")
+    check("a save to a deleted flow doesn't bring it back",
+          call(f"/api/flows/{gone['flow']['id']}", gone["flow"], "POST")[0] == 404 and call(f"/api/flows/{gone['flow']['id']}")[0] == 404)
+    # a request with a nonsense Content-Length gets a 400 instead of crashing or hanging the server
+    import http.client
+    for bad in ("abc", "-5"):
+        conn = http.client.HTTPConnection("127.0.0.1", APP, timeout=10)
+        conn.putrequest("POST", "/api/flows"); conn.putheader("Content-Length", bad); conn.endheaders()
+        check(f"Content-Length {bad} is a 400", conn.getresponse().status == 400)
+        conn.close()
+    sys.path.insert(0, str(ROOT)); import flows
+    check("model names can't start with a dash", flows.MODEL_RE.match("--help") is None and flows.MODEL_RE.match("haiku"))
+    check("a ``` inside an item doesn't cut the list short",
+          len(flows.parse_items('```items\n[{"title":"A","detail":"run ```x```"},{"title":"B"}]\n```')) == 2)
+    check("a webhook to this machine is refused, home network allowed", flows._reaches_this_machine("localhost") and not flows._reaches_this_machine("192.168.1.20"))
+    with tempfile.TemporaryDirectory() as tmp:   # the files a run made: new ones only, newest first, no hidden or build folders
+        for rel in ("old.txt", "site/index.html", "notes.md", ".git/HEAD", "node_modules/x/y.js", "site/.cache/z"):
+            Path(tmp, rel).parent.mkdir(parents=True, exist_ok=True); Path(tmp, rel).write_text("x")
+        os.utime(Path(tmp, "old.txt"), (time.time() - 600, time.time() - 600))
+        os.utime(Path(tmp, "site/index.html"), (time.time() + 5, time.time() + 5))
+        got = flows.changed_files(tmp, time.time() - 60)
+        check("a run lists the files it made, skipping old, hidden and build files", got == ["site/index.html", "notes.md"], got)
+    import agents
+    with tempfile.TemporaryDirectory() as tmp:   # a session that keeps spending is cut off at its token cap
+        spender = Path(tmp, "spender.py")
+        spender.write_text("import json, sys, time\n"
+                           "for i in range(50):\n"
+                           "    m = {'id': f'm{i}', 'model': 'claude', 'role': 'assistant', 'content': [{'type': 'tool_use', 'id': f't{i}', 'name': 'Read', 'input': {}}],\n"
+                           "         'usage': {'input_tokens': 10, 'cache_read_input_tokens': 99990, 'output_tokens': 0}}\n"
+                           "    print(json.dumps({'type': 'assistant', 'message': m}), flush=True)\n"
+                           "    print(json.dumps({'type': 'assistant', 'message': m}), flush=True)   # repeated per block\n"
+                           "    time.sleep(0.2)\n")
+        old_cmd = os.environ.get("CLAWD_BOT_CLAUDE_CMD")
+        os.environ["CLAWD_BOT_CLAUDE_CMD"] = json.dumps([sys.executable, str(spender)])
+        try:
+            import agents
+            a = agents.Agent(model="claude-haiku-4-5", effort="low", tools="none", system="s", prompt="p", cwd=tmp,
+                             on_update=lambda: None, token_cap=250_000)
+            t0 = time.time()
+            ok = a.run()
+            check("an agent over its token cap is stopped at once, and says why",
+                  not ok and a.capped and "token limit" in a.error and 250_000 < a.tokens <= 400_000 and time.time() - t0 < 8,
+                  (ok, a.capped, a.error, a.tokens, round(time.time() - t0, 1)))
+        finally:
+            if old_cmd is None:
+                os.environ.pop("CLAWD_BOT_CLAUDE_CMD", None)
+            else:
+                os.environ["CLAWD_BOT_CLAUDE_CMD"] = old_cmd
+    check("token limits are cleaned: 0 means none, others clamped", flows.clean_limit(0) == 0 and flows.clean_limit(5) == 50_000
+          and flows.clean_limit("junk") == flows.DEFAULT_LIMIT and flows.clean_flow({"nodes": [], "edges": []})["limit"] == flows.DEFAULT_LIMIT)
+    rf = flows.clean_flow({"models": {"think": "claude-fable-5-1", "run": "bad model!"}, "nodes": [
+        {"id": "master", "type": "master", "role": "think"},
+        {"id": "x", "type": "cluster", "role": "run", "model": "claude-opus-5-5"},
+        {"id": "y", "type": "cluster", "role": "", "model": "claude-opus-5-5"},
+        {"id": "z", "type": "checkpoint", "role": "nonsense"}], "edges": []})
+    m = {n["id"]: (n["role"], n["model"]) for n in rf["nodes"]}
+    check("roles pick their model, a model picked by hand is kept, junk is cleaned",
+          m == {"master": ("think", "claude-fable-5-1"), "x": ("run", "claude-haiku-4-5"), "y": ("", "claude-opus-5-5"),
+                "z": ("", flows.SUMMARY_MODEL)} and rf["models"]["build"] == "claude-sonnet-5-5", m)
+    check("the designer's stages get a role even when it names none",
+          [n.get("role") for n in flows.build_design({"nodes": [{"type": "master"}, {"id": "t", "type": "cluster"},
+                                                                {"id": "m", "type": "checkpoint", "mode": "summarize"}]}, [])["nodes"]
+           if n["type"] != "done"] == ["build", "build", "run"])
+    check("every template stage that runs a model has a role", all(n.get("role") for t in flows.TEMPLATES for n in t["nodes"] if "model" in n))
+    check("out-of-usage notices are recognized, ordinary failures aren't",
+          all(agents.OUT_OF_USAGE_RE.search(t) for t in ("You've hit your usage limit · resets 3pm", "Claude AI usage limit reached|1760000000",
+                                                         "Credit balance is too low")) and not agents.OUT_OF_USAGE_RE.search("Mock agent blew up"))
+    check("the busy sign-in error is recognized (so the session is retried), others aren't",
+          agents.SIGN_IN_BUSY_RE.search("Failed to refresh OAuth token: another Claude Code process is refreshing it") and not agents.SIGN_IN_BUSY_RE.search("Not logged in"))
     # a flow file edited by hand (or copied in) gets the same checks as page input
     _, hand = call("/api/flows", {}, "POST")
     hid = hand["flow"]["id"]
@@ -215,10 +286,35 @@ try:
     reviewers = [c for c in calls if "Reviewers" in c["flags"]["--append-system-prompt"]]
     merger = [c for c in calls if "merge reports" in c["flags"]["--append-system-prompt"]]
     check("3 reviewers + 1 merger, no lead (pass mode)", len(reviewers) == 3 and len(merger) == 1 and len(calls) == 4, len(calls))
+    check("a finished run says which files it made", isinstance(run.get("files"), list), run.get("files"))
+    check("only a run's own files can be opened", call(f"/api/runs/{run['id']}/open", {"file": "../hq.py"}, "POST")[0] == 400
+          and call(f"/api/runs/{run['id']}/open", {"file": "app.py"}, "POST")[0] == 400)
+    check("every report opens with a bottom line for the user", "Bottom line:" in reviewers[0]["flags"]["--append-system-prompt"])
     f0 = reviewers[0]["flags"]
     check("teams that read files can look at pages (lithnode-shot on their PATH, told how), and run nothing else",
           "lithnode-shot <file or URL>" in f0["--append-system-prompt"] and Path(hq_home, "bin", "lithnode-shot.cmd").exists()
           and Path(hq_home, "bin", "lithnode-shot").read_text().startswith("#!/bin/sh"), f0["--append-system-prompt"][-600:])
+    check("and are told how to use a page or play a game, not just look at it", "--do" in f0["--append-system-prompt"])
+    import shot
+    try:
+        shot.parse_steps(["click #go; fly away"])
+        bad_step = False
+    except RuntimeError:
+        bad_step = True
+    check("a step lithnode-shot doesn't know is refused with a reason", bad_step)
+    if shot.browser():
+        page = Path(tempfile.mkdtemp(prefix="lithnode-act-")) / "page.html"
+        page.write_text("<html><head><title>T</title></head><body><button id=go onclick=\"this.textContent='Clicked '+"
+                        "document.querySelector('input').value\">Go</button><input>"
+                        "<script>addEventListener('keydown',e=>{if(e.key==='x')boom()})</script></body></html>", encoding="utf-8")
+        rep = shot.act(str(page), shot.parse_steps(["type input hi; click text=Go; press x; click #nope"]), out_dir=page.parent)
+        check("lithnode-shot --do types, clicks, presses keys, catches JS errors and stops at a bad step",
+              "Clicked hi" in rep.get("text", "") and [r for _, r in rep["steps"]][:3] == ["ok", "ok", "ok"]
+              and "nothing matches" in rep["steps"][3][1] and any("boom" in e for e in rep["errors"])
+              and (page.parent / "page-after.png").exists(), rep)
+        shutil.rmtree(page.parent, ignore_errors=True)
+    else:
+        print("  (skipped the lithnode-shot --do check: no Chrome or Edge here)")
     check("reviewers are read-only", f0["--tools"] == "Read,Glob,Grep,Bash" and f0["--allowedTools"] == "Read,Glob,Grep,Bash(lithnode-shot:*)"
           and "--permission-mode" not in f0, f0)
     check("agents skip MCP servers, claude.ai connectors and the slash-command list (keeps prompts small)",
@@ -506,6 +602,36 @@ try:
     check("one failed agent out of three: the stage carries on", run["status"] == "done" and "1 of 3 agents failed" in run["nodes"]["c"]["note"]
           and run["nodes"]["c"]["output"].count("report from") == 2, run["nodes"]["c"])
 
+    # ---- roles: a stage takes Think, Build or Run, and the Run menu says which model fills it ------
+    n0 = len(cli_calls())
+    f = simple_flow({"name": "Roled", "count": 1, "role": "build", "model": "claude-opus-5-5"})
+    _, got = call(f"/api/flows/{f}")
+    check("a stage with a role gets the role's model, not the one it was saved with",
+          got["flow"]["nodes"][1]["model"] == flows.DEFAULT_MODELS["build"] and got["flow"]["models"] == flows.DEFAULT_MODELS, got["flow"]["nodes"][1])
+    run = wait_run(call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project), "models": {"build": "claude-haiku-4-5"}}, "POST")[1]["run"])
+    _, got = call(f"/api/flows/{f}")
+    rc = agent_calls(n0)
+    check("switching the Build model in the Run menu runs that stage on it, and is remembered",
+          run["status"] == "done" and rc and rc[0]["flags"].get("--model") == "claude-haiku-4-5"
+          and got["flow"]["models"]["build"] == "claude-haiku-4-5" and got["flow"]["nodes"][1]["model"] == "claude-haiku-4-5",
+          ([c["flags"].get("--model") for c in rc], got["flow"]["models"]))
+
+    # ---- out of usage: the run stops instead of starting agents that would fail too -------------
+    n0 = len(cli_calls())
+    _, made = call("/api/flows", {}, "POST")
+    dry = {"name": "Dry", "nodes": [{"id": "master", "type": "master", "x": 0, "y": 0, "mode": "pass"},
+                                    {"id": "a", "type": "cluster", "x": 0, "y": 0, "name": "NOUSAGE", "count": 2, "model": "claude-haiku-4-5"},
+                                    {"id": "b", "type": "cluster", "x": 0, "y": 0, "name": "After", "model": "claude-haiku-4-5"},
+                                    {"id": "done", "type": "done", "x": 0, "y": 0}],
+           "edges": [{"from": "master", "to": "a"}, {"from": "a", "to": "b"}, {"from": "b", "to": "done"}]}
+    call(f"/api/flows/{made['flow']['id']}", dry, "POST")
+    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    said = " ".join(e.get("text", "") for e in run.get("log", []))
+    check("out of usage stops the run, says why, and starts nothing after it",
+          run["status"] == "stopped" and "out of usage" in said and run["nodes"]["b"]["status"] != "done"
+          and not any('"After" stage' in c["flags"].get("--append-system-prompt", "") for c in agent_calls(n0)),
+          (run["status"], said[-300:], {k: v["status"] for k, v in run["nodes"].items()}))
+
     # ---- writers take turns --------------------------------------------------------------------
     n0 = len(cli_calls())
     f = simple_flow({"name": "Writers", "count": 2, "model": "claude-haiku-4-5", "tools": "edit"})
@@ -597,6 +723,10 @@ try:
     shutil.rmtree(early.store.root, ignore_errors=True)
     hops.clear()
     flows_mod._ping(f"http://127.0.0.1:{HOOK}/moved", "T", "m")
+    check("a webhook to this machine isn't called", hops == [], hops)
+    os.environ["LITHNODE_WEBHOOK_LOCAL"] = "1"
+    flows_mod._ping(f"http://127.0.0.1:{HOOK}/moved", "T", "m")
+    del os.environ["LITHNODE_WEBHOOK_LOCAL"]
     check("a webhook's redirect isn't followed", hops == ["POST /moved"], hops)
     import claude_code as cc_mod  # noqa: E402
     shim_dir = Path(tempfile.mkdtemp(prefix="hq-shim-"))

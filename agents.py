@@ -6,9 +6,11 @@ show what it is doing right now, then keep only its final report and cost.
 """
 import json
 import os
+import re
 import signal
 import subprocess
 import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -17,6 +19,19 @@ import engines
 
 # The longest one session may run before it's killed, so a hung CLI can't hold up its run forever.
 TIMEOUT = float(os.environ.get("LITHNODE_AGENT_TIMEOUT") or 4 * 3600)
+# When several sessions start at once, one may fail because another is renewing the shared sign-in.
+# That clears up in a moment, so such a session is started once more after a short pause.
+SIGN_IN_BUSY_RE = re.compile(r"another Claude Code process is refreshing|Failed to refresh OAuth token", re.I)
+# The plan is out of usage (or the API account out of credit): nothing more will run until it resets.
+OUT_OF_USAGE_RE = re.compile(r"usage limit|limit reached|hit your (usage )?limit|out of (extra )?usage|"
+                             r"credit balance is too low|insufficient credit|exceeded your .*quota", re.I)
+RETRY_PAUSE = float(os.environ.get("LITHNODE_RETRY_PAUSE") or 5)
+USAGE_KEYS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
+
+
+def short_tokens(n):
+    """1500000 -> '1.5M tokens', 400000 -> '400k tokens'."""
+    return f"{n / 1e6:g}M tokens" if n >= 1_000_000 else f"{round(n / 1000):g}k tokens"
 
 # What each tool level lets an agent touch. Reviewers get read-only; builders can edit.
 TOOLSETS = {
@@ -97,9 +112,13 @@ def describe(name, args):
     return f"Using {name}"
 
 
+# Tool calls a model wrote out as text (it does this when it has no tools): never part of a report.
+TOOL_TEXT_RE = re.compile(r"<(function_calls|invoke|antml:invoke|antml:function_calls)\b.*?(</\1>|\Z)", re.S)
+
+
 def report_of(text, limit):
     """The part of an agent's answer that is handed on: after 'REPORT:' if it wrote one."""
-    text = (text or "").strip()
+    text = TOOL_TEXT_RE.sub("", text or "").strip()
     marker = text.upper().rfind("REPORT:")
     if marker >= 0:
         text = text[marker + len("REPORT:"):].lstrip("*_ 	").strip()   # "**REPORT:**" leaves its closing ** behind
@@ -134,13 +153,16 @@ def kill_tree(proc):
 class Agent:
     """Runs one session. `on_update` is called (with no arguments) whenever its state changes."""
 
-    def __init__(self, *, model, effort, tools, system, prompt, cwd, on_update, max_turns=0, connectors=(), known=(), clis=(),
+    def __init__(self, *, model, effort, tools, system, prompt, cwd, on_update, max_turns=0, connectors=(), known=(), clis=(), token_cap=0,
                  engine="claude", engine_model=""):
         self.model, self.effort, self.tools, self.clis = model, effort, tools, list(clis)
         self.engine, self.engine_model = engine if engine in engines.ENGINES else "claude", engine_model
         self.connectors, self.known = [s for s in connectors if s in known], list(known)
         self.system, self.prompt, self.cwd = system, prompt, Path(cwd)
         self.max_turns = max_turns
+        self.token_cap = token_cap   # stop the session once it has used this many tokens (0: no cap)
+        self.capped = False
+        self.out_of_usage = False   # set after run(): the plan or account has no usage left
         self.on_update = on_update
         self.session_id = str(uuid.uuid4())
         self.step = ""
@@ -175,6 +197,17 @@ class Agent:
         except OSError:      # the agent was stopped before it read its prompt
             pass
 
+    def _count(self, obj, used):
+        """Adds an assistant message's tokens to the live total (Claude Code repeats a message once per content
+        block, so each message id counts once, at its latest numbers). True once the total passes the cap."""
+        msg = obj.get("message") or {}
+        use = msg.get("usage") if isinstance(msg.get("usage"), dict) else None
+        if not use or not msg.get("id"):
+            return False
+        used[msg["id"]] = sum(int(use.get(k) or 0) for k in USAGE_KEYS)
+        self.tokens = sum(used.values())
+        return bool(self.token_cap) and self.tokens > self.token_cap
+
     def _set_step(self, line):
         self.step = line
         self.steps = (self.steps + [line])[-30:]
@@ -184,6 +217,19 @@ class Agent:
         """Blocks until the session ends. Returns True on success."""
         if self.engine != "claude":
             return self._run_other()
+        ok = self._run_claude()
+        if ok or self.stopped or not SIGN_IN_BUSY_RE.search(self.error or ""):
+            return ok
+        self.error, self.text, self.timed_out = None, "", False
+        self.session_id = str(uuid.uuid4())     # the first session may exist; start a fresh one
+        self._set_step("Sign-in busy, trying again")
+        time.sleep(RETRY_PAUSE)
+        if self.stopped:
+            self.error = "Stopped"
+            return False
+        return self._run_claude()
+
+    def _run_claude(self):
         command = claude_code.find_command()
         if not command:
             self.error = "Claude Code isn't installed on this computer."
@@ -216,7 +262,7 @@ class Agent:
         timer.daemon = True
         timer.start()
         self._set_step("Starting up")
-        final, texts = None, []
+        final, texts, used = None, [], {}
         try:
             for line in proc.stdout:
                 line = line.strip()
@@ -227,6 +273,10 @@ class Agent:
                 except ValueError:
                     continue
                 kind = obj.get("type")
+                if kind == "assistant" and self._count(obj, used):
+                    self.capped = True   # over its token cap: end the session now, before it spends more
+                    kill_tree(proc)
+                    break
                 if kind == "assistant" and not obj.get("parent_tool_use_id"):
                     msg = obj.get("message") or {}
                     parts = msg.get("content") or []
@@ -255,7 +305,7 @@ class Agent:
             self.cost = float(final.get("total_cost_usd") or 0)
             self.turns = int(final.get("num_turns") or 0)
             use = final.get("usage") if isinstance(final.get("usage"), dict) else {}
-            self.tokens = sum(int(use.get(k) or 0) for k in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+            self.tokens = sum(int(use.get(k) or 0) for k in USAGE_KEYS) or self.tokens
             result = final.get("result") if isinstance(final.get("result"), str) else ""
             if final.get("is_error") or str(final.get("subtype", "")).startswith("error"):
                 self.error = self.error or result or str(final.get("subtype")) or "Claude Code reported an error."
@@ -263,6 +313,8 @@ class Agent:
                 self.text = result or "\n\n".join(texts)
         if self.stopped:
             self.error = "Stopped"
+        elif self.capped:
+            self.error = f"Stopped at its token limit ({short_tokens(self.token_cap)}), so it couldn't use up your plan."
         elif self.timed_out:
             self.error = f"Timed out after {TIMEOUT / 60:g} minutes, so it was stopped."
         elif not final and not self.error:
@@ -270,6 +322,7 @@ class Agent:
             self.error = "The session ended without a result." + (f" {tail}" if tail else "")
         if self.error and ("Not logged in" in self.error or "/login" in self.error):
             self.error = "Claude Code isn't signed in. Run `claude auth login` once, then try again."
+        self.out_of_usage = bool(self.error) and not (self.stopped or self.capped) and bool(OUT_OF_USAGE_RE.search(self.error))
         self.step = "Done" if not self.error else "Failed"
         self.on_update()
         return not self.error

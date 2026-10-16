@@ -65,6 +65,8 @@ def _backfill_tasks():
 # Flow clusters made from a built-in bot use its hidden role at run time.
 RUNNER.bot_roles = lambda: {b["id"]: b["instructions"] for b in load_bots() if b.get("builtin")}
 FLOW_ID_RE = re.compile(r"^[0-9a-f]{12}$")
+# Files a run made that open straight in their default app; anything else is shown in its folder
+OPENABLE = {".html", ".htm", ".md", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".pdf", ".csv", ".json"}
 STORE = Path(os.environ.get("CLAWD_BOT_HOME") or Path.home() / ".clawd-bot")
 
 MODELS = [
@@ -270,7 +272,13 @@ class Handler(BaseHTTPRequestHandler):
     def route(self, method):
         # Always consume the request body, even for routes that ignore it: on a
         # keep-alive connection, unread bytes would corrupt the next request.
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0:   # garbage or negative would crash or wait forever
+            self.close_connection = True
+            return self.send_json({"error": "bad Content-Length"}, 400)
         if length > 5_000_000:
             self.close_connection = True
             return self.send_json({"error": "body too large"}, 413)
@@ -404,6 +412,8 @@ class Handler(BaseHTTPRequestHandler):
             HQ_STORE.delete_flow(flow_id)
             return self.send_json({"ok": True})
         if method == "POST" and not action:
+            if not HQ_STORE.get_flow(flow_id):   # a late save or beacon must not bring back a deleted flow
+                return self.send_json({"error": "This flow was deleted."}, 404)
             try:
                 flow = {**flows.clean_flow(self.read_json()), "id": flow_id}
             except (ValueError, TypeError) as exc:
@@ -430,8 +440,13 @@ class Handler(BaseHTTPRequestHandler):
             folder = str(body.get("folder") or flow.get("folder") or "").strip().strip('"')
             if folder and not Path(folder).is_dir():
                 return self.send_json({"error": f"That folder doesn't exist: {folder}"}, 400)
-            if folder != flow.get("folder", "") or task[:4000] != flow.get("task", ""):
-                flow["folder"], flow["task"] = folder, task[:4000]   # the next run starts from this one
+            limit = flows.clean_limit(body["limit"]) if "limit" in body else flows.clean_limit(flow.get("limit", flows.DEFAULT_LIMIT))
+            models = flows.clean_models(body["models"]) if "models" in body else flow["models"]
+            new_models = models != flow["models"]
+            if new_models:   # which model fills each role: re-resolve every stage that has one
+                flow = {**flows.clean_flow({**flow, "models": models}), "id": flow_id}
+            if new_models or folder != flow.get("folder", "") or task[:4000] != flow.get("task", "") or limit != flow.get("limit"):
+                flow["folder"], flow["task"], flow["limit"] = folder, task[:4000], limit   # the next run starts from this one
                 HQ_STORE.save_flow(flow)
             run = RUNNER.start(flow, task[:20000], folder)
             return self.send_json({"run": run.id})
@@ -475,6 +490,8 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and not action:
             snap = RUNNER.snapshot(run_id)
             return self.send_json(snap) if snap else self.send_json({"error": "not found"}, 404)
+        if method == "POST" and action == "open":
+            return self.open_run_file(run_id, str(self.read_json().get("file") or ""))
         run = RUNNER.get(run_id)
         if not run:
             return self.send_json({"error": "That run isn't active."}, 404)
@@ -486,6 +503,34 @@ class Handler(BaseHTTPRequestHandler):
             ok = run.decide(str(body.get("node") or ""), bool(body.get("approved")), str(body.get("note") or ""))
             return self.send_json({"ok": ok}) if ok else self.send_json({"error": "Nothing is waiting there."}, 400)
         self.send_json({"error": "not found"}, 404)
+
+    def open_run_file(self, run_id, rel):
+        """Open a file a run made (or its folder, when rel is empty). Only files recorded on the run are
+        allowed, and only plain documents open directly; anything that could run is shown in its folder."""
+        snap = RUNNER.snapshot(run_id)
+        if not snap:
+            return self.send_json({"error": "not found"}, 404)
+        folder = Path(snap.get("folder") or "")
+        if rel and rel not in (snap.get("files") or []):
+            return self.send_json({"error": "That file isn't part of this run."}, 400)
+        path = (folder / rel).resolve() if rel else folder.resolve()
+        if rel and folder.resolve() not in path.parents:
+            return self.send_json({"error": "That file isn't part of this run."}, 400)
+        if not path.exists():
+            return self.send_json({"error": "It's not there any more."}, 404)
+        reveal = path.is_file() and path.suffix.lower() not in OPENABLE
+        try:
+            if sys.platform == "win32":
+                if reveal:
+                    subprocess.Popen(["explorer", "/select,", str(path)])
+                else:
+                    os.startfile(str(path))
+            else:
+                target = path.parent if reveal else path
+                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(target)])
+        except OSError as exc:
+            return self.send_json({"error": f"Couldn't open it: {exc}"}, 500)
+        self.send_json({"ok": True, "revealed": reveal})
 
     # -- bots ----------------------------------------------------------------
     def GET_api_bots(self):

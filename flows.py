@@ -11,9 +11,12 @@ A flow is a graph you draw in the Flows tab:
 Every node waits for all of its inputs, so stages run in order and parallel branches run
 side by side. Only short reports travel between stages, which keeps later prompts small.
 """
+import ipaddress
 import json
 import math
+import os
 import re
+import socket
 import threading
 import time
 import uuid
@@ -31,11 +34,16 @@ DEFAULT_NAMES = {"master": "Start", "cluster": "Team", "checkpoint": "Checkpoint
 SHAPES = ("crab", "scout", "byte", "muse", "golem", "bug", "guard", "owl", "rocket")
 ID_RE = re.compile(r"^[a-z0-9-]{1,40}$")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
-MODEL_RE = re.compile(r"^[A-Za-z0-9._\[\]-]{1,60}$")   # model names go on the claude command line
+MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._\[\]-]{0,59}$")   # model names go on the claude command line
 MAX_AGENTS = 15
 REPORT_LIMIT = 6000       # characters of each agent's report handed to the next stage
 DEFAULT_MODEL = "claude-sonnet-5-5"
 SUMMARY_MODEL = "claude-haiku-4-5"
+# Each stage can take a role instead of a fixed model: Think (planning, design, writing, judgment),
+# Build (making and changing things) or Run (checks, tests, merges, deploys). The flow says which
+# model fills each role, so switching models later is one change, not one per stage.
+ROLES = ("think", "build", "run")
+DEFAULT_MODELS = {"think": "claude-opus-5-5", "build": "claude-sonnet-5-5", "run": "claude-haiku-4-5"}
 
 # How heavy each model is relative to Haiku, for the pre-run estimate only. Real costs come
 # from Claude Code's own `total_cost_usd` once agents finish.
@@ -211,7 +219,19 @@ def clean_node(raw):
         if hook and not webhook_ok(hook):
             raise ValueError("webhook must be an http(s) URL")
         node.update(message=_text(raw, "message", 500), webhook=hook)
+    if "model" in node:
+        node["role"] = raw.get("role") if raw.get("role") in ROLES else ""
     return node
+
+
+def clean_models(raw):
+    """Which model fills each role; anything missing or malformed falls back to the default."""
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for role in ROLES:
+        model = str(raw.get(role) or "").strip()[:60]
+        out[role] = model if MODEL_RE.match(model) else DEFAULT_MODELS[role]
+    return out
 
 
 def clean_flow(raw):
@@ -238,6 +258,10 @@ def clean_flow(raw):
             raise ValueError("a done node can't feed another node")
     if _has_cycle(ids, edges):
         raise ValueError("the flow has a loop; connections must go one way")
+    models = clean_models(raw.get("models"))
+    for n in nodes:
+        if n.get("role"):
+            n["model"] = models[n["role"]]
     start = next((n["id"] for n in nodes if n["type"] == "master"), None)
     if start:
         edges += [{"from": start, "to": nid} for nid in fed_by_start({"nodes": nodes, "edges": edges})]
@@ -245,7 +269,20 @@ def clean_flow(raw):
             "folder": _text(raw, "folder", 500), "nodes": nodes, "edges": edges,
             "task": _text(raw, "task", 4000),   # what the Run menu opens with: your description, or the last task run
             "dir": raw.get("dir") if raw.get("dir") in ("tb", "lr") else "lr",
-            "auto": raw.get("auto") is not False}   # auto-arrange: re-lay out the nodes on every change
+            "auto": raw.get("auto") is not False,   # auto-arrange: re-lay out the nodes on every change
+            "limit": clean_limit(raw.get("limit", DEFAULT_LIMIT)), "models": models}
+
+
+DEFAULT_LIMIT = 1_000_000   # tokens a run may use before it's stopped; no agent may use more than half of it
+
+
+def clean_limit(value):
+    """A run's token limit: 0 for none, otherwise between 50k and 100M."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_LIMIT
+    return 0 if n <= 0 else max(50_000, min(100_000_000, n))
 
 
 def _has_cycle(ids, edges):
@@ -332,7 +369,7 @@ def estimate(flow):
 # The app shows them as cards; a team that judges them marks each one pass or cut with a reason.
 
 MAX_ITEMS = 24
-ITEMS_RE = re.compile(r"```items[^\S\n]*\n(.*?)```", re.S)
+ITEMS_RE = re.compile(r"```items[^\S\n]*\n(.*?)^[^\S\n]*```[^\S\n]*$", re.S | re.M)   # the closing fence is its own line, so ``` inside a value doesn't cut the list short
 VERDICTS = {"pass": "pass", "keep": "pass", "yes": "pass", "approve": "pass", "approved": "pass", "ok": "pass", "listed": "pass",
             "cut": "cut", "reject": "cut", "rejected": "cut", "no": "cut", "drop": "cut", "fail": "cut", "skip": "cut"}
 
@@ -437,7 +474,12 @@ ITEMS_NOTE = ('Only if your stage produces or judges a list of things (parts of 
 
 # ----------------------------------------------------------------- templates
 
+ROLE_OF = {"claude-opus-5-5": "think", "claude-sonnet-5-5": "build", "claude-haiku-4-5": "run"}
+
+
 def _n(nid, kind, x, y, **kw):
+    if "model" in kw and "role" not in kw:
+        kw["role"] = ROLE_OF.get(kw["model"], "")
     return {"id": nid, "type": kind, "x": x, "y": y, **kw}
 
 
@@ -445,7 +487,7 @@ TEMPLATES = [
     {"id": "ship-it", "name": "Build, review, secure, ship",
      "blurb": "A builder, then bug and security reviewers side by side, your sign-off, and a final production check.",
      "nodes": [
-         _n("master", "master", 40, 200, name="Start", model="claude-sonnet-5-5", mode="pass", tools="read",
+         _n("master", "master", 40, 200, name="Start", model="claude-sonnet-5-5", role="think", mode="pass", tools="read",
             instructions="Turn the task into a clear brief: goal, constraints, acceptance criteria, and what each stage should watch for."),
          _n("build", "cluster", 300, 200, name="Builders", summary='Build the change in your folder', count=1, model="claude-sonnet-5-5", tools="edit", effort="medium",
             shape="byte", color="#5b8def",
@@ -464,7 +506,7 @@ TEMPLATES = [
             focuses="Input handling and injection\nSecrets, auth and permissions"),
          _n("cp2", "checkpoint", 1060, 200, name="Reviews merged", mode="summarize", model="claude-haiku-4-5"),
          _n("ok", "approval", 1280, 200, name="Your call", message="Reviews are in. Approve to run the production check."),
-         _n("prod", "cluster", 1500, 200, name="Production check", summary="Says ship or don't ship", count=1, model="claude-sonnet-5-5", tools="read",
+         _n("prod", "cluster", 1500, 200, name="Production check", summary="Says ship or don't ship", count=1, model="claude-sonnet-5-5", role="think", tools="read",
             shape="rocket", color="#bb9af7",
             instructions=("You give the final production-readiness verdict based on the code and the reviews: error handling, "
                           "config, performance, docs, anything that breaks on a clean machine. End with ship or don't ship.")),
@@ -560,23 +602,27 @@ Turn the user's description into a flow. Reply with ONLY one JSON object, no pro
 
 Node types:
 - master: exactly one, id "master". Fields: name, mode ("brief" = an agent writes a plan everyone reads, "pass" = free,
-  the task goes straight on), model, tools, instructions. Use "pass" for small flows.
-- cluster: a group of agents with one role. Fields: id, name, count (1-15), model, tools, effort (low|medium|high),
+  the task goes straight on), role, tools, instructions. Use "pass" for small flows.
+- cluster: a group of agents with one job. Fields: id, name, count (1-15), role, tools, effort (low|medium|high),
   instructions (the role, in second person), summary (what the team does in plain words for its card, max 6 words,
   like "Hunts bugs in the new code"), focuses (one line per agent so they split the work),
   bot (a bot id to base it on, or ""), split (true when the agents should divide one big job into equal parts and
   work side by side, e.g. processing 100,000 rows; then add a checker team after them), clis (command-line tools the
   team may run, from: <<CLIS>>; only the ones the job needs, e.g. ["gh"] to work with GitHub issues).
-- checkpoint: waits for everything wired into it. Fields: id, name, mode ("pass" or "summarize"), model.
-  Use mode "summarize" with claude-haiku-4-5 after clusters with several agents, before the next stage.
+- checkpoint: waits for everything wired into it. Fields: id, name, mode ("pass" or "summarize"), role.
+  Use mode "summarize" with role "run" after clusters with several agents, before the next stage.
 - approval: pauses until the user approves. Fields: id, name, message. Add one only if the user wants to sign off,
   or before a stage that edits files based on reviews.
 - done: the end. Fields: id, name.
 
 Tools: none, read, web, research (read files + web), edit (read and edit files), full (edit files + run commands).
-Models: <<MODELS>>. Every agent uses the person's plan, so spend carefully: pick the cheapest model that can do each job
-(Haiku for checks, merges and simple script work; Sonnet for building, reviewing and research; Opus only when the user
-asks for the strongest model), keep teams at 1-2 agents unless more angles clearly help, and use Start mode "pass".
+Roles: give master, every cluster and every checkpoint a "role" instead of a model, and the person's settings pick
+the model for it (by default Opus for think, Sonnet for build, Haiku for run). "think": planning, design, writing,
+creative work and final judgment calls. "build": making and changing things, reviewing code, research. "run": checks,
+tests, merges, summaries, simple script work and deploys. Every agent uses the person's plan, so spend carefully: most
+stages are build or run; use think only where the thinking is the job. Only set "model" (one of <<MODELS>>) instead
+of a role when the person names a model. Keep teams at 1-2 agents unless more angles clearly help, and use Start
+mode "pass".
 Bots you can base a cluster on (set "bot" and reuse their role): <<BOTS>>
 
 Rules: ids are short, lowercase, with dashes. Every node is reachable from master, and the last stage feeds a done node.
@@ -618,6 +664,8 @@ def build_design(raw, bots):
             nid = f"{nid}-{i}"
         rename[str(n.get("id"))] = nid
         node = {**n, "id": nid}
+        if node["type"] in ("master", "cluster", "checkpoint") and not node.get("model") and node.get("role") not in ROLES:
+            node["role"] = "run" if node["type"] == "checkpoint" else "build"   # a stage with neither still gets a role
         bot = by_bot.get(n.get("bot"))
         if n["type"] == "cluster" and bot:
             node.setdefault("shape", bot["shape"])
@@ -740,6 +788,9 @@ class Run:
         self.status = "running"
         self.started = time.time()
         self.ended = None
+        self.files = []               # files this run made or changed, found when it ends
+        self.limit = clean_limit(flow.get("limit", DEFAULT_LIMIT))   # tokens; 0 means no limit
+        self.over_limit = False
         self.brief = ""
         self.log = []
         self.lock = threading.RLock()
@@ -790,7 +841,7 @@ class Run:
                 "task": self.task, "folder": str(self.folder), "status": self.status, "started": self.started,
                 "ended": self.ended, "cost": self.cost, "tokens": self.tokens, "brief": self.brief, "log": list(self.log),
                 "nodes": json.loads(json.dumps(self.nodes)),
-                "final": self.final_output(),
+                "final": self.final_output(), "files": list(self.files),
             }
 
     def final_output(self):
@@ -813,6 +864,28 @@ class Run:
             for ev in self.approvals.values():
                 ev.set()
         self.say("Stopped by you.")
+
+    def stop_at_limit(self):
+        """The run's agents together passed its token limit: stop everything, and say why."""
+        self._halt(f"Stopped: this run reached its token limit of {agents.short_tokens(self.limit)}. "
+                   "You can raise it in the Run menu.")
+
+    def stop_out_of_usage(self):
+        """Claude says the plan has no usage left: every later agent would fail too, so stop now."""
+        self._halt("Stopped: your Claude plan is out of usage for now, so nothing more can run. "
+                   "The work finished so far is kept; run it again once your usage resets.")
+
+    def _halt(self, message):
+        with self.lock:
+            if self.over_limit or self.status not in ("running", "waiting"):
+                return
+            self.log.append({"t": time.time(), "text": message})   # logged with the status, so no one sees "stopped" without why
+            self.over_limit, self.status = True, "stopped"
+            for a in list(self.live_agents):
+                a.stop()
+            for ev in self.approvals.values():
+                ev.set()
+        self.changed(force=True)
 
     def decide(self, node_id, approved, note=""):
         with self.lock:
@@ -855,8 +928,10 @@ class Run:
                 self.status = "waiting" if "approval" in states and "running" not in states else "running"
             self._wake.wait(1.0)
             self._wake.clear()
+        files = changed_files(self.folder, self.started)
         with self.lock:
             self.ended = time.time()
+            self.files = files
         self.say({"done": "Finished.", "failed": "The run failed.",
                   "stopped": "Run stopped."}.get(self.status, "Run ended."))
         self.changed(force=True)
@@ -961,13 +1036,21 @@ class Run:
             *(["To look at a web page or HTML file (one you made or one you're checking), run `lithnode-shot <file or URL> "
                "[seconds]`. It saves a screenshot and prints its path; read that image. For anything animated, look at "
                "several moments (like 1, 4 and 8 seconds). Never call visual work good without looking at it: check "
-               "that nothing is cut off, overlapping or unreadable."]
+               "that nothing is cut off, overlapping or unreadable. To use an HTML page or game the way a person would, "
+               "add steps: `lithnode-shot page.html --do \"click text=Start; wait 3; press ArrowLeft; shot; click 400,300\"` "
+               "(steps: click <selector | text=words | x,y>, move, type <selector> <text>, press/hold/release <key>, "
+               "wait <seconds>, reload, shot). It reports each step, any JavaScript errors and the page text, and saves "
+               "screenshots. Play or click through what you build or check this way; never report that you couldn't run "
+               "it. A canvas must be sized by devicePixelRatio, or it looks blurry when the window is bigger than it."]
               if node.get("tools", "read") in ("read", "research", "edit", "full") else []),
             "Work economically: read only the files you need, prefer Grep and Glob over reading whole files, "
             "and skip exploratory detours.",
             "Do your stage's job only; other stages handle the rest.",
             ITEMS_NOTE,
-            'Finish with a section starting with "REPORT:" (under 250 words, plus any list your job produces): what you '
+            'Finish with a section starting with "REPORT:" (under 250 words, plus any list your job produces). Its first '
+            'line is "Bottom line:" and one plain sentence for the user, naming what they now have and how to use it, '
+            'even when your job was checking the work (for example "index.html is a working todo page: open '
+            'it in a browser."), or else the answer. Then: what you '
             "did, what you found, and what the next stage must know. Only that report is passed on, and it's what the "
             "user reads: put your actual results in it (the ideas, the answer, the findings, the list), not a "
             "sentence saying you made them. Say plainly what you didn't do, and never describe planned work as done.",
@@ -997,11 +1080,13 @@ class Run:
 
         def update():
             with self.lock:
-                rec.update(step=agent.step, steps=list(agent.steps))
+                rec.update(step=agent.step, steps=list(agent.steps), tokens=agent.tokens)
+            if self.limit and self.tokens > self.limit:
+                self.stop_at_limit()
             self.changed()
 
         agent = agents.Agent(model=model, effort=effort, tools=tools, system=system, prompt=prompt,
-                             cwd=self.folder, on_update=update, max_turns=max_turns,
+                             cwd=self.folder, on_update=update, max_turns=max_turns, token_cap=self.limit // 2,
                              connectors=connectors, known=known, clis=clis, engine=engine, engine_model=engine_model)
         with self.lock:
             rec["session_id"] = agent.session_id
@@ -1022,6 +1107,8 @@ class Run:
                        items=parse_items(agent.text) if ok else [],
                        error=agent.error or "", cost=round(agent.cost, 4), tokens=agent.tokens, turns=agent.turns,
                        step=agent.step, ended=time.time())
+        if agent.out_of_usage:
+            self.stop_out_of_usage()
         self.changed(force=True)
         return rec
 
@@ -1174,6 +1261,22 @@ class Run:
             st["status"], st["error"] = "failed", "Rejected" + (f": {note}" if note else "")
 
 
+def _reaches_this_machine(host):
+    """True when a webhook host is this computer (Lithnode's own API lives there) or a link-local address
+    like a cloud metadata service. Your home network stays allowed, for a self-hosted ntfy."""
+    if os.environ.get("LITHNODE_WEBHOOK_LOCAL"):   # the tests' own receiver runs on 127.0.0.1
+        return False
+    try:
+        addrs = {info[4][0] for info in socket.getaddrinfo(host, None)}
+    except OSError:
+        return True   # can't tell where it goes: don't call it
+    for a in addrs:
+        ip = ipaddress.ip_address(a.split("%")[0])
+        if ip.is_loopback or ip.is_link_local or ip.is_unspecified or ip.is_multicast:
+            return True
+    return False
+
+
 class _NoRedirect(urlrequest.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
         return None   # a webhook that redirects isn't followed: the new address could be anything
@@ -1184,7 +1287,7 @@ _WEBHOOK_OPENER = urlrequest.build_opener(_NoRedirect)
 
 def _ping(url, flow_name, message):
     """Tell a phone or chat app that a run needs you. Works with ntfy, IFTTT, Discord and Slack webhooks."""
-    if not webhook_ok(url):
+    if not webhook_ok(url) or _reaches_this_machine(urlparse(url).hostname):
         return
     body = json.dumps({"text": f"Lithnode · {flow_name}: {message}", "content": f"Lithnode · {flow_name}: {message}",
                        "value1": flow_name, "value2": message}).encode()
@@ -1195,6 +1298,35 @@ def _ping(url, flow_name, message):
         _WEBHOOK_OPENER.open(urlrequest.Request(url, data=body, headers=headers, method="POST"), timeout=10).read()
     except OSError:
         pass
+
+
+SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".lithnode-shots", ".next", "dist", "build", ".cache"}
+
+
+def changed_files(folder, since, limit=40):
+    """Files under folder modified since a time, newest first, as paths relative to it (forward slashes).
+    Skips hidden and build folders, and gives up on huge trees rather than stall the end of a run."""
+    found, seen = [], 0
+    try:
+        root = Path(folder)
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+            for name in filenames:
+                seen += 1
+                if seen > 20000:
+                    break
+                path = Path(dirpath) / name
+                try:
+                    mtime = path.stat().st_mtime
+                except OSError:
+                    continue
+                if mtime >= since - 1:
+                    found.append((mtime, path.relative_to(root).as_posix()))
+            if seen > 20000:
+                break
+    except OSError:
+        return []
+    return [rel for _, rel in sorted(found, reverse=True)[:limit]]
 
 
 class Runner:
@@ -1217,6 +1349,13 @@ class Runner:
                     for st in rec.get("nodes", {}).values():
                         if st.get("status") in ("waiting", "running", "approval"):
                             st["status"] = "stopped"
+                        for agent in st.get("agents", []):   # no agent outlives its server
+                            if agent.get("status") in ("waiting", "running", "starting"):
+                                agent["status"] = "stopped"
+                    # it ended when it last did anything, so "took" isn't the hours the app was closed
+                    last = max([e.get("t", 0) for e in rec.get("log", [])] + [rec.get("started", 0)])
+                    rec["ended"] = rec.get("ended") or last
+                    rec.setdefault("log", []).append({"t": last, "text": "Interrupted: Lithnode closed while this was running."})
                     self.store.save_run(rec)
 
     def start(self, flow, task, folder):

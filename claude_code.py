@@ -281,8 +281,13 @@ def find_command():
     unwrapped = unwrap_shim(shim) if shim else None
     if unwrapped:
         return unwrapped
-    base = Path(os.environ.get("APPDATA", "")) / "Claude" / "claude-code"
-    found = list(base.glob("*/*/claude.exe")) if base.exists() else []
+    # The Claude desktop app's own copy. The Store/MSIX build keeps it in its package folder: only processes the app
+    # started see it under %APPDATA%, so Lithnode launched from the Start menu or taskbar must look there directly.
+    bases = [Path(os.environ.get("APPDATA", "")) / "Claude" / "claude-code"]
+    packages = Path(os.environ.get("LOCALAPPDATA", "")) / "Packages"
+    if os.environ.get("LOCALAPPDATA") and packages.is_dir():
+        bases += list(packages.glob("Claude_*/LocalCache/Roaming/Claude/claude-code"))
+    found = [exe for base in bases if base.is_dir() for exe in base.glob("*/*/claude.exe")]
 
     def version(path):
         return [int(p) if p.isdigit() else 0 for p in path.parent.parent.name.split(".")]
