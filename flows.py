@@ -39,8 +39,8 @@ MAX_AGENTS = 15
 REPORT_LIMIT = 6000       # characters of each agent's report handed to the next stage
 DEFAULT_MODEL = "claude-sonnet-5-5"
 SUMMARY_MODEL = "claude-haiku-4-5"
-# Each stage can take a role instead of a fixed model: Think (planning, design, writing, judgment),
-# Build (making and changing things) or Run (checks, tests, merges, deploys). The flow says which
+# Each stage can take a role instead of a fixed model: think (shown as Composer: planning, design, writing,
+# judgment), build (Orchestrator: making and changing things) or run (Performer: checks, tests, merges, deploys). The flow says which
 # model fills each role, so switching models later is one change, not one per stage.
 ROLES = ("think", "build", "run")
 DEFAULT_MODELS = {"think": "claude-opus-5-5", "build": "claude-sonnet-5-5", "run": "claude-haiku-4-5"}
@@ -617,9 +617,10 @@ Node types:
 
 Tools: none, read, web, research (read files + web), edit (read and edit files), full (edit files + run commands).
 Roles: give master, every cluster and every checkpoint a "role" instead of a model, and the person's settings pick
-the model for it (by default Opus for think, Sonnet for build, Haiku for run). "think": planning, design, writing,
-creative work and final judgment calls. "build": making and changing things, reviewing code, research. "run": checks,
-tests, merges, summaries, simple script work and deploys. Every agent uses the person's plan, so spend carefully: most
+the model for it (by default Opus for think, Sonnet for build, Haiku for run). The person sees them as Composer,
+Orchestrator and Performer. "think" (Composer): planning, design, writing, creative work and final judgment calls.
+"build" (Orchestrator): making and changing things, reviewing code, research. "run" (Performer): checks, tests, merges,
+summaries, simple script work and deploys. Every agent uses the person's plan, so spend carefully: most
 stages are build or run; use think only where the thinking is the job. Only set "model" (one of <<MODELS>>) instead
 of a role when the person names a model. Keep teams at 1-2 agents unless more angles clearly help, and use Start
 mode "pass".

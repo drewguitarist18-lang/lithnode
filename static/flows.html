@@ -426,6 +426,7 @@
   .seg { display: flex; gap: 3px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 11px; }
   .seg button { flex: 1; min-width: 0; border: 0; background: transparent; padding: 6px 4px; border-radius: 8px; font-size: 12.5px; color: var(--muted); }
   .seg button:hover { color: var(--ink); background: transparent; }
+  .seg[data-seg="role"] { display: grid; grid-template-columns: 1fr 1fr; }   /* four role buttons: two rows, so long names never run together */
   .seg button.on { background: var(--pad); color: var(--ink); font-weight: 600; box-shadow: 0 1px 4px var(--shadow); outline: 1px solid var(--line); }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chips button { border-radius: 999px; padding: 5px 11px; font-size: 12px; color: var(--muted); background: var(--pad); }
@@ -838,9 +839,9 @@
         <span class="sub" id="limitSub"></span></div></div>
     <div class="field"><label>Models</label>
       <div class="roles">
-        <label><span>Think</span><select id="roleThink" data-role="think"></select></label>
-        <label><span>Build</span><select id="roleBuild" data-role="build"></select></label>
-        <label><span>Run</span><select id="roleRun" data-role="run"></select></label></div>
+        <label><span>Composer</span><select id="roleThink" data-role="think"></select></label>
+        <label><span>Orchestrator</span><select id="roleBuild" data-role="build"></select></label>
+        <label><span>Performer</span><select id="roleRun" data-role="run"></select></label></div>
       <div class="sub" id="rolesSub"></div></div>
     <label id="riskBox" class="risk" hidden><input type="checkbox" id="riskOk"> <span id="riskText"></span></label>
     <div id="runWarn" class="hint" style="color:var(--failed)"></div>
@@ -951,7 +952,7 @@ const TOOL_INFO = {
 const TYPE_LABEL = { master: "Start", cluster: "Team", checkpoint: "Checkpoint", approval: "Approval", done: "Done" };
 // Stages take a role, and the flow says which model fills it (flows.py DEFAULT_MODELS)
 const DEFAULT_MODELS = { think: "claude-opus-5-5", build: "claude-sonnet-5-5", run: "claude-haiku-4-5" };
-const ROLE_NAME = { think: "Think", build: "Build", run: "Run" };
+const ROLE_NAME = { think: "Composer", build: "Orchestrator", run: "Performer" };   // writes the idea, arranges it into something real, plays it out
 const ROLE_OF = { "claude-opus-5-5": "think", "claude-sonnet-5-5": "build", "claude-haiku-4-5": "run" };
 const roleModel = (role) => ((flow && flow.models) || DEFAULT_MODELS)[role] || DEFAULT_MODELS[role];
 const modelLabel = (id) => (meta.models.find((m) => m.id === id) || {}).label || ENGINE_NAME[id] || id;
@@ -1890,7 +1891,7 @@ function renderInspector() {
   const ROLE_TIPS = { think: "Planning, design, writing, judgment", build: "Making and changing things", run: "Checks, tests, merges, deploys" };
   const modelPick = (node) => {   // a role (the Run menu says which model fills it) or a model picked by hand
     const role = node.role || "";
-    return seg("role", [["think", "Think", ROLE_TIPS.think], ["build", "Build", ROLE_TIPS.build], ["run", "Run", ROLE_TIPS.run], ["", "Pick a model"]], role)
+    return seg("role", [["think", ROLE_NAME.think, ROLE_TIPS.think], ["build", ROLE_NAME.build, ROLE_TIPS.build], ["run", ROLE_NAME.run, ROLE_TIPS.run], ["", "Pick a model"]], role)
       + (role ? `<div class="sub">${esc(ROLE_TIPS[role])}. Uses <b>${esc(modelLabel(roleModel(role)))}</b>; change which model fills ${ROLE_NAME[role]} in the Run menu.</div>`
               : models(node.model));
   };
