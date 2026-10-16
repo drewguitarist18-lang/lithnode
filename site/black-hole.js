@@ -53,7 +53,7 @@
       vec2 uv = (gl_FragCoord.xy - .5 * uRes) / uRes.y - uShift;
       uv *= uZoom;
       uv = mat2(cos(uRoll), sin(uRoll), -sin(uRoll), cos(uRoll)) * uv;
-      float pitch = uLook.y + .03, yaw = uLook.x;
+      float pitch = uLook.y, yaw = uLook.x;
       vec3 ro = vec3(sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch)) * uDist;
       vec3 fw = normalize(-ro), rt = normalize(cross(vec3(0., 1., 0.), fw)), up = cross(fw, rt);
       vec3 vel = normalize(fw * 2. + rt * uv.x + up * uv.y), pos = ro, v0 = vel;
@@ -82,7 +82,7 @@
             float pr = length(pc.xz), x = pr - 1.25;
             if (x > 0. && pr < 22.) {
               vec3 d = normalize(vel);
-              float vy = max(abs(d.y), .02);
+              float vy = max(abs(d.y), .05);
               float s = gas(pr, atan(pc.z, pc.x) + float(k) * 1.7, trav * uPix / vy);
               float wk = k == 0 ? 1. : (k == 1 || k == -1) ? .5 : .25;
               float prof = smoothstep(0., .8, x) * (exp(-x / .85) + exp(-x / 8.) * .27 * mix(1., smoothstep(.25, .06, vy), smoothstep(0., 3., dot(pc.xz, normalize(ro.xz))))) * smoothstep(22., 2., pr) * wk;
@@ -127,14 +127,15 @@
     gl.uniform1f(U("uPix"), .2 * 160 / DIST / A * (A > 1 ? 1.15 : .9) / (2 * H));
     gl.uniform2f(U("uShift"), 0, tall ? .118 : .25);
   }
-  // the camera eases toward the cursor: up flattens the disk edge-on, down tips it toward you
+  // the camera eases toward the cursor: up flattens the disk, down tips it toward you. It never goes fully edge-on,
+  // where the disk's sheets would show as lines
   let tx = .5, ty = .75, mx = tx, my = ty;
   addEventListener("pointermove", (e) => { tx = e.clientX / innerWidth; ty = e.clientY / innerHeight; }, { passive: true });
   let on = true, last = 0, slow = 0, t0 = performance.now();
   function frame(now) {
     mx += (tx - mx) * .04; my += (ty - my) * .04;
     gl.uniform1f(U("uT"), reduce ? 6 : (now - t0) / 1000 + 6);
-    gl.uniform2f(U("uLook"), (mx - .5) * .2, (my - .5) * .2);
+    gl.uniform2f(U("uLook"), (mx - .5) * .2, .06 + .07 * my);
     gl.uniform1f(U("uRoll"), .2);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     // a slow GPU draws fewer pixels rather than a choppy hole
