@@ -6,9 +6,11 @@
 <script>
 // A 30-second film of the real app and site: footage/*.mp4 recorded by capture.js, composited over the night sky.
 // render.js serves the repo, calls renderFrame(t) for each of 900 frames, then renderAudio() for the score.
-// Open film.html?t=12.5 for a still of any moment.
-const W = 1920, H = 1080, LENGTH = 30;
+// Open film.html?t=12.5 for a still of any moment. ?v=1 is the vertical cut (1080x1920, for TikTok, Reels and Shorts).
+const Q = new URLSearchParams(location.search), V = Q.has("v");
+const W = V ? 1080 : 1920, H = V ? 1920 : 1080, LENGTH = 30;
 const cv = document.getElementById("cv"), g = cv.getContext("2d");
+cv.width = W; cv.height = H;
 const C = { void: "#08080a", ink: "#ecebe6", soft: "#b1b0aa", faint: "#74736e" };
 const F = { pix: "'Pixelify Sans', monospace", mono: "'Geist Mono', ui-monospace, monospace" };
 const LOGO = [".##..........##.", "#.#..........#.#", "###..........###", ".#............#.", ".#............#.", ".##.########.##.", "..############..", "..##.######.##..", "..############..", "...##########...", "...#.#....#.#...", "...#.#....#.#...", "..##.##..##.##.."];
@@ -28,21 +30,26 @@ function text(s, x, y, font, color, align = "center", alpha = 1) { g.save(); g.g
 const SCENES = [
   { id: "describe", clip: "describe", t0: 2.8, t1: 8, map: [[3, 2.3], [5.6, 9.2], [6.2, 11.0], [7.0, 15.0], [8, 16.8]],
     cam: [[2.8, 960, 290, 1.9], [5.9, 960, 290, 1.9], [6.7, 960, 540, 1.0], [8, 960, 580, 1.08]],
+    vcam: [[2.8, 905, 160, 1.7], [5.9, 905, 160, 1.7], [6.7, 790, 560, 1.0], [8, 790, 580, 1.0]],
     cap: ["Describe the job.", "One line in. A team of agents out."] },
   { id: "run", clip: "run", t0: 8, t1: 14, map: [[8, 2.6], [9.6, 10.9], [14, 28.4]],
     cam: [[8, 960, 560, 1.18], [9.5, 960, 560, 1.18], [10.4, 760, 600, 1.3], [14, 820, 650, 1.26]],
+    vcam: [[8, 970, 420, 1.3], [9.5, 970, 420, 1.3], [10.4, 790, 600, 1.0], [12.4, 790, 640, 1.0], [14, 600, 800, 1.2]],
     cap: ["Hit run. They split the work.", "A scout hunts the web. Two checkers judge every find."] },
   { id: "office", clip: "office", t0: 14, t1: 18, map: [[14, 19.0], [18, 27.0]],
     cam: [[14, 930, 300, 1.7], [18, 940, 290, 1.86]],
+    vcam: [[14, 950, 260, 1.6], [18, 950, 240, 1.75]],
     cap: ["Watch every agent work.", "The Office shows each session, live."] },
   { id: "approve", clip: "run", t0: 18, t1: 22, map: [[18, 29.3], [20.6, 32.9], [21.15, 35.6], [21.25, 36.4], [22, 37.9]],
     cam: [[18, 1420, 430, 1.9], [20.55, 1480, 400, 2.25], [20.95, 960, 560, 1.0], [21.24, 960, 560, 1.0], [21.25, 960, 600, 1.0], [22, 860, 640, 1.12]],
+    vcam: [[18, 1640, 380, 1.5], [20.55, 1700, 360, 1.9], [20.95, 790, 600, 1.0], [21.24, 790, 600, 1.0], [21.25, 790, 620, 1.0], [22, 560, 780, 1.2]],
     cap: ["Nothing ships without your go.", "The checkers cut the weak ones. You approve the rest."] },
-  { id: "site", clip: "site", t0: 22, t1: 26.3, map: [[22, 1.2], [26.3, 7.2]],
-    cam: [[22, 960, 540, 1.0]], browser: true,
+  { id: "site", clip: V ? "phone" : "site", t0: 22, t1: 26.3, map: V ? [[22, 1.5], [26.3, 5.8]] : [[22, 1.2], [26.3, 7.2]],
+    cam: [[22, 960, 540, 1.0]], vcam: [[22, 270, 480, 1.0]], browser: true,
     cap: ["Free. Open source. Yours.", "MIT licensed · runs on the Claude, Codex or Cursor plan you have"] },
 ];
-const CLIPS = ["describe", "run", "office", "site"];
+if (V) SCENES.forEach((s) => { s.cam = s.vcam; });
+const CLIPS = ["describe", "run", "office", V ? "phone" : "site"];
 const vids = {}, logs = {};
 function mapTime(m, t) {
   if (t <= m[0][0]) return m[0][1];
@@ -55,10 +62,12 @@ function camAt(c, t) {
   for (let i = 1; i < c.length; i++) if (t <= c[i][0]) { const k = eio((t - c[i - 1][0]) / (c[i][0] - c[i - 1][0])); return [1, 2, 3].map((j) => lerp(c[i - 1][j], c[i][j], k)); }
   return c[c.length - 1].slice(1);
 }
-// the part of the 1920x1080 recording the camera sees
-function crop(cam) {
-  const [cx, cy, z] = cam, sw = W / z, sh = H / z;
-  return { sx: clamp(cx - sw / 2, 0, W - sw), sy: clamp(cy - sh / 2, 0, H - sh), sw, sh };
+// the part of the recording the camera sees: at zoom 1, the biggest crop with the window's shape
+function crop(cam, vw, vh, aspect) {
+  const [cx, cy, z] = cam;
+  let sw = vw / z, sh = sw / aspect;
+  if (sh > vh / z) { sh = vh / z; sw = sh * aspect; }
+  return { sx: clamp(cx - sw / 2, 0, vw - sw), sy: clamp(cy - sh / 2, 0, vh - sh), sw, sh };
 }
 // pointer and clicks from the capture log, as film-time events (for the cursor's ripples and the sound)
 const EVENTS = [];
@@ -114,7 +123,8 @@ function hush(y, r, a) {   // a soft dark pool so type reads over the bright dis
 function blackHole(t, src, alpha, scale = 1) {   // the site's ray-traced black hole (footage/hole.mp4, 1920x1200), cropped to the frame
   if (alpha <= 0) return;
   g.save(); g.globalAlpha = alpha; g.translate(W / 2, H / 2); g.scale(scale, scale);
-  g.drawImage(bh, 0, 60, 1920, 1080, -W / 2, -H / 2, W, H); g.restore();
+  if (V) g.drawImage(bh, -W / 2, -H / 2, W, H); else g.drawImage(bh, 0, 60, 1920, 1080, -W / 2, -H / 2, W, H);
+  g.restore();
 }
 
 // ============================================================================ pieces
@@ -132,18 +142,36 @@ function crab(cx, top, cell, t, from, spread, seed = 7) {   // Lithnode's logo; 
   g.restore();
 }
 function crabPops(from, spread, seed = 7) { const r = mulberry(seed), out = []; LOGO.forEach((row) => [...row].forEach((ch) => { if (ch === "#") out.push(from + r() * spread); })); return out; }
+// lines of words no wider than max for the vertical cut's narrow frame, balanced so no word is left alone
+function wrap(words, widths, space, max) {
+  const w = (a, b) => widths.slice(a, b).reduce((x, y) => x + y, 0) + space * (b - a - 1), all = words.map((_, i) => i);
+  if (w(0, words.length) <= max) return [all];
+  let best = 1;
+  for (let k = 1; k < words.length; k++) if (Math.max(w(0, k), w(k, words.length)) < Math.max(w(0, best), w(best, words.length))) best = k;
+  return [all.slice(0, best), all.slice(best)];
+}
 function caption(t, s, big, small) {   // words rise in, one after another, then fade before the cut
   const tin = s.t0 + .2, out = 1 - span(t, s.t1 - .35, s.t1 - .05);
   if (t < tin || out <= 0) return;
-  g.save(); g.font = `600 58px ${F.pix}`;
-  const words = big.split(" "), widths = words.map((w) => g.measureText(w + " ").width), total = widths.reduce((a, b) => a + b, 0) - g.measureText(" ").width;
-  let x = W / 2 - total / 2;
-  words.forEach((w, i) => {
-    const k = eout(span(t, tin + i * .06, tin + i * .06 + .4));
-    text(w, x, 112 + (1 - k) * 22, `600 58px ${F.pix}`, C.ink, "left", k * out); x += widths[i];
+  const bf = V ? `600 70px ${F.pix}` : `600 58px ${F.pix}`, sf = V ? `400 27px ${F.mono}` : `400 22px ${F.mono}`;
+  const top = V ? 300 : 112, lh = V ? 82 : 0;
+  g.save(); g.font = bf;
+  const words = big.split(" "), widths = words.map((w) => g.measureText(w).width), space = g.measureText(" ").width;
+  const lines = V ? wrap(words, widths, space, 960) : [words.map((_, i) => i)];
+  lines.forEach((line, j) => {
+    const total = line.reduce((a, i) => a + widths[i], 0) + space * (line.length - 1);
+    let x = W / 2 - total / 2;
+    line.forEach((i) => {
+      const k = eout(span(t, tin + i * .06, tin + i * .06 + .4));
+      text(words[i], x, top + j * lh + (1 - k) * 22, bf, C.ink, "left", k * out); x += widths[i] + space;
+    });
   });
   const k2 = eout(span(t, tin + .35, tin + .8));
-  text(small, W / 2, 158 + (1 - k2) * 10, `400 22px ${F.mono}`, C.soft, "center", k2 * out);
+  g.font = sf;
+  const sw = small.split(" "), sws = sw.map((w) => g.measureText(w).width), ss = g.measureText(" ").width;
+  const sl = V ? wrap(sw, sws, ss, 900) : [sw.map((_, i) => i)];
+  const sy = top + (lines.length - 1) * lh + (V ? 62 : 46);
+  sl.forEach((line, j) => text(line.map((i) => sw[i]).join(" "), W / 2, sy + j * 38 + (1 - k2) * 10, sf, C.soft, "center", k2 * out));
   g.restore();
 }
 function cursor(x, y, s, press) {
@@ -152,20 +180,22 @@ function cursor(x, y, s, press) {
   g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 6; g.shadowOffsetY = 2;
   g.fillStyle = "#fff"; g.fill(); g.shadowColor = "transparent"; g.lineWidth = 1.4; g.strokeStyle = "#111"; g.stroke(); g.restore();
 }
-const WIN = { x: 210, y: 196, w: 1500, h: 844 };
+const WIN = V ? { x: 40, y: 520, w: 1000, h: 910 } : { x: 210, y: 196, w: 1500, h: 844 };
 // one window of footage: the clip, cropped by the camera, with its cursor and click ripples on top
 function footageWindow(s, t, { scale = 1, alpha = 1, dy = 0 } = {}) {
-  const v = vids[s.clip], cam = camAt(s.cam, t), c = crop(cam), ct = mapTime(s.map, t);
-  let { x, y, w, h } = WIN; const bar = s.browser ? 46 : 0;
-  if (s.browser) { w = 1400; h = 788 + bar; x = (W - w) / 2; y = 1040 - h; }
+  const v = vids[s.clip], cam = camAt(s.cam, t), ct = mapTime(s.map, t), phone = V && s.browser;
+  let { x, y, w, h } = WIN; const bar = s.browser && !phone ? 46 : 0, rad = phone ? 54 : 16;
+  if (s.browser && !phone) { w = 1400; h = 788 + bar; x = (W - w) / 2; y = 1040 - h; }
+  if (phone) { w = 640; h = 1138; x = (W - w) / 2; y = 470; }
+  const c = crop(cam, v.videoWidth, v.videoHeight, w / (h - bar));
   y += dy + Math.sin(t * .7) * 3;
   g.save(); g.globalAlpha = alpha;
   g.translate(x + w / 2, y + h / 2); g.scale(scale, scale); g.translate(-(x + w / 2), -(y + h / 2));
   // shadow and a faint starlight rim
-  g.save(); rr(x, y, w, h, 16); g.shadowColor = "rgba(0,0,0,.75)"; g.shadowBlur = 90; g.shadowOffsetY = 34; g.fillStyle = "#0b0b0e"; g.fill();
+  g.save(); rr(x, y, w, h, rad); g.shadowColor = "rgba(0,0,0,.75)"; g.shadowBlur = 90; g.shadowOffsetY = 34; g.fillStyle = "#0b0b0e"; g.fill();
   g.shadowColor = "rgba(170,185,255,.16)"; g.shadowBlur = 50; g.shadowOffsetY = 0; g.fill(); g.restore();
-  g.save(); rr(x, y, w, h, 16); g.clip();
-  if (s.browser) {
+  g.save(); rr(x, y, w, h, rad); g.clip();
+  if (s.browser && !phone) {
     g.fillStyle = "#151518"; g.fillRect(x, y, w, bar);
     ["#ff5f57", "#febc2e", "#28c840"].forEach((col, i) => { g.fillStyle = col; g.beginPath(); g.arc(x + 26 + i * 22, y + bar / 2, 6.5, 0, 7); g.fill(); });
     rr(x + w / 2 - 230, y + 10, 460, bar - 20, 13); g.fillStyle = "#0b0b0e"; g.fill();
@@ -186,7 +216,8 @@ function footageWindow(s, t, { scale = 1, alpha = 1, dy = 0 } = {}) {
     const [px, py] = toWin(...p); cursor(px, py, clamp(.9 + cam[2] * .35, 1.2, 1.7), pressed);
   }
   g.restore();
-  rr(x + .5, y + .5, w - 1, h - 1, 16); g.strokeStyle = "rgba(236,235,230,.16)"; g.lineWidth = 1; g.stroke();
+  rr(x + .5, y + .5, w - 1, h - 1, rad); g.strokeStyle = "rgba(236,235,230,.16)"; g.lineWidth = 1; g.stroke();
+  if (phone) { rr(x - 7, y - 7, w + 14, h + 14, rad + 7); g.strokeStyle = "rgba(236,235,230,.22)"; g.lineWidth = 3; g.stroke(); }
   // honest about time-lapse
   const rate = rateAt(s.map, t);
   if (rate > 1.4 && t > s.t0 + .1) {
@@ -202,9 +233,10 @@ function footageWindow(s, t, { scale = 1, alpha = 1, dy = 0 } = {}) {
 function open(t) {   // 0–3: the black hole, the crab assembling, the name
   if (t > 3.2) return;
   const out = span(t, 2.6, 3.1), sc = 1 + eio(out) * .18;
-  blackHole(t, t, .62 * span(t, 0, 1.1) * (1 - out), 1.06 - t * .015);
-  hush(560, 520, .55 * (1 - out));
-  g.save(); g.globalAlpha = 1 - eio(out); g.translate(W / 2, 470); g.scale(sc, sc); g.translate(-W / 2, -470);
+  blackHole(t, t, .62 * span(t, 0, 1.1) * (1 - out), (1.06 - t * .015) * (V ? 1.2 : 1));
+  const DY = V ? 280 : 0;
+  hush(560 + DY, 520, .55 * (1 - out));
+  g.save(); g.globalAlpha = 1 - eio(out); g.translate(W / 2, 470 + DY); g.scale(sc, sc); g.translate(-W / 2, -470); g.translate(0, DY);
   crab(W / 2, 236, 14, t, .2, .95);
   const word = "Lithnode", font = `700 140px ${F.pix}`; g.font = font;
   const full = g.measureText(word).width; let x = W / 2 - full / 2;
@@ -231,17 +263,17 @@ function scenes(t) {
 function endCard(t) {   // 26–30
   if (t < 25.8) return;
   const a = span(t, 25.8, 26.6);
-  blackHole(t, t, .8 * a, 1.12 - (t - 26) * .02);
-  hush(560, 640, .78 * a);
+  blackHole(t, t, .8 * a, (1.12 - (t - 26) * .02) * (V ? 1.2 : 1));
+  hush(560 + (V ? 280 : 0), 640, .78 * a);
   const fade = 1 - span(t, 29.4, 30);
-  g.save(); g.globalAlpha = fade;
+  g.save(); g.globalAlpha = fade; if (V) g.translate(0, 280);
   crab(W / 2, 214, 11, t, 26.05, .5, 11);
   const k1 = eout(span(t, 26.35, 26.8));
   text("Lithnode", W / 2, 498 + (1 - k1) * 20, `700 150px ${F.pix}`, C.ink, "center", k1);
   const k2 = eout(span(t, 26.65, 27.1));
   text("Your AI team. Managed.", W / 2, 580 + (1 - k2) * 14, `500 46px ${F.pix}`, C.soft, "center", k2);
   const k3 = eout(span(t, 27.0, 27.45));
-  text("Research  ·  ads  ·  content  ·  checks  ·  free and open source", W / 2, 650 + (1 - k3) * 10, `400 24px ${F.mono}`, "#9b9a94", "center", k3);
+  text("Research  ·  ads  ·  content  ·  checks  ·  free and open source", W / 2, 650 + (1 - k3) * 10, `400 ${V ? 21 : 24}px ${F.mono}`, "#9b9a94", "center", k3);
   const k4 = back(span(t, 27.35, 27.75));
   if (k4 > 0) {
     g.save(); g.translate(W / 2, 752); g.scale(k4, k4);
@@ -285,11 +317,11 @@ async function prepare(t) {
 window.renderFrame = async (t) => { await prepare(t); draw(t); };
 window.ready = (async () => {
   const load = (v, src) => new Promise((r, j) => { v.muted = true; v.preload = "auto"; v.oncanplaythrough = r; v.onerror = () => j(new Error(src)); v.src = src; v.load(); });
-  const jobs = [load(bh, "footage/hole.mp4")];
+  const jobs = [load(bh, V ? "footage/hole-tall.mp4" : "footage/hole.mp4")];
   for (const c of CLIPS) { vids[c] = document.createElement("video"); jobs.push(load(vids[c], `footage/${c}.mp4`)); jobs.push(fetch(`footage/${c}.json`).then((r) => r.json()).then((j) => { logs[c] = j.log; })); }
   jobs.push(...[`700 140px ${F.pix}`, `600 58px ${F.pix}`, `500 42px ${F.pix}`, `400 22px ${F.mono}`, `500 15px ${F.mono}`, `600 30px ${F.mono}`].map((f) => document.fonts.load(f)));
   await Promise.all(jobs); buildEvents();
-  const q = new URLSearchParams(location.search).get("t");
+  const q = Q.get("t");
   if (q !== null) await window.renderFrame(+q);
   return true;
 })();

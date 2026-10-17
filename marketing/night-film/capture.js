@@ -2,7 +2,7 @@
 // cost nothing) and the site served on 8797 (`python -m http.server 8797 -d site`). Writes footage/<clip>.mp4 (30 fps)
 // and footage/<clip>.json (every mouse move, click and key with its time in the clip, so the film can draw the cursor).
 // Frames come from Chrome's screencast with their own timestamps, on the same clock as the log, so they line up exactly.
-// Usage: node capture.js [clip ...]   clips: describe, run, site   (run also records the Office alongside it)
+// Usage: node capture.js [clip ...]   clips: describe, run, site, phone   (run also records the Office alongside it)
 const puppeteer = require("puppeteer-core");
 const fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const FF = process.env.FFMPEG || "ffmpeg";
@@ -19,7 +19,7 @@ async function page(b) {
   return p;
 }
 // a recording with a log of the pointer: every move and click, timed from the recording's start
-async function record(p, name) {
+async function record(p, name, [mw, mh] = [1920, 1080]) {
   const dir = out(name + "-frames"), frames = [];
   fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir);
   const cdp = await p.createCDPSession();
@@ -29,7 +29,7 @@ async function record(p, name) {
     cdp.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
   });
   const t0 = Date.now(), log = [];
-  await cdp.send("Page.startScreencast", { format: "jpeg", quality: 94, maxWidth: 1920, maxHeight: 1080 });
+  await cdp.send("Page.startScreencast", { format: "jpeg", quality: 94, maxWidth: mw, maxHeight: mh });
   let at = [960, 540];
   const mark = (kind, x, y) => log.push({ t: (Date.now() - t0) / 1000, kind, x: Math.round(x), y: Math.round(y) });
   return {
@@ -135,6 +135,16 @@ const clips = {
     r.mark("done");
     await sleep(3500);
     await r.stop(); await ro.stop(); await p.close(); await b2.close();
+  },
+  // the site on a phone, for the vertical cut: the hero's black hole, live, at 1080x1920
+  async phone(b) {
+    const p = await b.newPage();
+    await p.setViewport({ width: 540, height: 960, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await p.goto(SITE + "/", { waitUntil: "networkidle2" });
+    await sleep(3000);
+    const r = await record(p, "phone", [1080, 1920]);
+    await sleep(8000);
+    await r.stop(); await p.close();
   },
   // the site: the hero's live black hole, tipping as the pointer drifts, then a glide to the download button
   async site(b) {
