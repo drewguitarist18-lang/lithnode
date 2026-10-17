@@ -7,7 +7,7 @@ const puppeteer = require("puppeteer-core");
 const fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const FF = process.env.FFMPEG || "ffmpeg";
 const APP = "http://127.0.0.1:8795", SITE = "http://127.0.0.1:8797";
-const FOLDER = "C:/Users/drewm/AppData/Local/Temp/lithnode-demo/project";
+const FOLDER = "C:/Users/drewm/AppData/Local/Temp/lithnode-film/project";
 const out = (f) => path.join(__dirname, "footage", f);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -89,11 +89,11 @@ const clips = {
   // describe a team in one line, and it's drawn
   async describe(b) {
     const p = await page(b);
-    const f = await openApp(p, await flowId("Build, review, secure, ship"));
+    const f = await openApp(p, await flowId("Research squad"));
     const r = await record(p, "describe");
     await sleep(600);
     await r.move(...(await center(f, "#askIn")), 900); await r.click(); await sleep(250);
-    await r.type("Two bug hunters, then merge what they find");
+    await r.type("Find products worth selling, check margins and reviews, list the winners");
     await sleep(350);
     await r.move(...(await center(f, "#askBtn")), 500); await sleep(150); await r.click();
     await f.waitForFunction(() => document.getElementById("askBtn").textContent === "Build flow", { timeout: 60000 });
@@ -103,7 +103,7 @@ const clips = {
   },
   // run the big flow from the Run dialog, watch it, approve it, see it finish; the Office records alongside
   async run(b) {
-    const id = await flowId("Build, review, secure, ship");
+    const id = await flowId("Product hunt");
     const b2 = await launch(), p = await page(b), o = await page(b2);   // the Office in its own browser, so neither tab is in the background
     console.log("run: opening the app"); const f = await openApp(p, id);
     console.log("run: opening the office"); await o.goto(APP + "/office", { waitUntil: "load" });
@@ -113,7 +113,7 @@ const clips = {
     await r.move(...(await center(f, "#runBtn")), 900); await r.click(); await sleep(500);
     await f.$eval("#taskIn", (el) => { el.value = ""; el.dispatchEvent(new Event("input", { bubbles: true })); });
     await r.move(...(await center(f, "#taskIn")), 500); await r.click();
-    await r.type("Add a dark mode toggle to the settings page", 38);
+    await r.type("Find home gadgets worth selling this month", 38);
     await f.$eval("#folderIn", (el, v) => { el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); }, FOLDER);
     await sleep(300);
     if (await f.$eval("#riskBox", (el) => !el.hidden)) { await r.move(...(await center(f, "#riskOk")), 500); await r.click(); await sleep(250); }
@@ -136,19 +136,19 @@ const clips = {
     await sleep(3500);
     await r.stop(); await ro.stop(); await p.close(); await b2.close();
   },
-  // the site: the hero, then a glide down to the three moves
+  // the site: the hero's live black hole, tipping as the pointer drifts, then a glide to the download button
   async site(b) {
     const p = await page(b);
     await p.goto(SITE + "/", { waitUntil: "networkidle2" });
-    await sleep(2500);
+    await p.mouse.move(960, 900);
+    await sleep(3000);
     const r = await record(p, "site");
-    await sleep(3200);
-    await p.evaluate(async () => {
-      const to = document.querySelector(".move, #how, section:nth-of-type(3)");
-      const y1 = to ? to.getBoundingClientRect().top + scrollY - 120 : innerHeight * 1.5, y0 = scrollY, T = 2600, s = performance.now();
-      await new Promise((done) => { const f = (n) => { const k = Math.min(1, (n - s) / T), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; scrollTo(0, y0 + (y1 - y0) * e); k < 1 ? requestAnimationFrame(f) : done(); }; requestAnimationFrame(f); });
-    });
-    await sleep(3500);
+    await r.move(960, 900, 10);
+    await sleep(800);
+    await r.move(700, 260, 3600);
+    await r.move(1250, 520, 3200);
+    await r.move(...(await center(p, "#dlMain")), 1400);
+    await sleep(2200);
     await r.stop(); await p.close();
   },
 };

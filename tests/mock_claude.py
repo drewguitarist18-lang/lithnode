@@ -142,6 +142,18 @@ if "--append-system-prompt" in flags:
              "tools": "read", "focuses": "Logic\nErrors"},
             {"id": "merge", "type": "checkpoint", "mode": "summarize", "model": "claude-haiku-4-5"}],
             "edges": [["master", "Bug Hunters!"], ["Bug Hunters!", "merge"]]}
+        if "product" in prompt.lower():   # the film's non-coding team: the dropship stages the steps below act out
+            draft = {"name": "Product hunt", "nodes": [
+                {"id": "master", "type": "master", "mode": "pass"},
+                {"id": "scout", "type": "cluster", "name": "Product scout", "count": 1, "bot": "scout", "tools": "web", "role": "run",
+                 "summary": "Searches suppliers for trending products"},
+                {"id": "check", "type": "cluster", "name": "Checker", "count": 2, "bot": "sentinel", "tools": "web", "role": "build",
+                 "focuses": "Margin and price\nReviews, shipping and competition", "summary": "One checks the money, one the reviews"},
+                {"id": "ok", "type": "approval", "name": "Your pick", "message": "The checkers cut the weak ones. Approve to list the rest."},
+                {"id": "upload", "type": "cluster", "name": "Uploader", "count": 1, "bot": "launch", "tools": "none", "role": "run",
+                 "connectors": ["claude.ai Store"], "summary": "Lists the winners as drafts"},
+                {"id": "done", "type": "done", "name": "Done"}],
+                "edges": [["master", "scout"], ["scout", "check"], ["check", "ok"], ["ok", "upload"], ["upload", "done"]]}
         text = "nope, no flow here" if "BADJSON" in prompt else "Here it is:\n```json\n" + json.dumps(draft) + "\n```"
         out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
         out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": 0.02, "num_turns": 1, **base})

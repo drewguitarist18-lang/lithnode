@@ -26,21 +26,21 @@ function text(s, x, y, font, color, align = "center", alpha = 1) { g.save(); g.g
 // ============================================================================ footage
 // each scene plays one clip: `map` is [film time, clip time] knots (sped up between them), `cam` is [film time, centre x, centre y, zoom]
 const SCENES = [
-  { id: "describe", clip: "describe", t0: 2.8, t1: 8, map: [[3, 2.2], [6, 8.3], [8, 15.6]],
-    cam: [[2.8, 960, 290, 1.9], [5.7, 960, 290, 1.9], [6.6, 960, 540, 1.0], [8, 960, 560, 1.08]],
-    cap: ["Describe the team.", "One line in. A flow of agents out."] },
-  { id: "run", clip: "run", t0: 8, t1: 14, map: [[8, 2.6], [9.6, 11.0], [14, 29.6]],
-    cam: [[8, 960, 560, 1.18], [9.5, 960, 560, 1.18], [10.4, 800, 560, 1.3], [14, 790, 560, 1.38]],
-    cap: ["Hit run. They split the work.", "Real Claude Code, Codex and Cursor sessions, on your machine."] },
-  { id: "office", clip: "office", t0: 14, t1: 18, map: [[14, 18.0], [18, 24.0]],
-    cam: [[14, 930, 330, 1.62], [18, 940, 300, 1.86]],
+  { id: "describe", clip: "describe", t0: 2.8, t1: 8, map: [[3, 2.3], [5.6, 9.2], [6.2, 11.0], [7.0, 15.0], [8, 16.8]],
+    cam: [[2.8, 960, 290, 1.9], [5.9, 960, 290, 1.9], [6.7, 960, 540, 1.0], [8, 960, 580, 1.08]],
+    cap: ["Describe the job.", "One line in. A team of agents out."] },
+  { id: "run", clip: "run", t0: 8, t1: 14, map: [[8, 2.6], [9.6, 10.9], [14, 28.4]],
+    cam: [[8, 960, 560, 1.18], [9.5, 960, 560, 1.18], [10.4, 760, 600, 1.3], [14, 820, 650, 1.26]],
+    cap: ["Hit run. They split the work.", "A scout hunts the web. Two checkers judge every find."] },
+  { id: "office", clip: "office", t0: 14, t1: 18, map: [[14, 19.0], [18, 27.0]],
+    cam: [[14, 930, 300, 1.7], [18, 940, 290, 1.86]],
     cap: ["Watch every agent work.", "The Office shows each session, live."] },
-  { id: "approve", clip: "run", t0: 18, t1: 22, map: [[18, 30.6], [20.6, 33.95], [21.15, 41.6], [21.25, 43.2], [22, 45.7]],
-    cam: [[18, 1420, 430, 1.9], [20.55, 1480, 400, 2.25], [20.95, 960, 540, 1.0], [21.24, 960, 540, 1.0], [21.25, 960, 520, 1.0], [22, 1000, 440, 1.14]],
-    cap: ["Nothing ships without your go.", "Approve, reject, or leave a note for the next stage."] },
-  { id: "site", clip: "site", t0: 22, t1: 26.3, map: [[22, .3], [23.4, 1.7], [26, 9.3]],
+  { id: "approve", clip: "run", t0: 18, t1: 22, map: [[18, 29.3], [20.6, 32.9], [21.15, 35.6], [21.25, 36.4], [22, 37.9]],
+    cam: [[18, 1420, 430, 1.9], [20.55, 1480, 400, 2.25], [20.95, 960, 560, 1.0], [21.24, 960, 560, 1.0], [21.25, 960, 600, 1.0], [22, 860, 640, 1.12]],
+    cap: ["Nothing ships without your go.", "The checkers cut the weak ones. You approve the rest."] },
+  { id: "site", clip: "site", t0: 22, t1: 26.3, map: [[22, 1.2], [26.3, 7.2]],
     cam: [[22, 960, 540, 1.0]], browser: true,
-    cap: ["Free. Local. Yours.", "MIT licensed · no telemetry · runs on your own Claude Code"] },
+    cap: ["Free. Open source. Yours.", "MIT licensed · runs on the Claude, Codex or Cursor plan you have"] },
 ];
 const CLIPS = ["describe", "run", "office", "site"];
 const vids = {}, logs = {};
@@ -111,7 +111,7 @@ function hush(y, r, a) {   // a soft dark pool so type reads over the bright dis
   gr.addColorStop(0, `rgba(8,8,10,${a})`); gr.addColorStop(.55, `rgba(8,8,10,${a * .7})`); gr.addColorStop(1, "rgba(8,8,10,0)");
   g.save(); g.translate(W / 2, y); g.scale(1.5, 1); g.translate(-W / 2, -y); g.fillStyle = gr; g.fillRect(-W, 0, W * 3, H); g.restore();
 }
-function blackHole(t, src, alpha, scale = 1) {   // the site's ray-traced black hole, 1920x1200, cropped to the frame
+function blackHole(t, src, alpha, scale = 1) {   // the site's ray-traced black hole (footage/hole.mp4, 1920x1200), cropped to the frame
   if (alpha <= 0) return;
   g.save(); g.globalAlpha = alpha; g.translate(W / 2, H / 2); g.scale(scale, scale);
   g.drawImage(bh, 0, 60, 1920, 1080, -W / 2, -H / 2, W, H); g.restore();
@@ -241,7 +241,7 @@ function endCard(t) {   // 26–30
   const k2 = eout(span(t, 26.65, 27.1));
   text("Your AI team. Managed.", W / 2, 580 + (1 - k2) * 14, `500 46px ${F.pix}`, C.soft, "center", k2);
   const k3 = eout(span(t, 27.0, 27.45));
-  text("Free  ·  MIT licensed  ·  Windows  ·  Mac  ·  Linux", W / 2, 650 + (1 - k3) * 10, `400 24px ${F.mono}`, "#9b9a94", "center", k3);
+  text("Research  ·  ads  ·  content  ·  checks  ·  free and open source", W / 2, 650 + (1 - k3) * 10, `400 24px ${F.mono}`, "#9b9a94", "center", k3);
   const k4 = back(span(t, 27.35, 27.75));
   if (k4 > 0) {
     g.save(); g.translate(W / 2, 752); g.scale(k4, k4);
@@ -258,7 +258,7 @@ function post(t) {
   const r = mulberry(Math.floor(t * 30) + 1); g.translate(-r() * 256, -r() * 256);
   g.fillStyle = g.createPattern(grain, "repeat"); g.fillRect(0, 0, W + 256, H + 256); g.restore();
 }
-const APPROVE_AT = 18 + (33.91 - 30.6) / (33.95 - 30.6) * 2.6;
+const APPROVE_AT = 18 + (32.86 - 29.3) / (32.9 - 29.3) * 2.6;   // the approve click in run.json, through the approve map
 function draw(t) {
   sky(t);
   open(t);
@@ -285,7 +285,7 @@ async function prepare(t) {
 window.renderFrame = async (t) => { await prepare(t); draw(t); };
 window.ready = (async () => {
   const load = (v, src) => new Promise((r, j) => { v.muted = true; v.preload = "auto"; v.oncanplaythrough = r; v.onerror = () => j(new Error(src)); v.src = src; v.load(); });
-  const jobs = [load(bh, "../../site/media/black-hole-wide.mp4")];
+  const jobs = [load(bh, "footage/hole.mp4")];
   for (const c of CLIPS) { vids[c] = document.createElement("video"); jobs.push(load(vids[c], `footage/${c}.mp4`)); jobs.push(fetch(`footage/${c}.json`).then((r) => r.json()).then((j) => { logs[c] = j.log; })); }
   jobs.push(...[`700 140px ${F.pix}`, `600 58px ${F.pix}`, `500 42px ${F.pix}`, `400 22px ${F.mono}`, `500 15px ${F.mono}`, `600 30px ${F.mono}`].map((f) => document.fonts.load(f)));
   await Promise.all(jobs); buildEvents();
