@@ -217,18 +217,18 @@
   .node.nd-step .pstate { font-size: 11.5px; font-weight: 500; color: var(--muted); }
   .node.nd-step .pstate:empty { display: none; }
   /* a team is one big agent (the orb) with its agents as small circles around its lower edge */
-  .node .orb { width: 96px; height: 96px; border-radius: 50%; flex: none; display: grid; place-items: center; position: relative;
+  .node .orb { width: 80px; height: 80px; border-radius: 50%; flex: none; display: grid; place-items: center; position: relative;
                background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--tc) 30%, var(--pad)), color-mix(in srgb, var(--tc) 9%, var(--pad)) 72%);
                border: 1.5px solid color-mix(in srgb, var(--tc) 38%, var(--line));
                box-shadow: 0 0 0 6px color-mix(in srgb, var(--tc) 7%, transparent), 0 14px 36px -14px color-mix(in srgb, var(--tc) 70%, transparent);
                transition: border-color .25s, box-shadow .25s, transform .25s; }
   .node.nd-team:hover .orb { border-color: color-mix(in srgb, var(--tc) 70%, var(--line)); transform: translateY(-1px); }
-  .node .orb canvas { width: 72px; height: 54px; image-rendering: pixelated; margin-top: -4px; }
+  .node .orb canvas { width: 72px; height: 54px; image-rendering: pixelated; margin-top: -2px; }
   .node .orb .ok { position: absolute; right: 2px; top: 2px; width: 22px; height: 22px; border-radius: 50%; display: none; place-items: center;
                    background: var(--done); color: #fff; box-shadow: 0 0 0 3px var(--bg); }
   .node .orb .ok svg { width: 13px; height: 13px; }
   .node.st-done .orb .ok { display: grid; }
-  .node .tt { min-width: 0; max-width: 100%; margin-top: 18px; }
+  .node .tt { min-width: 0; max-width: 100%; margin-top: 13px; }
   .node .nm { font-size: 14px; font-weight: 650; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
               text-shadow: 0 1px 8px var(--bg), 0 0 2px var(--bg); }
   .node .jb { font-size: 12px; line-height: 1.4; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -237,12 +237,12 @@
   .node .jb.warn { color: var(--approval); }
   .node .jb.err { color: var(--failed); }
   .node .jb .y { color: var(--done); font-weight: 600; } .node .jb .n { color: var(--failed); font-weight: 600; }
-  .node .ft { display: inline-flex; align-items: center; gap: 7px; height: 26px; max-width: 100%; margin-top: 8px; padding: 0 11px; border-radius: 999px;
+  .node .ft { display: inline-flex; align-items: center; gap: 7px; height: 24px; max-width: 100%; margin-top: 6px; padding: 0 10px; border-radius: 999px;
               font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--pad) 80%, transparent); backdrop-filter: blur(8px);
               border: 1px solid color-mix(in srgb, var(--tc) 18%, var(--line)); }
   .node .ag { position: absolute; inset: 0; pointer-events: none; }
-  .node .ag i { position: absolute; left: calc(50% - 8px); top: calc(50% - 8px); width: 16px; height: 16px; border-radius: 50%; pointer-events: auto;
-                transform: rotate(var(--a)) translate(50px) rotate(calc(-1 * var(--a)));
+  .node .ag i { position: absolute; left: calc(50% - 7px); top: calc(50% - 7px); width: 14px; height: 14px; border-radius: 50%; pointer-events: auto;
+                transform: rotate(var(--a)) translate(42px) rotate(calc(-1 * var(--a)));
                 background: color-mix(in srgb, var(--tc) 70%, var(--pad)); box-shadow: 0 0 0 3px var(--bg); transition: background .25s; }
   .node .ag i.wait { background: color-mix(in srgb, var(--waiting) 55%, var(--pad)); }
   .node .ag i.run { background: var(--running); animation: agent-pulse 1.1s ease-in-out infinite; }
@@ -750,10 +750,10 @@
   .node.nd-team.st-failed .orb { border-color: var(--failed); box-shadow: 0 0 0 6px color-mix(in srgb, var(--failed) 16%, transparent); }
   .node.nd-team.sel .orb { border-color: var(--accent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent), 0 14px 36px -14px color-mix(in srgb, var(--tc) 70%, transparent); }
   /* ports sit on the orb, not on the label under it */
-  #canvas:not(.vertical) .node.nd-team .port { top: 41px; }
-  #canvas:not(.vertical) .node.nd-team .port.in { left: calc(50% - 56px); }
-  #canvas:not(.vertical) .node.nd-team .port.out { right: calc(50% - 56px); }
-  .node.nd-team .x { top: 0; left: calc(50% - 50px); }
+  #canvas:not(.vertical) .node.nd-team .port { top: 33px; }
+  #canvas:not(.vertical) .node.nd-team .port.in { left: calc(50% - 48px); }
+  #canvas:not(.vertical) .node.nd-team .port.out { right: calc(50% - 48px); }
+  .node.nd-team .x { top: -2px; left: calc(50% - 44px); }
   /* the steps between teams: small glass pills, each kind with its own tint */
   .node.nd-step { --pc: var(--muted); background: color-mix(in srgb, var(--pad) 82%, transparent); backdrop-filter: blur(8px);
                   border-color: color-mix(in srgb, var(--pc) 34%, var(--line)); }
@@ -1278,11 +1278,11 @@ function tidy(direction) {   // arrange now and keep auto-arranging
   flow.auto = true;
   changed(); autoFit = true; fit();
 }
-const TEAM_W = 184, ORB_R = 48;   // a team: the orb (radius ORB_R) with its name under it
+const TEAM_W = 184, ORB_R = 40;   // a team: the orb (radius ORB_R) with its name under it
 function nodeSize(n) {   // the real size once drawn; the server's numbers before that
   const el = els[n.id] && els[n.id].el;
   if (el && el.offsetWidth) return { w: el.offsetWidth, h: el.offsetHeight };
-  return n.type === "cluster" ? { w: TEAM_W, h: 182 } : { w: 120, h: 40 };
+  return n.type === "cluster" ? { w: TEAM_W, h: 156 } : { w: 120, h: 40 };
 }
 // Left to right, a long flow wraps onto more rows. How wide a row may get depends on the window: try a few widths
 // and keep the one that lets the whole flow show biggest, so nodes stay readable instead of shrinking to a strip.
@@ -1306,7 +1306,7 @@ function layoutFlow(direction, f = flow) {
 }
 function layoutAt(direction, f, MAX_ROW_W) {   // same rules as the server's flows._layout
   f.dir = direction;
-  const WRAP = 5, STACK = 3, COL_GAP = 84, ROW_H = 210, edges = f.edges;
+  const WRAP = 5, STACK = 3, COL_GAP = 84, ROW_H = 180, edges = f.edges;
   const wired = new Set(edges.flatMap((e) => [e.from, e.to]));
   const loose = f.nodes.filter((n) => !wired.has(n.id) && n.type !== "master");
   const main = f.nodes.filter((n) => wired.has(n.id) || n.type === "master");
@@ -1433,7 +1433,7 @@ function teamText(n) {   // [title html, footer html] for a team card, at rest o
   const model = `<span class="mdl">${esc(engineOf(n) === "claude" ? modelLabel(n.model).replace(/^Claude /, "") : (n.engine_model ? teamModel(n).split(" · ")[1] : ENGINE_NAME[engineOf(n)]))}</span>`;
   const sum = summaryOf(n);
   let job = sum ? `<div class="jb" title="${esc(sum)}">${esc(sum)}</div>` : `<div class="jb warn">Click to give this team a job</div>`;
-  const shown = Math.min(count, 6), at = (i) => `style="--a:${90 + (i - (shown - 1) / 2) * 31}deg"`;   // fanned around the bottom of the orb
+  const shown = Math.min(count, 6), at = (i) => `style="--a:${90 + (i - (shown - 1) / 2) * 34}deg"`;   // fanned around the bottom of the orb
   let dots = Array.from({ length: shown }, (_, i) => `<i ${at(i)}></i>`).join("");
   let foot = `<span class="how" title="${esc(how)}">${count < 2 ? "1 agent" : count + " agents"}</span>${toolIcons(n)}${model}`;
   if (st) {

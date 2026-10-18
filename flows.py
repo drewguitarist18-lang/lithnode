@@ -699,9 +699,9 @@ def build_design(raw, bots):
 
 
 WRAP = 5    # columns per row before a left-to-right flow wraps onto the next row
-COL_GAP, ROW_H, MAX_ROW_W = 84, 210, 2100   # gap between columns, spacing of side-by-side steps, widest row before wrapping
-TEAM_W, TEAM_H, PILL_W, PILL_H = 184, 182, 120, 40   # a team is an orb with its name under it, every other step a pill (static/flows.html)
-ORB_R = 48   # the orb's radius: wires meet a team at its middle
+COL_GAP, ROW_H, MAX_ROW_W = 84, 180, 2100   # gap between columns, spacing of side-by-side steps, widest row before wrapping
+TEAM_W, TEAM_H, PILL_W, PILL_H = 184, 156, 120, 40   # a team is an orb with its name under it, every other step a pill (static/flows.html)
+ORB_R = 40   # the orb's radius: wires meet a team at its middle
 STACK = 3   # most nodes stacked in one column; a busier stage spreads into extra columns
 
 

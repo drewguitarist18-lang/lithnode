@@ -138,7 +138,7 @@ try:
     ship = d["flow"]
     check("ship-it template: 9 nodes, ready to run", len(ship["nodes"]) == 9 and d["problems"] == [], d["problems"])
     by = {n["id"]: n for n in ship["nodes"]}
-    mid = lambda n: n["y"] + (48 if n["type"] == "cluster" else 40 / 2)   # noqa: E731   steps are centered on their row (a team by its orb)
+    mid = lambda n: n["y"] + (40 if n["type"] == "cluster" else 40 / 2)   # noqa: E731   steps are centered on their row (a team by its orb)
     check("templates go left to right on one line, parallel stages stacked, every step centered on the row", ship["dir"] == "lr"
           and by["master"]["x"] < by["build"]["x"] < by["bugs"]["x"] == by["sec"]["x"] < by["cp2"]["x"] < by["ok"]["x"] < by["prod"]["x"] < by["done"]["x"]
           and mid(by["bugs"]) < mid(by["master"]) < mid(by["sec"]) and max(abs(mid(by[k]) - mid(by["master"])) for k in ("build", "cp1", "cp2", "ok", "prod", "done")) <= 1,
