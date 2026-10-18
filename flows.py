@@ -699,8 +699,9 @@ def build_design(raw, bots):
 
 
 WRAP = 5    # columns per row before a left-to-right flow wraps onto the next row
-COL_GAP, ROW_H, MAX_ROW_W = 84, 150, 2100   # gap between columns, spacing of side-by-side steps, widest row before wrapping
-TEAM_W, TEAM_H, PILL_W, PILL_H = 248, 97, 120, 38   # a team is a card, every other step a pill (static/flows.html)
+COL_GAP, ROW_H, MAX_ROW_W = 84, 210, 2100   # gap between columns, spacing of side-by-side steps, widest row before wrapping
+TEAM_W, TEAM_H, PILL_W, PILL_H = 184, 182, 120, 40   # a team is an orb with its name under it, every other step a pill (static/flows.html)
+ORB_R = 48   # the orb's radius: wires meet a team at its middle
 STACK = 3   # most nodes stacked in one column; a busier stage spreads into extra columns
 
 
@@ -733,16 +734,16 @@ def _layout(flow, direction="lr"):
             rank[n["id"]] = i - (len(level) - 1) / 2
         stacks += [level[i:i + STACK] for i in range(0, len(level), STACK)]
 
+    size = lambda n: (TEAM_W, TEAM_H) if n["type"] == "cluster" else (PILL_W, PILL_H)   # noqa: E731
     if direction == "tb":
         y = 40
-        for stack in stacks:
+        for stack in stacks:                          # each stage centered down the middle, as tall as its tallest node
             for i, n in enumerate(stack):
-                n["x"], n["y"] = round(420 + (i - (len(stack) - 1) / 2) * 250), y
-            y += 200
+                n["x"], n["y"] = round(520 + (i - (len(stack) - 1) / 2) * 250 - size(n)[0] / 2), y
+            y += max(size(n)[1] for n in stack) + 64
         for i, n in enumerate(loose):
             n["x"], n["y"] = 60 + (i % WRAP) * 250, y + 60 + (i // WRAP) * 170
         return
-    size = lambda n: (TEAM_W, TEAM_H) if n["type"] == "cluster" else (PILL_W, PILL_H)   # noqa: E731
     col_w = lambda stack: max(size(n)[0] for n in stack)   # noqa: E731   each column as wide as what's in it
     rows, cur, width = [], [], 0
     for stack in stacks:                              # wrap onto a new row once a row gets too wide
@@ -764,7 +765,7 @@ def _layout(flow, direction="lr"):
             for i, n in enumerate(stack):             # centered in its column and on its row
                 w, h = size(n)
                 n["x"] = round(x + (cw - w) / 2)
-                n["y"] = round(middle + (i - (len(stack) - 1) / 2) * ROW_H - h / 2)
+                n["y"] = round(middle + (i - (len(stack) - 1) / 2) * ROW_H - (ORB_R if n["type"] == "cluster" else h / 2))   # a team lines up by its orb
             x += cw + COL_GAP
         top += tallest * ROW_H + 90
     for i, n in enumerate(loose):                     # not wired yet: a row underneath
