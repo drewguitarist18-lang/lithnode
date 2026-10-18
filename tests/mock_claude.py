@@ -154,6 +154,18 @@ if "--append-system-prompt" in flags:
                  "connectors": ["claude.ai Store"], "summary": "Lists the winners as drafts"},
                 {"id": "done", "type": "done", "name": "Done"}],
                 "edges": [["master", "scout"], ["scout", "check"], ["check", "ok"], ["ok", "upload"], ["upload", "done"]]}
+        if "ad script" in prompt.lower():   # the second film's team: the same shape, writing ads instead of finding products
+            draft = {"name": "Ad scripts", "nodes": [
+                {"id": "master", "type": "master", "mode": "pass"},
+                {"id": "trends", "type": "cluster", "name": "Trend scout", "count": 1, "bot": "scout", "tools": "web", "role": "run",
+                 "summary": "Finds what's working in the feed"},
+                {"id": "write", "type": "cluster", "name": "Scriptwriter", "count": 2, "bot": "muse", "tools": "none", "role": "build",
+                 "focuses": "Hooks\nClaims and brand voice", "summary": "Write the scripts and judge each other's"},
+                {"id": "ok", "type": "approval", "name": "Your pick", "message": "The writers cut the weak ones. Approve to save the rest."},
+                {"id": "save", "type": "cluster", "name": "Producer", "count": 1, "bot": "launch", "tools": "none", "role": "run",
+                 "connectors": ["claude.ai Notion"], "summary": "Saves the winners as shot lists"},
+                {"id": "done", "type": "done", "name": "Done"}],
+                "edges": [["master", "trends"], ["trends", "write"], ["write", "ok"], ["ok", "save"], ["save", "done"]]}
         text = "nope, no flow here" if "BADJSON" in prompt else "Here it is:\n```json\n" + json.dumps(draft) + "\n```"
         out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
         out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": 0.02, "num_turns": 1, **base})
@@ -214,6 +226,34 @@ if "--append-system-prompt" in flags:
             items = [dict(i, verdict="pass", reason="Listed as draft") for i in items
                      if not any(w in i["title"] for w in ("Posture", "LED", "Earbuds"))]
         text = (f"Done.\n\nREPORT: {stage}: {len(items)} products.\n\n```items\n" + json.dumps(items) + "\n```")
+    if stage in ("Trend scout", "Scriptwriter", "Producer"):   # the ad team: trends in, scripts out, the weak ones cut
+        steps = {"Trend scout": [("WebSearch", {"query": "top coffee ads on tiktok this month"}), ("WebFetch", {"url": "https://ads.tiktok.com/business/creativecenter"}),
+                                 ("WebSearch", {"query": "trending hooks food and drink"})],
+                 "Scriptwriter": [("Write", {"file_path": "scripts.md"}), ("Edit", {"file_path": "scripts.md"})],
+                 "Producer": [("mcp__claude_ai_Notion__create_page", {"title": "Ad scripts"})]}[stage]
+        for i, (name, args) in enumerate(steps):
+            time.sleep(pace)
+            out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [
+                {"type": "tool_use", "id": f"toolu_a{i}", "name": name, "input": args}]}, **base})
+        if stage == "Trend scout":
+            items = [{"title": t, "facts": {"Format": f, "Views": v}} for t, f, v in
+                     [("POV hooks", "POV", "48M"), ("Taste tests", "Reaction", "31M"), ("Myth busting", "Talking head", "22M"),
+                      ("Barista reacts", "Duet", "19M"), ("Morning routines", "Vlog", "15M"), ("3 mistakes", "List", "12M")]]
+        else:
+            items = [{"title": t, "facts": {"Hook": h, "Length": n}} for t, h, n in
+                     [("POV: your coffee is still hot at 3pm", "0.6s", "18s"), ("3 mistakes ruining your morning cup", "0.9s", "24s"),
+                      ("We tested 5 beans so you don't have to", "1.8s", "31s"), ("Barista reacts to gas-station coffee", "0.7s", "21s"),
+                      ("This coffee cures tiredness", "0.8s", "15s"), ("Why your cold brew tastes bitter", "1.1s", "27s")]]
+            if stage == "Scriptwriter":   # one writer cuts slow hooks, the other claims you can't make
+                for it in items:
+                    slow, claim = float(it["facts"]["Hook"][:-1]) > 1.5, "cures" in it["title"]
+                    if "# Your focus\nHooks" in prompt:
+                        it.update(verdict="cut" if slow else "pass", reason=f"Hook takes {it['facts']['Hook']}" if slow else "Hooks in under a second")
+                    else:
+                        it.update(verdict="cut" if claim else "pass", reason="Health claim" if claim else "Claims check out")
+            else:   # saves what the writers passed
+                items = [dict(i, verdict="pass", reason="Saved as a shot list") for i in items if not any(w in i["title"] for w in ("tested", "cures"))]
+        text = (f"Done.\n\nREPORT: {stage}: {len(items)} {'trends' if stage == 'Trend scout' else 'scripts'}.\n\n```items\n" + json.dumps(items) + "\n```")
     out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
     used = {"usage": {"input_tokens": 1200, "output_tokens": 800, "cache_read_input_tokens": 30000 + len(text) * 40}} if os.environ.get("CLAWD_MOCK_RICH") else {}
     out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": 0.01,

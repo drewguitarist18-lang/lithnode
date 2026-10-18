@@ -2,7 +2,7 @@
 // cost nothing) and the site served on 8797 (`python -m http.server 8797 -d site`). Writes footage/<clip>.mp4 (30 fps)
 // and footage/<clip>.json (every mouse move, click and key with its time in the clip, so the film can draw the cursor).
 // Frames come from Chrome's screencast with their own timestamps, on the same clock as the log, so they line up exactly.
-// Usage: node capture.js [clip ...]   clips: describe, run, site, phone   (run also records the Office alongside it)
+// Usage: node capture.js [clip ...]   clips: describe, run, site, phone, ads   (run and ads also record the Office alongside)
 const puppeteer = require("puppeteer-core");
 const fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const FF = process.env.FFMPEG || "ffmpeg";
@@ -87,13 +87,13 @@ const launch = () => puppeteer.launch({ executablePath: "C:/Program Files (x86)/
 
 const clips = {
   // describe a team in one line, and it's drawn
-  async describe(b) {
+  async describe(b, { name = "describe", ask = "Find products worth selling, check margins and reviews, list the winners" } = {}) {
     const p = await page(b);
     const f = await openApp(p, await flowId("Research squad"));
-    const r = await record(p, "describe");
+    const r = await record(p, name);
     await sleep(600);
     await r.move(...(await center(f, "#askIn")), 900); await r.click(); await sleep(250);
-    await r.type("Find products worth selling, check margins and reviews, list the winners");
+    await r.type(ask);
     await sleep(350);
     await r.move(...(await center(f, "#askBtn")), 500); await sleep(150); await r.click();
     await f.waitForFunction(() => document.getElementById("askBtn").textContent === "Build flow", { timeout: 60000 });
@@ -102,18 +102,18 @@ const clips = {
     await r.stop(); await p.close();
   },
   // run the big flow from the Run dialog, watch it, approve it, see it finish; the Office records alongside
-  async run(b) {
-    const id = await flowId("Product hunt");
+  async run(b, { name = "run", flow = "Product hunt", task = "Find home gadgets worth selling this month", office = "office" } = {}) {
+    const id = await flowId(flow);
     const b2 = await launch(), p = await page(b), o = await page(b2);   // the Office in its own browser, so neither tab is in the background
     console.log("run: opening the app"); const f = await openApp(p, id);
     console.log("run: opening the office"); await o.goto(APP + "/office", { waitUntil: "load" });
     await sleep(800);
-    const r = await record(p, "run"), ro = await record(o, "office");
+    const r = await record(p, name), ro = await record(o, office);
     await sleep(1200);
     await r.move(...(await center(f, "#runBtn")), 900); await r.click(); await sleep(500);
     await f.$eval("#taskIn", (el) => { el.value = ""; el.dispatchEvent(new Event("input", { bubbles: true })); });
     await r.move(...(await center(f, "#taskIn")), 500); await r.click();
-    await r.type("Find home gadgets worth selling this month", 38);
+    await r.type(task, 38);
     await f.$eval("#folderIn", (el, v) => { el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); }, FOLDER);
     await sleep(300);
     if (await f.$eval("#riskBox", (el) => !el.hidden)) { await r.move(...(await center(f, "#riskOk")), 500); await r.click(); await sleep(250); }
@@ -135,6 +135,11 @@ const clips = {
     r.mark("done");
     await sleep(3500);
     await r.stop(); await ro.stop(); await p.close(); await b2.close();
+  },
+  // the second job, for versus.html?job=ads: a team that writes ad scripts, described and then run
+  async ads(b) {
+    await clips.describe(b, { name: "ads-describe", ask: "Write ad scripts for my coffee brand, cut the weak ones, save the winners" });
+    await clips.run(b, { name: "ads-run", flow: "Ad scripts", task: "Write TikTok ad scripts for Night Owl Coffee", office: "ads-office" });
   },
   // the site on a phone, for the vertical cut: the hero's black hole, live, at 1080x1920
   async phone(b) {

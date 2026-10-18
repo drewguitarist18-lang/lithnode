@@ -7,7 +7,8 @@
 // A 14-second before/after for TikTok (1080x1920): product research by hand on top, Lithnode's team doing it below,
 // at the same moment. The bottom is the real run footage (footage/run.mp4); the top is drawn.
 // render.js --versus calls renderFrame(t) for each frame, then renderAudio(). film.html?t=… works here too: versus.html?t=5
-const Q = new URLSearchParams(location.search);
+// ?job=ads is the same film for a second job: writing ad scripts (footage/ads-run.mp4, recorded by capture.js ads).
+const Q = new URLSearchParams(location.search), ADS = Q.get("job") === "ads";
 const W = 1080, H = 1920, LENGTH = 14;
 const cv = document.getElementById("cv"), g = cv.getContext("2d");
 const C = { void: "#0c0c0f", ink: "#ecebe6", soft: "#b1b0aa", faint: "#74736e", ok: "#7ee0a1", warn: "#e8a27a" };
@@ -31,10 +32,11 @@ const SPLIT_END = 10.3;          // the two halves leave; the end card comes in
 const A = { x: 40, y: 380, w: 1000, h: 560 }, B = { x: 40, y: 980, w: 1000, h: 560 };   // below TikTok's top tabs, above its caption
 
 // ============================================================================ the bottom: the real run, as in film.html, time-shifted
+const CLIP = ADS ? "ads-run" : "run", LATE = ADS ? -3 : 0;   // LATE: the clip's approval, against the product run's
 const SCENES = [
-  { clip: "run", t0: 0, t1: 6.3, map: [[.3, 2.6], [1.9, 10.9], [6.3, 28.4]],
+  { clip: CLIP, t0: 0, t1: 6.3, map: [[.3, 2.6], [1.9, 10.9], [6.3, 28.4 + LATE]],
     cam: [[0, 960, 540, 1.3], [1.8, 960, 560, 1.4], [2.7, 760, 590, 2.0], [6.3, 820, 640, 1.8]] },
-  { clip: "run", t0: 6.3, t1: SPLIT_END, map: [[6.3, 29.3], [8.9, 32.9], [9.45, 35.6], [9.55, 36.4], [10.3, 37.9]],
+  { clip: CLIP, t0: 6.3, t1: SPLIT_END, map: [[6.3, 29.3 + LATE], [8.9, 32.9 + LATE], [9.45, 35.6 + LATE], [9.55, 36.4 + LATE], [10.3, 37.9 + LATE]],
     cam: [[6.3, 1420, 430, 1.9], [8.85, 1480, 400, 2.2], [9.25, 960, 560, 1.2], [10.3, 900, 620, 1.25]] },
 ];
 const vids = {}, logs = {};
@@ -117,13 +119,26 @@ function team(t) {   // the bottom panel
 }
 
 // ============================================================================ the top: research by hand, drawn
+const JOB = ADS ? {
+  head: "Writing f\u200Cive ad scripts:"   /* the joiner stops Pixelify drawing fi as one glyph */, stuck: "still on script 3…",
+  tabs: ["viral coffee ads", "tiktok creative center", "hooks that stop the scroll", "competitor ads", "copywriting tips", "can I say 'cures'?",
+         "trending sounds", "brand voice doc", "ad length tips", "reddit: bad ads", "script template", "coffee memes", "thesaurus: delicious"],
+  queries: ["best coffee ads on tiktok", "hooks that stop the scroll", "how long should a tiktok ad be", "can coffee ads make health claims", "trending sounds coffee"],
+  cols: ["Script", "Hook", "Length", "OK?"], widths: [190, 70, 70, 70],
+  rows: [["POV: still hot at 3pm", "0.6s", "18s", "?"], ["3 coffee mistakes", "0.9s", "24s", "yes"], ["We tested 5 beans", "1.8s", ""]],
+} : {
+  head: "Finding products to sell:", stuck: "still on row 3…",
+  tabs: null, queries: null, cols: ["Product", "Cost", "Price", "Margin"], widths: [150, 80, 80, 80], rows: null,
+};
 const TABS = ["best products to sell 2026", "trending gadgets", "supplier: sunset lamp", "is this legit??", "shipping times", "reviews (3.2★)", "margin calculator", "competitor store", "why sold out", "led strip bulk price", "tiktok made me buy it", "customs fees", "supplier #2", "return policy", "dropship forum", "reddit: worth it?", "price history"];
 const QUERIES = ["best products to sell 2026", "trending home gadgets this month", "sunset lamp supplier price", "is sunset lamp still trending", "led strip shipping time", "posture corrector reviews"];
-const SHEET = [["Sunset lamp", "6.80", "24.99", "?"], ["LED strip", "7.90", "11.99", "4.09"], ["Phone mount", "5.4", "19.99", ""]];
+const SHEET = JOB.rows || [["Sunset lamp", "6.80", "24.99", "?"], ["LED strip", "7.90", "11.99", "4.09"], ["Phone mount", "5.4", "19.99", ""]];
+if (JOB.tabs) TABS.splice(0, TABS.length, ...JOB.tabs);
+if (JOB.queries) QUERIES.splice(0, QUERIES.length, ...JOB.queries);
 const L = { paper: "#e6e4de", chrome: "#cfccc4", tab: "#dcd9d2", ink: "#3a3935", dim: "#8d8a83", line: "#c4c1ba", link: "#5b6b8f" };
 function typed(t) {   // how many characters are typed: slow, with stalls while they tab away to look things up
   let n = 0;
-  for (let s = 0; s < t; s += 1 / 30) { const stall = Math.sin(s * 1.9) > .55; if (!stall) n += 8.5 / 30; }
+  for (let s = 0; s < t; s += 1 / 30) { const stall = Math.sin(s * 1.9) > .55; if (!stall) n += (ADS ? 10.5 : 8.5) / 30; }
   return Math.floor(n);
 }
 function byHand(t) {
@@ -155,9 +170,9 @@ function byHand(t) {
   }
   g.restore();
   // the spreadsheet on the right, typed one slow cell at a time
-  const sx = x + 580, sy = top + 10, cw = [150, 80, 80, 80], rh = 46;
+  const sx = x + 580, sy = top + 10, cw = JOB.widths, rh = 46;
   rr(sx, sy, 400, P.h - 200, 10); g.fillStyle = "#f6f5f1"; g.fill(); g.strokeStyle = L.line; g.lineWidth = 1; g.stroke();
-  ["Product", "Cost", "Price", "Margin"].forEach((h, i) => text(h, sx + 12 + cw.slice(0, i).reduce((a, b) => a + b, 0), sy + 30, `600 16px ${F.sans}`, L.ink, "left"));
+  JOB.cols.forEach((h, i) => text(h, sx + 12 + cw.slice(0, i).reduce((a, b) => a + b, 0), sy + 30, `600 16px ${F.sans}`, L.ink, "left"));
   let left = typed(t), caret = null;
   for (let j = 0; j < 8; j++) {
     const ry = sy + 46 + j * rh;
@@ -185,7 +200,7 @@ function byHand(t) {
   chip(clock, x + P.w - 22, y + 18, { align: "right", fg: t >= APPROVE ? C.warn : C.ink, bg: "rgba(40,39,36,.88)" });
   if (done > 0) { const k = back(span(t, APPROVE + .3, APPROVE + .7)); g.save(); g.translate(x + P.w / 2, y + P.h / 2); g.scale(k, k); g.rotate(-.05);
     rr(-210, -42, 420, 84, 14); g.fillStyle = "rgba(12,12,15,.9)"; g.fill(); g.strokeStyle = C.warn; g.lineWidth = 3; g.stroke();
-    text("still on row 3…", 0, 13, `600 36px ${F.pix}`, C.warn); g.restore(); }
+    text(JOB.stuck, 0, 13, `600 36px ${F.pix}`, C.warn); g.restore(); }
   g.restore();
 }
 
@@ -194,7 +209,7 @@ function header(t) {   // on screen from the first frame, so the hook reads befo
   const out = 1 - span(t, SPLIT_END - .3, SPLIT_END);
   if (out <= 0) return;
   const swap = span(t, APPROVE + .9, APPROVE + 1.2);
-  const l1 = swap < .5 ? "Finding products to sell:" : "Hours by hand.", l2 = swap < .5 ? "me vs my AI team" : "Minutes with a team.";
+  const l1 = swap < .5 ? JOB.head : "Hours by hand.", l2 = swap < .5 ? "me vs my AI team" : "Minutes with a team.";
   const a = out * (swap < .5 ? 1 - swap * 2 : (swap - .5) * 2), f = `600 66px ${F.pix}`;
   text(l1, W / 2, 240, f, C.ink, "center", a);
   text(l2, W / 2, 318, f, swap < .5 ? C.soft : C.ok, "center", a);
@@ -275,8 +290,8 @@ function seek(v, s) {
 window.renderFrame = async (t) => { const s = SCENES.find((s) => t >= s.t0 && t < s.t1); if (s) await seek(vids[s.clip], mapTime(s.map, t)); draw(t); };
 window.ready = (async () => {
   const load = (v, src) => new Promise((r, j) => { v.muted = true; v.preload = "auto"; v.oncanplaythrough = r; v.onerror = () => j(new Error(src)); v.src = src; v.load(); });
-  vids.run = document.createElement("video");
-  await Promise.all([load(vids.run, "footage/run.mp4"), fetch("footage/run.json").then((r) => r.json()).then((j) => { logs.run = j.log; }),
+  vids[CLIP] = document.createElement("video");
+  await Promise.all([load(vids[CLIP], `footage/${CLIP}.mp4`), fetch(`footage/${CLIP}.json`).then((r) => r.json()).then((j) => { logs[CLIP] = j.log; }),
     ...[`600 66px ${F.pix}`, `700 150px ${F.pix}`, `600 24px ${F.mono}`, `400 28px ${F.mono}`, `500 15px ${F.sans}`, `600 16px ${F.sans}`, `400 17px ${F.sans}`].map((f) => document.fonts.load(f))]);
   buildEvents();
   const q = Q.get("t"); if (q !== null) await window.renderFrame(+q);

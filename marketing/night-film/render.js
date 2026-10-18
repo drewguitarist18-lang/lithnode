@@ -3,13 +3,13 @@
 //        node render.js --audio            (re-score the existing mp4 without re-rendering the picture)
 //        node render.js --stills 3.5 12 20.6   (PNGs of those moments into stills/, for checking)
 //        add --vertical to any of these for the 1080x1920 cut (default ../lithnode-night-vertical.mp4)
-//        --versus renders versus.html, the 14-second before/after (default ../lithnode-versus.mp4)
+//        --versus renders versus.html, the 14-second before/after (default ../lithnode-versus.mp4); --versus --ads is the ad-scripts job
 //        add --hook too for the 22-second feed cut that starts on the run (default ../lithnode-hook-vertical.mp4)
 // Needs puppeteer-core (NODE_PATH) and ffmpeg (FFMPEG or on PATH). Serves the repo itself, so it needs nothing else running.
 const puppeteer = require("puppeteer-core");
 const http = require("http"), fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const HOOK = process.argv.includes("--hook"), T0 = HOOK ? 8 : 0;   // the hook cut is film 8–30
-const VERSUS = process.argv.includes("--versus");
+const VERSUS = process.argv.includes("--versus"), ADS = process.argv.includes("--ads");
 const FF = process.env.FFMPEG || "ffmpeg", ROOT = path.resolve(__dirname, "../.."), FPS = 30, LENGTH = VERSUS ? 14 : 30 - T0;
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".mp4": "video/mp4", ".webm": "video/webm" };
 
@@ -28,7 +28,7 @@ const server = http.createServer((req, res) => {
 const VERT = VERSUS || process.argv.includes("--vertical"), [VW, VH] = VERT ? [1080, 1920] : [1920, 1080];
 (async () => {
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  const url = `http://127.0.0.1:${server.address().port}/marketing/night-film/${VERSUS ? "versus.html?" : `film.html?${VERT ? "v=1&" : ""}${HOOK ? "hook=1" : ""}`}`;
+  const url = `http://127.0.0.1:${server.address().port}/marketing/night-film/${VERSUS ? `versus.html?${ADS ? "job=ads" : ""}` : `film.html?${VERT ? "v=1&" : ""}${HOOK ? "hook=1" : ""}`}`;
   const b = await puppeteer.launch({ executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", headless: "new", protocolTimeout: 600000,
     args: ["--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"] });
   const p = await b.newPage();
@@ -37,8 +37,8 @@ const VERT = VERSUS || process.argv.includes("--vertical"), [VW, VH] = VERT ? [1
   await p.goto(url, { waitUntil: "load" });
   await p.evaluate(() => window.ready);
   const grab = (t, type, q) => p.evaluate(async (t, type, q) => { await renderFrame(t); return document.getElementById("cv").toDataURL(type, q).split(",")[1]; }, t, type, q);
-  const args = process.argv.slice(2).filter((a) => !["--vertical", "--hook", "--versus"].includes(a)),
-    DEF = path.join(__dirname, VERSUS ? "../lithnode-versus.mp4" : `../lithnode-${HOOK ? "hook" : "night"}${VERT ? "-vertical" : ""}.mp4`);
+  const args = process.argv.slice(2).filter((a) => !["--vertical", "--hook", "--versus", "--ads"].includes(a)),
+    DEF = path.join(__dirname, VERSUS ? `../lithnode-versus${ADS ? "-ads" : ""}.mp4` : `../lithnode-${HOOK ? "hook" : "night"}${VERT ? "-vertical" : ""}.mp4`);
 
   if (args[0] === "--audio") {   // new score onto the already-rendered picture
     const out = path.resolve(args[1] || DEF), tmp = path.join(__dirname, "score.pcm"), redo = out + ".tmp.mp4";

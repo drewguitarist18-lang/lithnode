@@ -26,3 +26,4 @@ Both scripts use `puppeteer-core` (set `NODE_PATH`) with installed Edge, and ffm
 - `node render.js --vertical` renders the same film at 1080×1920 (`../lithnode-night-vertical.mp4`).
 - `node render.js --vertical --hook` renders a 22-second cut that starts on the run (`../lithnode-hook-vertical.mp4`).
 - `node render.js --versus` renders `versus.html` (`../lithnode-versus.mp4`), a 14-second before and after: research by hand on top (drawn), the team's real run below, then the end card. It has its own lo-fi score that drops when the run is approved.
+- `node render.js --versus --ads` is the same before and after for writing ad scripts (`../lithnode-versus-ads.mp4`). Its footage comes from `node capture.js ads`, which describes and runs the "Ad scripts" team (the fake Claude acts it out). On a fresh demo app, first add the Research squad: `POST /api/flows {"template": "research"}`.
