@@ -428,6 +428,54 @@
   .iconbtn { flex: none; width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border-radius: 10px; color: var(--muted); }
   .iconbtn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .iconbtn:hover { color: var(--failed); border-color: color-mix(in srgb, var(--failed) 50%, var(--line)); }
+  /* the header as a portrait: the bot in a glowing orb, its name under it, other bots to pick from */
+  .ihead.hero { position: relative; flex-direction: column; gap: 6px; padding: 22px 16px 14px; text-align: center; border-bottom: 0;
+                background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%); }
+  .ihead.hero .ava { width: 84px; height: 84px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c) 45%, var(--line));
+                     background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--c) 32%, var(--pad)), color-mix(in srgb, var(--c) 8%, var(--pad)) 72%);
+                     box-shadow: 0 0 0 7px color-mix(in srgb, var(--c) 8%, transparent), 0 12px 40px -10px color-mix(in srgb, var(--c) 80%, transparent); }
+  .ihead.hero .ava canvas { width: 64px; height: 48px; image-rendering: pixelated; }
+  .ihead.hero input.title { margin: 6px 0 0; text-align: center; font-size: 19px; width: 100%; border-radius: 10px; }
+  .ihead.hero .kind { white-space: normal; }
+  .ihead.hero .iconbtn { position: absolute; top: 10px; right: 10px; border-color: transparent; background: transparent; }
+  .botstrip { display: flex; gap: 8px; width: calc(100% + 32px); margin: 8px -16px 0; padding: 6px 16px 4px; overflow-x: auto; scrollbar-width: none;
+              mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent); }
+  .botstrip::-webkit-scrollbar { display: none; }
+  .botstrip button { flex: none; width: 42px; height: 42px; padding: 0; border-radius: 50%; display: grid; place-items: center;
+                     background: color-mix(in srgb, var(--bc) 12%, var(--pad)); border: 1.5px solid color-mix(in srgb, var(--bc) 22%, var(--line));
+                     opacity: .6; transition: opacity .15s, transform .15s, border-color .15s; }
+  .botstrip button:hover { opacity: 1; transform: translateY(-2px); }
+  .botstrip button.on { opacity: 1; border-color: var(--bc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc) 25%, transparent), 0 6px 18px -6px var(--bc); }
+  .botstrip canvas { width: 32px; height: 24px; image-rendering: pixelated; }
+  /* sliders: a soft track that fills in the control's color, a glowing thumb, the value up top */
+  .sl { --c: var(--accent); display: grid; gap: 4px; }
+  .sl-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); }
+  .sl-top b { color: var(--ink); font-size: 13.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .sl-ends { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); letter-spacing: .04em; opacity: .8; }
+  .sl input[type=range], .mslider input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+  .sl input[type=range]:focus { outline: none; }
+  .sl input[type=range]::-webkit-slider-runnable-track, .mslider input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 999px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--c, var(--accent)) 55%, transparent), var(--c, var(--accent)) var(--fill, 0%), color-mix(in srgb, var(--ink) 9%, transparent) var(--fill, 0%)); }
+  .sl input[type=range]::-webkit-slider-thumb, .mslider input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -7px; border-radius: 50%;
+    background: #fff; border: 0; box-shadow: 0 0 0 5px color-mix(in srgb, var(--c, var(--accent)) 35%, transparent), 0 3px 12px color-mix(in srgb, var(--c, var(--accent)) 60%, transparent);
+    transition: box-shadow .15s; }
+  .sl input[type=range]:hover::-webkit-slider-thumb, .mslider input[type=range]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 8px color-mix(in srgb, var(--c, var(--accent)) 30%, transparent), 0 3px 14px color-mix(in srgb, var(--c, var(--accent)) 70%, transparent); }
+  .sl input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--c); outline-offset: 3px; }
+  /* how many agents, drawn: one circle each, lit up to the count */
+  .agviz { --c: var(--accent); display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 4px; }
+  .agviz button { width: 15px; height: 15px; padding: 0; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c) 30%, var(--line)); background: transparent; transition: background .15s, transform .15s, box-shadow .15s; }
+  .agviz button.on { background: var(--c); border-color: var(--c); box-shadow: 0 0 10px -2px var(--c); }
+  .agviz button:hover { transform: scale(1.25); }
+  /* what a team may touch, safe to powerful: icons that light up in the level's color */
+  .acviz { --c: var(--accent); display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .acviz button { height: 38px; padding: 0; border-radius: 12px; display: grid; place-items: center; color: var(--muted);
+                  background: color-mix(in srgb, var(--ink) 4%, transparent); border: 1px solid var(--line); transition: all .15s; }
+  .acviz button svg { width: 17px; height: 17px; }
+  .acviz button.on { color: var(--c); border-color: color-mix(in srgb, var(--c) 45%, var(--line)); background: color-mix(in srgb, var(--c) 12%, transparent); }
+  .acviz button:hover { color: var(--ink); }
+  .usespill { justify-self: start; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .usespill b { color: var(--ink); }
+  .switch.mini { padding: 8px 12px; border-radius: 12px; }
   .isec { padding: 14px 16px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
   .isec:last-child { border-bottom: 0; }
   .isec > h4 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -1761,9 +1809,9 @@ function getStarted() {
   const done = [clusters.length > 0 && problems.length === 0, clusters.length > 0 && !unsetCluster(), ranFlows.has(flow.id)];
   const now = done.findIndex((d) => !d);
   const steps = [
-    { shape: "owl", color: "#7aa2f7", title: "Make a team", text: "Describe it in one line, or add bots from the left and wire them together.", act: "describe", label: "Describe a team" },
-    { shape: "golem", color: "#e0823d", title: "Set them up", text: "Give each team a bot or a job, how many agents, and what they can touch.", act: "setup", label: unsetCluster() ? "Pick a team" : "Open a team" },
-    { shape: "rocket", color: "#bb9af7", title: "Run it", text: "Say what you want done and pick your project folder. Then watch it work.", act: "run", label: "▶ Run" },
+    { shape: "owl", color: "#7aa2f7", title: "Make a team", text: "Describe it in one line, or drag bots in.", act: "describe", label: "Describe a team" },
+    { shape: "golem", color: "#e0823d", title: "Set them up", text: "Pick a job, agents and access for each team.", act: "setup", label: unsetCluster() ? "Pick a team" : "Open a team" },
+    { shape: "rocket", color: "#bb9af7", title: "Run it", text: "Say what you want done, then watch.", act: "run", label: "▶ Run" },
   ];
   const count = done.filter(Boolean).length;
   return `<div class="gs-top"><h4>${count === 3 ? "You're all set" : "Get started"}</h4><span>${count} of 3</span></div>
@@ -1772,7 +1820,7 @@ function getStarted() {
       const cls = done[i] ? "did" : i === now ? "now" : "next";
       return `<div class="gs-step ${cls}" style="--c:${st.color}">
         <span class="ic"><canvas width="96" height="72" data-shape="${st.shape}" data-color="${st.color}"></canvas>${done[i] ? '<span class="tick" aria-label="done">✓</span>' : ""}</span>
-        <div><b>${st.title}</b><p>${st.text}</p>
+        <div><b>${st.title}</b>${i === now ? `<p>${st.text}</p>` : ""}
           ${i === now ? `<button type="button" class="primary" data-gs="${st.act}">${st.label}</button>` : ""}
           ${count === 3 && i === 2 ? `<button type="button" data-gs="run">Run again</button>` : ""}</div></div>`;
     }).join("")}</div>`;
@@ -1863,8 +1911,7 @@ function renderInspector() {
           ${est ? Object.entries(est.per_model).map(([m, c]) => `<span>${c}× ${esc(modelLabel(m))}</span>`).join("") : ""}</div>
       </div>
       <div class="isec">${getStarted()}</div>
-      <div class="isec"><h4>Project folder</h4>${folderField("fFolder", flow.folder)}
-        <div class="sub">Where agents work. You can change it each time you run.</div></div>
+      <div class="isec" title="Where agents work. You can change it each time you run."><h4>Project folder</h4>${folderField("fFolder", flow.folder)}</div>
       <div class="isec"><details class="more"><summary>How it works</summary>
         <p class="hint">Your task goes in at <b>Start</b>, which can write a short plan every agent sees. Each node waits for everything wired into it, so stages run in order and branches run side by side. Only each agent's short report moves on to the next stage, which keeps usage down.</p>
         <p class="hint">Agents that can <b>edit files</b> take turns in the folder so they never overwrite each other. Read-only agents all work at once.</p></details></div>`;
@@ -1901,35 +1948,47 @@ function renderInspector() {
       <input type="range" id="mRange" min="0" max="${n - 1}" step="1" value="${i}" style="--fill:${(i / (n - 1)) * 100}%" aria-label="Model">
       <div class="stops" style="--n:${n}">${ordered.map((m, k) => `<button type="button" data-model-i="${k}" class="${k === i ? "on" : ""}">${esc(m.label.split(" ")[0])}</button>`).join("")}</div></div>`;
   };
-  const effortBar = (node) => {   // five rising bars, like Claude Code's effort control
-    const off = String(node.model || "").startsWith("claude-haiku"), k = Math.max(0, EFFORTS.findIndex(([v]) => v === node.effort));
-    if (off) return "";   // Haiku has no effort setting
-    return `<div class="effort${off ? " off" : ""}"><div class="bars">${EFFORTS.map(([v, l], j) =>
-      `<button type="button" data-effort="${v}" class="${j <= k ? "lit" : ""}" style="height:${30 + j * 17.5}%" title="${l}" aria-label="Effort: ${l}"></button>`).join("")}</div>
-      <div class="lbl"><span>Effort</span><b>${off ? "Haiku doesn't use effort" : EFFORTS[k][1]}</b></div></div>`;
+  const effortBar = (node) => {   // how hard it thinks: a slider from quick to deep
+    if (String(node.model || "").startsWith("claude-haiku")) return "";   // Haiku has no effort setting
+    const k = Math.max(0, EFFORTS.findIndex(([v]) => v === node.effort));
+    return slider("efRange", 0, EFFORTS.length - 1, k, { name: "Effort", val: EFFORTS[k][1], lo: "Quick", hi: "Deep", c: "#b48cf2" });
   };
   const ROLE_TIPS = { think: "Planning, design, writing, judgment", build: "Making and changing things", run: "Checks, tests, merges, deploys" };
   const modelPick = (node) => {   // a role (the Run menu says which model fills it) or a model picked by hand
     const role = node.role || "";
     return seg("role", [["think", ROLE_NAME.think, ROLE_TIPS.think], ["build", ROLE_NAME.build, ROLE_TIPS.build], ["run", ROLE_NAME.run, ROLE_TIPS.run], ["", "Pick a model"]], role)
-      + (role ? `<div class="sub">${esc(ROLE_TIPS[role])}. Uses <b>${esc(modelLabel(roleModel(role)))}</b>; change which model fills ${ROLE_NAME[role]} in the Run menu.</div>`
+      + (role ? `<div class="usespill" title="${esc(ROLE_TIPS[role])}. Change which model fills ${ROLE_NAME[role]} in the Run menu.">Uses <b>${esc(modelLabel(roleModel(role)))}</b></div>`
               : models(node.model));
   };
-  const modelNote = (value) => { const m = meta.models.find((x) => x.id === value); return m ? `<div class="sub">${esc(m.label)}: ${esc(m.blurb.toLowerCase())}</div>` : ""; };
+  const modelNote = () => "";   // the model's blurb was one line too many; the slider says enough
   const ACCESS = [["none", "Think only"], ["read", "Read files"], ["web", "Web"], ["research", "Read + web"], ["edit", "Edit files"], ["full", "Edit + run code"]];
   const ACCESS_NOTE = { none: "No tools: works only from what it's given.", read: "Can read the project, can't change anything.", web: "Can search and read the web.",
                         research: "Can read the project and the web.", edit: "Can change files. Editing agents take turns.", full: "Can change files and run commands on this computer." };
+  const ACCESS_COLOR = { none: "#8f96a3", read: "#4fb59a", web: "#5b8def", research: "#7a9cf0", edit: "#e0a23c", full: "#e5604b" };   // safe to powerful
+  const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const ACCESS_ICON = { none: svg('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>'),
+    read: svg('<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
+    web: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
+    research: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>'),
+    edit: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/>'),
+    full: svg('<path d="m5 8 4 4-4 4M12 17h7"/>') };
 
-  let html = `<div class="ihead" style="--c:${esc(look.color)}">
+  // a slider with its name and value on top: the panel's main control
+  const slider = (id, min, max, v, { name, val, lo, hi, c, tip }) => `<div class="sl"${c ? ` style="--c:${esc(c)}"` : ""}${tip ? ` title="${esc(tip)}"` : ""}>
+      <div class="sl-top"><span>${esc(name)}</span><b id="${id}Val">${val}</b></div>
+      <input type="range" id="${id}" min="${min}" max="${max}" step="1" value="${v}" style="--fill:${max > min ? ((v - min) / (max - min)) * 100 : 0}%" aria-label="${esc(name)}">
+      ${lo ? `<div class="sl-ends"><span>${esc(lo)}</span><span>${esc(hi)}</span></div>` : ""}</div>`;
+  const team = n.type === "cluster";
+  let html = `<div class="ihead hero${team ? " team" : ""}" style="--c:${esc(look.color)}">
       <span class="ava"><canvas id="iAva" width="96" height="72"></canvas></span>
-      <div class="who"><input class="title" id="iName" data-k="name" maxlength="40" value="${esc(n.name)}" aria-label="Name">
-        <div class="kind">${esc(kind)}</div></div>
+      <input class="title" id="iName" data-k="name" maxlength="40" value="${esc(n.name)}" aria-label="Name">
+      ${team ? "" : `<div class="kind">${esc(kind)}</div>`}
       ${n.type !== "master" ? `<button class="iconbtn" id="iDel" title="Delete this node (or press Delete)" aria-label="Delete node"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>` : ""}
+      ${team ? `<div class="botstrip" role="group" aria-label="Start from a bot">${teamBots().map((b) => `<button type="button" data-bot="${esc(b.id)}" class="${b.id === n.bot ? "on" : ""}" style="--bc:${esc(b.color)}" title="${esc(b.name + (b.tagline ? " · " + b.tagline : ""))}"><canvas width="96" height="72" data-shape="${esc(b.shape)}" data-color="${esc(b.color)}"></canvas></button>`).join("")}</div>` : ""}
     </div>`;
 
   if (n.type === "master") {
-    html += `<div class="isec"><h4>Start</h4><p class="hint" style="margin:0">Every run starts here: your task goes in, then flows down the wires.</p>
-        <label class="switch"><span><b>Write a plan first</b><small>${n.mode === "pass" ? "Off: your task goes straight to the first team. Free." : "On: one agent turns your task into a short plan every team reads."}</small></span>
+    html += `<div class="isec"><label class="switch" title="${n.mode === "pass" ? "Off: your task goes straight to the first team. Free." : "On: one agent turns your task into a short plan every team reads."}"><span><b>Write a plan first</b></span>
           <input type="checkbox" id="planSw"${n.mode === "pass" ? "" : " checked"}></label></div>`;
     if (n.mode !== "pass") html += `<div class="isec"><h4>Model</h4>${modelPick(n)}${n.role ? "" : modelNote(n.model)}${effortBar(n)}</div>
       <div class="isec"><h4>Always tell the team</h4><textarea data-k="instructions" rows="3" placeholder="e.g. Use TypeScript. Keep changes small.">${esc(n.instructions || "")}</textarea></div>
@@ -1937,24 +1996,23 @@ function renderInspector() {
   }
   if (n.type === "cluster") {
     const claude = engineOf(n) === "claude";
+    const ai = Math.max(0, ACCESS.findIndex(([v]) => v === n.tools)), how = n.count === 1 ? "Works alone" : n.split ? "Split the job" : n.tools === "edit" || n.tools === "full" ? "Take turns" : "Side by side";
     html += `<div class="isec"><h4>Job</h4>
-        <textarea data-k="instructions" rows="4" placeholder="${esc(builtinOf(n) ? `Uses ${builtinOf(n).name}'s built-in job. Write here to give them your own.` : "Review the changes for bugs. Don't edit files.")}">${esc(n.instructions || "")}</textarea>
-        <div class="field"><label>On the card</label><input data-k="summary" maxlength="80" value="${esc(n.summary || "")}" placeholder="${esc(summaryOf({ ...n, summary: "" }) || "What this team does, in a few words")}"></div>
-        <div class="field"><label>Start from a bot</label><select id="iBot" aria-label="Bot"><option value="">Custom team</option>${teamBots().map((b) => `<option value="${esc(b.id)}"${b.id === n.bot ? " selected" : ""}>${esc(b.name)} · ${esc(b.tagline || "")}</option>`).join("")}</select></div></div>
-      <div class="isec"><h4>Agents</h4>
-        <div class="inrow"><div class="stepper"><button type="button" data-step="-1" aria-label="Fewer agents">−</button><output id="countOut">${n.count}</output><button type="button" data-step="1" aria-label="More agents">+</button></div>
-          <span class="sub">${n.count === 1 ? "One agent does the job" : n.split ? `${n.count} agents split the job` : n.tools === "edit" || n.tools === "full" ? `${n.count} agents, taking turns` : `${n.count} agents, side by side`}</span></div>
-        ${n.count > 1 ? `<label class="switch"><span><b>Split the job</b><small>${n.split ? `One job, cut into ${n.count} parts, done at once` : "Off: every agent does the whole job"}</small></span>
-          <input type="checkbox" id="splitSw"${n.split ? " checked" : ""}></label>` : ""}</div>
-      <div class="isec"><h4>Engine</h4>${engineCards(n)}
-        ${claude ? `${modelPick(n)}${n.role ? "" : modelNote(n.model)}${effortBar(n)}`
+        <textarea data-k="instructions" rows="3" placeholder="${esc(builtinOf(n) ? `${builtinOf(n).name}'s built-in job. Write your own here.` : "Review the changes for bugs.")}">${esc(n.instructions || "")}</textarea></div>
+      <div class="isec">
+        ${slider("agRange", 1, meta.max_agents, n.count, { name: "Agents", val: n.count, c: n.color })}
+        <div class="agviz" style="--c:${esc(n.color)}" title="${esc(how)}">${Array.from({ length: meta.max_agents }, (_, i) => `<button type="button" data-count="${i + 1}" class="${i < n.count ? "on" : ""}" aria-label="${i + 1} agent${i ? "s" : ""}"></button>`).join("")}</div>
+        ${n.count > 1 ? `<label class="switch mini"><span><b>Split the job</b></span><input type="checkbox" id="splitSw"${n.split ? " checked" : ""} title="${esc(n.split ? `One job, cut into ${n.count} parts` : "Every agent does the whole job")}"></label>` : ""}</div>
+      <div class="isec"><h4>Brain</h4>${engineCards(n)}
+        ${claude ? `${modelPick(n)}${effortBar(n)}`
           : `<div class="field"><label>Model</label>${engineModels(n)}</div>`}</div>
-      <div class="isec"><h4>Access</h4>${chips("tools", ACCESS, n.tools)}
-        <div class="sub">${esc(n.split && n.count > 1 && n.tools === "edit" ? "Can change files. With Split the job on, each agent writes only its own part." : ACCESS_NOTE[n.tools] || "")}</div>
+      <div class="isec"><h4>Access</h4>
+        <div class="acviz" style="--c:${ACCESS_COLOR[ACCESS[ai][0]]}">${ACCESS.map(([v, l], j) => `<button type="button" data-acc="${j}" class="${j <= ai ? "on" : ""}" title="${esc(l)}">${ACCESS_ICON[v]}</button>`).join("")}</div>
+        ${slider("acRange", 0, ACCESS.length - 1, ai, { name: "Can", val: esc(ACCESS[ai][1]), lo: "Safe", hi: "Powerful", c: ACCESS_COLOR[ACCESS[ai][0]], tip: ACCESS_NOTE[n.tools] || "" })}
         ${claude ? `<div class="slabel">Commands</div>${cliRows(n)}
-        <div class="slabel">Connectors <a href="#" id="connRefresh">Refresh</a></div>${connectorRows(n)}`
-          : `<div class="sub">Connectors and command lists are Claude Code features. A ${ENGINE_NAME[engineOf(n)]} team runs commands when its access allows.</div>`}</div>
-      <div class="isec">${more(`<div class="field"><label>Focus per agent</label><textarea data-k="focuses" rows="3" placeholder="One line per agent, e.g.&#10;Logic and edge cases&#10;Error handling">${esc(n.focuses || "")}</textarea>
+        <div class="slabel">Apps <a href="#" id="connRefresh">Refresh</a></div>${connectorRows(n)}` : ""}</div>
+      <div class="isec">${more(`<div class="field"><label>On the card</label><input data-k="summary" maxlength="80" value="${esc(n.summary || "")}" placeholder="${esc(summaryOf({ ...n, summary: "" }) || "What this team does, in a few words")}"></div>
+        <div class="field"><label>Focus per agent</label><textarea data-k="focuses" rows="3" placeholder="One line per agent, e.g.&#10;Logic and edge cases&#10;Error handling">${esc(n.focuses || "")}</textarea>
           <div class="sub">Agent 1 gets line 1, and so on, so they don't all check the same thing.</div></div>
         <div class="row2" style="margin-top:12px"><div class="field"><label>Max turns</label><input type="number" min="0" max="200" data-k="max_turns" data-num value="${n.max_turns || 0}"><div class="sub">0 = no limit</div></div>
           <div class="field"><label>Look</label><div class="inrow" style="gap:6px"><select data-k="shape">${opt(meta.shapes.map((x) => [x, x[0].toUpperCase() + x.slice(1)]), n.shape)}</select>
@@ -2041,6 +2099,34 @@ function renderInspector() {
     changed(false); renderInspector();
   }));
   if ($("splitSw")) $("splitSw").onchange = (e) => { n.split = e.target.checked; changed(false); renderInspector(); };
+  // the sliders: live while dragging (value, fill, the picture above), a full redraw when let go
+  const live = (id, set) => {
+    const r = $(id); if (!r) return;
+    r.addEventListener("input", () => {
+      const v = Number(r.value), lbl = set(v);
+      r.style.setProperty("--fill", `${((v - r.min) / (r.max - r.min)) * 100}%`);
+      if (lbl !== undefined) $(id + "Val").innerHTML = lbl;
+      changed(false);
+    });
+    r.addEventListener("change", () => renderInspector());
+  };
+  live("agRange", (v) => { n.count = v; box.querySelectorAll("[data-count]").forEach((d) => d.classList.toggle("on", Number(d.dataset.count) <= v)); return v; });
+  live("efRange", (v) => { n.effort = EFFORTS[v][0]; return EFFORTS[v][1]; });
+  live("acRange", (v) => {
+    n.tools = ACCESS[v][0]; const c = ACCESS_COLOR[n.tools];
+    $("acRange").closest(".sl").style.setProperty("--c", c); box.querySelector(".acviz").style.setProperty("--c", c);
+    box.querySelectorAll("[data-acc]").forEach((d) => d.classList.toggle("on", Number(d.dataset.acc) <= v));
+    return esc(ACCESS[v][1]);
+  });
+  box.querySelectorAll("[data-count]").forEach((d) => d.addEventListener("click", () => { n.count = Number(d.dataset.count); changed(false); renderInspector(); }));
+  box.querySelectorAll("[data-acc]").forEach((d) => d.addEventListener("click", () => { n.tools = ACCESS[Number(d.dataset.acc)][0]; changed(false); renderInspector(); }));
+  box.querySelectorAll(".botstrip canvas").forEach((cv) => drawBot(cv.getContext("2d"), { shape: cv.dataset.shape, color: cv.dataset.color }, 6, 8, 7, { state: "idle", t: 0 }));
+  box.querySelectorAll("[data-bot]").forEach((b) => b.addEventListener("click", () => {
+    const bot = bots.find((x) => x.id === b.dataset.bot); if (!bot) return;
+    applyBot(n, bot); changed(false); renderInspector();
+  }));
+  const picked = box.querySelector(".botstrip .on");   // keep the team's bot in view
+  if (picked) picked.parentElement.scrollLeft = picked.offsetLeft - picked.parentElement.clientWidth / 2 + picked.offsetWidth / 2;
 }
 
 // ------------------------------------------------------------------ runs

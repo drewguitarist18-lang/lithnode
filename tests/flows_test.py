@@ -125,7 +125,7 @@ Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True}))
 server = start_server()
 try:
     # ---- pages ------------------------------------------------------------------------------
-    for path, needle in [("/", "Lithnode"), ("/flows", "Custom team"), ("/office", "<h1>Office</h1>"), ("/static/sprites.js", "drawClawd")]:
+    for path, needle in [("/", "Lithnode"), ("/flows", "botstrip"), ("/office", "<h1>Office</h1>"), ("/static/sprites.js", "drawClawd")]:
         s, body = call(path)
         check(f"serves {path}", s == 200 and needle in body, s)
     check("static files can't escape the folder", call("/static/..%5Chq.py")[0] == 404 and call("/static/../hq.py")[0] == 404)
