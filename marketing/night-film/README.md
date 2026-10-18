@@ -20,3 +20,9 @@ A 30-second film of the real app and site, cut together over the night sky and t
    - `node render.js --stills 3 12 20` writes PNGs to check.
 
 Both scripts use `puppeteer-core` (set `NODE_PATH`) with installed Edge, and ffmpeg (`FFMPEG` or on PATH). MP4s stay out of git.
+
+## Short cuts for TikTok, Reels and Shorts
+
+- `node render.js --vertical` renders the same film at 1080×1920 (`../lithnode-night-vertical.mp4`).
+- `node render.js --vertical --hook` renders a 22-second cut that starts on the run (`../lithnode-hook-vertical.mp4`).
+- `node render.js --versus` renders `versus.html` (`../lithnode-versus.mp4`), a 14-second before and after: research by hand on top (drawn), the team's real run below, then the end card. It has its own lo-fi score that drops when the run is approved.

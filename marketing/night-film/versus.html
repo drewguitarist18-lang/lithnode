@@ -1,0 +1,392 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Lithnode Versus</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap">
+<style>html,body{margin:0;background:#0c0c0f}canvas{display:block;width:100vw;height:auto}</style></head>
+<body><canvas id="cv" width="1080" height="1920"></canvas>
+<script>
+// A 14-second before/after for TikTok (1080x1920): product research by hand on top, Lithnode's team doing it below,
+// at the same moment. The bottom is the real run footage (footage/run.mp4); the top is drawn.
+// render.js --versus calls renderFrame(t) for each frame, then renderAudio(). film.html?t=… works here too: versus.html?t=5
+const Q = new URLSearchParams(location.search);
+const W = 1080, H = 1920, LENGTH = 14;
+const cv = document.getElementById("cv"), g = cv.getContext("2d");
+const C = { void: "#0c0c0f", ink: "#ecebe6", soft: "#b1b0aa", faint: "#74736e", ok: "#7ee0a1", warn: "#e8a27a" };
+const F = { pix: "'Pixelify Sans', monospace", mono: "'Geist Mono', ui-monospace, monospace", sans: "Inter, 'Segoe UI', sans-serif" };
+const LOGO = [".##..........##.", "#.#..........#.#", "###..........###", ".#............#.", ".#............#.", ".##.########.##.", "..############..", "..##.######.##..", "..############..", "...##########...", "...#.#....#.#...", "...#.#....#.#...", "..##.##..##.##.."];
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const span = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const lerp = (a, b, k) => a + (b - a) * k;
+const eio = (k) => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const eout = (k) => 1 - Math.pow(1 - k, 3);
+const back = (k) => { const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function rr(x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+function text(s, x, y, font, color, align = "center", alpha = 1) { g.save(); g.globalAlpha *= alpha; g.font = font; g.fillStyle = color; g.textAlign = align; g.textBaseline = "alphabetic"; g.fillText(s, x, y); g.restore(); }
+function fit(s, font, max) { g.font = font; if (g.measureText(s).width <= max) return s; while (s.length > 1 && g.measureText(s + "…").width > max) s = s.slice(0, -1); return s.length > 1 ? s + "…" : ""; }
+
+// ============================================================================ timing
+const APPROVE = 20.57 - 11.7;   // the approve click: film.html's approve scene, shifted to start at 6.3
+const SPLIT_END = 10.3;          // the two halves leave; the end card comes in
+const A = { x: 40, y: 380, w: 1000, h: 560 }, B = { x: 40, y: 980, w: 1000, h: 560 };   // below TikTok's top tabs, above its caption
+
+// ============================================================================ the bottom: the real run, as in film.html, time-shifted
+const SCENES = [
+  { clip: "run", t0: 0, t1: 6.3, map: [[.3, 2.6], [1.9, 10.9], [6.3, 28.4]],
+    cam: [[0, 960, 540, 1.3], [1.8, 960, 560, 1.4], [2.7, 760, 590, 2.0], [6.3, 820, 640, 1.8]] },
+  { clip: "run", t0: 6.3, t1: SPLIT_END, map: [[6.3, 29.3], [8.9, 32.9], [9.45, 35.6], [9.55, 36.4], [10.3, 37.9]],
+    cam: [[6.3, 1420, 430, 1.9], [8.85, 1480, 400, 2.2], [9.25, 960, 560, 1.2], [10.3, 900, 620, 1.25]] },
+];
+const vids = {}, logs = {};
+function mapTime(m, t) {
+  if (t <= m[0][0]) return m[0][1];
+  for (let i = 1; i < m.length; i++) if (t <= m[i][0]) return lerp(m[i - 1][1], m[i][1], (t - m[i - 1][0]) / (m[i][0] - m[i - 1][0]));
+  return m[m.length - 1][1];
+}
+function rateAt(m, t) { for (let i = 1; i < m.length; i++) if (t <= m[i][0]) return (m[i][1] - m[i - 1][1]) / (m[i][0] - m[i - 1][0]); return 1; }
+function camAt(c, t) {
+  if (t <= c[0][0]) return c[0].slice(1);
+  for (let i = 1; i < c.length; i++) if (t <= c[i][0]) { const k = eio((t - c[i - 1][0]) / (c[i][0] - c[i - 1][0])); return [1, 2, 3].map((j) => lerp(c[i - 1][j], c[i][j], k)); }
+  return c[c.length - 1].slice(1);
+}
+function crop(cam, vw, vh, aspect) {
+  const [cx, cy, z] = cam;
+  let sw = vw / z, sh = sw / aspect;
+  if (sh > vh / z) { sh = vh / z; sw = sh * aspect; }
+  return { sx: clamp(cx - sw / 2, 0, vw - sw), sy: clamp(cy - sh / 2, 0, vh - sh), sw, sh };
+}
+const EVENTS = [];
+function buildEvents() {
+  for (const s of SCENES) for (const e of logs[s.clip] || []) {
+    if (e.kind !== "down") continue;
+    for (let i = 1; i < s.map.length; i++) {
+      const [fa, ca] = s.map[i - 1], [fb, cb] = s.map[i];
+      if (e.t >= ca && e.t < cb) { const ft = fa + (e.t - ca) / (cb - ca) * (fb - fa); if (ft >= s.t0 && ft < s.t1) EVENTS.push({ ft, clip: s.clip, x: e.x, y: e.y }); }
+    }
+  }
+}
+function pointerAt(clip, t) {
+  const L = (logs[clip] || []).filter((e) => e.kind === "move" || e.kind === "down");
+  if (!L.length || t < L[0].t - .4) return null;
+  let i = 0; while (i + 1 < L.length && L[i + 1].t <= t) i++;
+  const a = L[i], b = L[i + 1];
+  if (b && t > a.t && b.t - a.t < .1) { const k = (t - a.t) / (b.t - a.t); return [lerp(a.x, b.x, k), lerp(a.y, b.y, k)]; }
+  return [a.x, a.y];
+}
+function cursor(x, y, s, press) {
+  g.save(); g.translate(x, y); g.scale(s * (press ? .86 : 1), s * (press ? .86 : 1));
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 22); g.lineTo(5.5, 17); g.lineTo(9.5, 26); g.lineTo(13, 24.5); g.lineTo(9, 16); g.lineTo(16, 16); g.closePath();
+  g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 6; g.shadowOffsetY = 2;
+  g.fillStyle = "#fff"; g.fill(); g.shadowColor = "transparent"; g.lineWidth = 1.4; g.strokeStyle = "#111"; g.stroke(); g.restore();
+}
+function chip(label, x, y, { align = "left", fg = C.ink, bg = "rgba(8,8,10,.82)", font = `600 24px ${F.mono}`, h = 46 } = {}) {
+  g.font = font; const w = g.measureText(label).width + 36, x0 = align === "left" ? x : x - w;
+  rr(x0, y, w, h, h / 2); g.fillStyle = bg; g.fill(); g.strokeStyle = "rgba(236,235,230,.16)"; g.lineWidth = 1; g.stroke();
+  text(label, x0 + w / 2, y + h / 2 + 8, font, fg);
+  return w;
+}
+function frame(P, t, inK) {   // a panel's shadow, the slide in, and its clip
+  const dy = (1 - eout(inK)) * 60;
+  g.save(); g.globalAlpha = inK; g.translate(0, dy);
+  rr(P.x, P.y, P.w, P.h, 22); g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = 70; g.shadowOffsetY = 26; g.fillStyle = "#0b0b0e"; g.fill(); g.shadowColor = "transparent";
+}
+function team(t) {   // the bottom panel
+  const s = SCENES.find((s) => t >= s.t0 && t < s.t1); if (!s) return;
+  const v = vids[s.clip], cam = camAt(s.cam, t), ct = mapTime(s.map, t), P = B;
+  const c = crop(cam, v.videoWidth, v.videoHeight, P.w / P.h);
+  frame(P, t, 1);
+  g.save(); rr(P.x, P.y, P.w, P.h, 22); g.clip();
+  g.drawImage(v, c.sx, c.sy, c.sw, c.sh, P.x, P.y, P.w, P.h);
+  const toP = (px, py) => [P.x + (px - c.sx) / c.sw * P.w, P.y + (py - c.sy) / c.sh * P.h];
+  for (const e of EVENTS) {
+    if (t < e.ft || t > e.ft + .55) continue;
+    const k = (t - e.ft) / .55, [rx, ry] = toP(e.x, e.y);
+    g.beginPath(); g.arc(rx, ry, 8 + eout(k) * 46, 0, 7); g.strokeStyle = `rgba(236,235,230,${.75 * (1 - k)})`; g.lineWidth = 3 * (1 - k) + 1; g.stroke();
+  }
+  const p = pointerAt(s.clip, ct);
+  if (p) { const [px, py] = toP(...p); cursor(px, py, clamp(.9 + cam[2] * .35, 1.2, 1.7), EVENTS.some((e) => t >= e.ft && t < e.ft + .1)); }
+  // the approval lands: the panel lights up
+  const fl = span(t, APPROVE, APPROVE + .45); if (fl > 0 && fl < 1) { g.fillStyle = `rgba(236,235,230,${.32 * (1 - fl)})`; g.fillRect(P.x, P.y, P.w, P.h); }
+  g.restore();
+  rr(P.x + .5, P.y + .5, P.w - 1, P.h - 1, 22); g.strokeStyle = t >= APPROVE ? `rgba(126,224,161,${.25 + .5 * (1 - span(t, APPROVE, APPROVE + 1.2))})` : "rgba(236,235,230,.18)"; g.lineWidth = t >= APPROVE ? 3 : 1; g.stroke();
+  chip("MY AI TEAM", P.x + 22, P.y + 22);
+  const rate = rateAt(s.map, t);
+  if (t < APPROVE && rate > 1.4) chip(`${rate < 10 ? rate.toFixed(rate < 3 ? 1 : 0) : Math.round(rate)}× speed`, P.x + P.w - 22, P.y + 22, { align: "right", fg: C.soft, font: `500 20px ${F.mono}`, h: 40 });
+  if (t >= APPROVE) { const k = back(span(t, APPROVE + .1, APPROVE + .45)); g.save(); g.translate(P.x + P.w - 22, P.y + 44); g.scale(k, k); g.translate(-(P.x + P.w - 22), -(P.y + 44)); chip("✓ DONE", P.x + P.w - 22, P.y + 22, { align: "right", fg: "#08140c", bg: C.ok }); g.restore(); }
+  g.restore();
+}
+
+// ============================================================================ the top: research by hand, drawn
+const TABS = ["best products to sell 2026", "trending gadgets", "supplier: sunset lamp", "is this legit??", "shipping times", "reviews (3.2★)", "margin calculator", "competitor store", "why sold out", "led strip bulk price", "tiktok made me buy it", "customs fees", "supplier #2", "return policy", "dropship forum", "reddit: worth it?", "price history"];
+const QUERIES = ["best products to sell 2026", "trending home gadgets this month", "sunset lamp supplier price", "is sunset lamp still trending", "led strip shipping time", "posture corrector reviews"];
+const SHEET = [["Sunset lamp", "6.80", "24.99", "?"], ["LED strip", "7.90", "11.99", "4.09"], ["Phone mount", "5.4", "19.99", ""]];
+const L = { paper: "#e6e4de", chrome: "#cfccc4", tab: "#dcd9d2", ink: "#3a3935", dim: "#8d8a83", line: "#c4c1ba", link: "#5b6b8f" };
+function typed(t) {   // how many characters are typed: slow, with stalls while they tab away to look things up
+  let n = 0;
+  for (let s = 0; s < t; s += 1 / 30) { const stall = Math.sin(s * 1.9) > .55; if (!stall) n += 8.5 / 30; }
+  return Math.floor(n);
+}
+function byHand(t) {
+  const P = A, x = P.x, y = P.y, inK = span(t, 0, .35), done = span(t, APPROVE, APPROVE + .8);
+  frame(P, t, 1);
+  g.save(); rr(x, y, P.w, P.h, 22); g.clip();
+  g.fillStyle = L.paper; g.fillRect(x, y, P.w, P.h);
+  // the tab strip fills up until the tabs are slivers
+  const n = Math.min(34, 4 + Math.floor(t * 2.9)), tabTop = y + 76, tw = clamp((P.w - 40) / n, 26, 220);
+  g.fillStyle = L.chrome; g.fillRect(x, y, P.w, 158);
+  for (let i = 0; i < n; i++) {
+    const tx = x + 20 + i * tw, act = i === n - 1;
+    rr(tx, tabTop, tw - 3, 36, [9, 9, 0, 0]); g.fillStyle = act ? L.paper : L.tab; g.fill();
+    if (tw > 60) text(fit(TABS[i % TABS.length], `500 15px ${F.sans}`, tw - 26), tx + 12, tabTop + 23, `500 15px ${F.sans}`, act ? L.ink : L.dim, "left");
+    else { g.fillStyle = L.dim; g.beginPath(); g.arc(tx + tw / 2 - 1, tabTop + 18, 5, 0, 7); g.fill(); }
+  }
+  // the address bar: a new search every so often
+  g.fillStyle = L.paper; g.fillRect(x, tabTop + 36, P.w, 46);
+  rr(x + 20, tabTop + 42, P.w - 40, 34, 17); g.fillStyle = "#f3f2ee"; g.fill();
+  const qi = Math.floor(t / 1.7) % QUERIES.length, q = QUERIES[qi], qk = Math.min(q.length, Math.floor((t % 1.7) * 30));
+  text("🔍  " + q.slice(0, qk), x + 40, tabTop + 65, `400 17px ${F.sans}`, L.ink, "left");
+  // the page: search results on the left, scrolling down and back up
+  const top = y + 172, scroll = (Math.sin(t * 1.3) * .5 + .5) * 260, r = mulberry(3 + qi);
+  g.save(); g.beginPath(); g.rect(x, top, 560, P.h - 172); g.clip();
+  for (let i = 0; i < 7; i++) {
+    const ry = top + 22 + i * 96 - scroll;
+    g.fillStyle = L.link; g.fillRect(x + 30, ry, 260 + r() * 200, 16);
+    g.fillStyle = L.line; g.fillRect(x + 30, ry + 30, 470, 10); g.fillRect(x + 30, ry + 50, 320 + r() * 140, 10);
+  }
+  g.restore();
+  // the spreadsheet on the right, typed one slow cell at a time
+  const sx = x + 580, sy = top + 10, cw = [150, 80, 80, 80], rh = 46;
+  rr(sx, sy, 400, P.h - 200, 10); g.fillStyle = "#f6f5f1"; g.fill(); g.strokeStyle = L.line; g.lineWidth = 1; g.stroke();
+  ["Product", "Cost", "Price", "Margin"].forEach((h, i) => text(h, sx + 12 + cw.slice(0, i).reduce((a, b) => a + b, 0), sy + 30, `600 16px ${F.sans}`, L.ink, "left"));
+  let left = typed(t), caret = null;
+  for (let j = 0; j < 8; j++) {
+    const ry = sy + 46 + j * rh;
+    g.fillStyle = L.line; g.fillRect(sx, ry, 400, 1);
+    let cx = sx + 12;
+    for (let i = 0; i < 4; i++) {
+      const cell = (SHEET[j] || [])[i] || "", k = Math.min(cell.length, Math.max(0, left));
+      if (k > 0) text(cell.slice(0, k), cx, ry + 30, `400 17px ${F.sans}`, cell === "?" ? "#b2442f" : L.ink, "left");
+      if (left >= 0 && left < cell.length + 1 && !caret && j < SHEET.length) { g.font = `400 17px ${F.sans}`; caret = [cx + g.measureText(cell.slice(0, k)).width + 2, ry + 12]; }
+      left -= cell.length + 1; cx += cw[i];
+    }
+    for (let i = 1; i < 4; i++) g.fillRect(sx + cw.slice(0, i).reduce((a, b) => a + b, 0), sy, 1, P.h - 200);
+  }
+  if (caret && Math.floor(t * 2.5) % 2 === 0) { g.fillStyle = L.ink; g.fillRect(caret[0], caret[1], 2, 24); }
+  // the pointer wanders: scroll, a tab, back to the sheet
+  const px = x + 420 + Math.sin(t * 1.1) * 260 + Math.sin(t * 3.7) * 40, py = y + 260 + Math.cos(t * .9) * 140;
+  cursor(px, py, 1.3, false);
+  // once the team is done, this side greys out: still going
+  if (done > 0) { g.fillStyle = `rgba(12,12,15,${.45 * done})`; g.fillRect(x, y, P.w, P.h); }
+  g.restore();
+  rr(x + .5, y + .5, P.w - 1, P.h - 1, 22); g.strokeStyle = "rgba(236,235,230,.18)"; g.lineWidth = 1; g.stroke();
+  chip("ME, BY HAND", x + 22, y + 18, { bg: "rgba(40,39,36,.88)" });
+  // the clock runs away: the sheet is three rows in after three hours
+  const m = Math.round(195 * Math.pow(Math.min(t, SPLIT_END) / SPLIT_END, 1.25)), clock = `⏱ ${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+  chip(clock, x + P.w - 22, y + 18, { align: "right", fg: t >= APPROVE ? C.warn : C.ink, bg: "rgba(40,39,36,.88)" });
+  if (done > 0) { const k = back(span(t, APPROVE + .3, APPROVE + .7)); g.save(); g.translate(x + P.w / 2, y + P.h / 2); g.scale(k, k); g.rotate(-.05);
+    rr(-210, -42, 420, 84, 14); g.fillStyle = "rgba(12,12,15,.9)"; g.fill(); g.strokeStyle = C.warn; g.lineWidth = 3; g.stroke();
+    text("still on row 3…", 0, 13, `600 36px ${F.pix}`, C.warn); g.restore(); }
+  g.restore();
+}
+
+// ============================================================================ the words
+function header(t) {   // on screen from the first frame, so the hook reads before anyone scrolls
+  const out = 1 - span(t, SPLIT_END - .3, SPLIT_END);
+  if (out <= 0) return;
+  const swap = span(t, APPROVE + .9, APPROVE + 1.2);
+  const l1 = swap < .5 ? "Finding products to sell:" : "Hours by hand.", l2 = swap < .5 ? "me vs my AI team" : "Minutes with a team.";
+  const a = out * (swap < .5 ? 1 - swap * 2 : (swap - .5) * 2), f = `600 66px ${F.pix}`;
+  text(l1, W / 2, 240, f, C.ink, "center", a);
+  text(l2, W / 2, 318, f, swap < .5 ? C.soft : C.ok, "center", a);
+}
+function crab(cx, top, cell, t, from, spread, seed = 7) {
+  const r = mulberry(seed), w = LOGO[0].length * cell, x0 = cx - w / 2;
+  g.save(); g.shadowColor = "rgba(236,235,230,.5)"; g.shadowBlur = cell * 1.4;
+  LOGO.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch !== "#") return;
+    const at = from + r() * spread, k = span(t, at, at + .22);
+    if (k <= 0) return;
+    const s = back(k), x = x0 + i * cell + cell / 2, y = top + j * cell + cell / 2;
+    g.globalAlpha = Math.min(1, k * 2); g.fillStyle = k < 1 ? "#ffffff" : C.ink;
+    g.fillRect(x - cell * s / 2, y - cell * s / 2, cell * s, cell * s);
+  }));
+  g.restore();
+}
+function endCard(t) {
+  if (t < SPLIT_END) return;
+  const fade = 1 - span(t, LENGTH - .5, LENGTH), Y = 560;
+  g.save(); g.globalAlpha = fade;
+  crab(W / 2, Y, 13, t, SPLIT_END + .05, .5, 11);
+  const k1 = eout(span(t, SPLIT_END + .35, SPLIT_END + .8));
+  text("Lithnode", W / 2, Y + 340 + (1 - k1) * 20, `700 150px ${F.pix}`, C.ink, "center", k1);
+  const k2 = eout(span(t, SPLIT_END + .6, SPLIT_END + 1.05));
+  text("Your AI team. Managed.", W / 2, Y + 420 + (1 - k2) * 14, `500 50px ${F.pix}`, C.soft, "center", k2);
+  const k3 = eout(span(t, SPLIT_END + .9, SPLIT_END + 1.3));
+  text("Free and open source", W / 2, Y + 490 + (1 - k3) * 10, `400 28px ${F.mono}`, "#9b9a94", "center", k3);
+  const k4 = back(span(t, SPLIT_END + 1.2, SPLIT_END + 1.6));
+  if (k4 > 0) {
+    g.save(); g.translate(W / 2, Y + 600); g.scale(k4, k4);
+    rr(-200, -42, 400, 84, 42); g.fillStyle = C.ink; g.shadowColor = "rgba(236,235,230,.35)"; g.shadowBlur = 40; g.fill(); g.restore();
+    text("lithnode.com", W / 2, Y + 612, `600 36px ${F.mono}`, C.void, "center", Math.min(1, k4));
+  }
+  g.restore();
+}
+
+// ============================================================================ the ground: flat, a faint dot grid, grain
+const grain = (() => {
+  const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), im = x.createImageData(256, 256), r = mulberry(4);
+  for (let i = 0; i < im.data.length; i += 4) { const v = r() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
+  x.putImageData(im, 0, 0); return c;
+})();
+function ground(t) {
+  g.fillStyle = C.void; g.fillRect(0, 0, W, H);
+  g.fillStyle = "rgba(236,235,230,.07)";
+  for (let y = 20; y < H; y += 40) for (let x = 20; x < W; x += 40) g.fillRect(x, y, 2, 2);
+  const glow = g.createRadialGradient(W / 2, B.y + B.h / 2, 0, W / 2, B.y + B.h / 2, 900);
+  glow.addColorStop(0, `rgba(126,224,161,${.12 * span(t, APPROVE, APPROVE + .4) * (1 - span(t, SPLIT_END - .3, SPLIT_END))})`); glow.addColorStop(1, "rgba(126,224,161,0)");
+  g.fillStyle = glow; g.fillRect(0, 0, W, H);
+}
+function post(t) {
+  const v = g.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * 1.05); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.5)");
+  g.fillStyle = v; g.fillRect(0, 0, W, H);
+  g.save(); g.globalCompositeOperation = "overlay"; g.globalAlpha = .05;
+  const r = mulberry(Math.floor(t * 30) + 1); g.translate(-r() * 256, -r() * 256);
+  g.fillStyle = g.createPattern(grain, "repeat"); g.fillRect(0, 0, W + 256, H + 256); g.restore();
+}
+function draw(t) {
+  ground(t);
+  if (t < SPLIT_END) {
+    const out = eio(span(t, SPLIT_END - .3, SPLIT_END));
+    g.save(); g.globalAlpha = 1 - out; g.translate(W / 2, H / 2); g.scale(1 - .06 * out, 1 - .06 * out); g.translate(-W / 2, -H / 2);
+    byHand(t); team(t); g.restore();
+  }
+  header(t);
+  endCard(t);
+  const k = span(t, SPLIT_END, SPLIT_END + .18); if (k > 0 && k < 1) { g.fillStyle = `rgba(236,235,230,${.25 * (1 - k)})`; g.fillRect(0, 0, W, H); }
+  post(t);
+}
+
+// ============================================================================ loading and seeking
+function seek(v, s) {
+  s = clamp(s, 0, v.duration - .04); const target = (Math.floor(s * 30) + .5) / 30;
+  if (Math.abs(v.currentTime - target) < 1e-3 && v.readyState >= 2) return Promise.resolve();
+  return new Promise((r) => { v.addEventListener("seeked", r, { once: true }); v.currentTime = target; });
+}
+window.renderFrame = async (t) => { const s = SCENES.find((s) => t >= s.t0 && t < s.t1); if (s) await seek(vids[s.clip], mapTime(s.map, t)); draw(t); };
+window.ready = (async () => {
+  const load = (v, src) => new Promise((r, j) => { v.muted = true; v.preload = "auto"; v.oncanplaythrough = r; v.onerror = () => j(new Error(src)); v.src = src; v.load(); });
+  vids.run = document.createElement("video");
+  await Promise.all([load(vids.run, "footage/run.mp4"), fetch("footage/run.json").then((r) => r.json()).then((j) => { logs.run = j.log; }),
+    ...[`600 66px ${F.pix}`, `700 150px ${F.pix}`, `600 24px ${F.mono}`, `400 28px ${F.mono}`, `500 15px ${F.sans}`, `600 16px ${F.sans}`, `400 17px ${F.sans}`].map((f) => document.fonts.load(f))]);
+  buildEvents();
+  const q = Q.get("t"); if (q !== null) await window.renderFrame(+q);
+  return true;
+})();
+
+// ============================================================================ the music: lo-fi while you grind, a drop when the team is done
+// 0 → approve: a dusty 85 BPM beat, electric piano, vinyl crackle and a ticking clock. The approval: a riser, then the beat
+// doubles up with a bass and claps. The end card: one wide major chord and bells.
+let ac, out, revIn;
+const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+const BEAT = 60 / 85, BAR = BEAT * 4;
+let noiseBuf;
+function noise() {
+  if (noiseBuf) return noiseBuf;
+  noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noiseBuf.getChannelData(0), r = mulberry(5);
+  for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1; return noiseBuf;
+}
+function studio() {
+  const lim = ac.createDynamicsCompressor(); lim.threshold.value = -4; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = .002; lim.release.value = .1;
+  out = ac.createGain(); out.gain.value = .9; out.connect(lim); lim.connect(ac.destination);
+  const conv = ac.createConvolver(), len = ac.sampleRate * 2.2, ir = ac.createBuffer(2, len, ac.sampleRate), r = mulberry(9);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (r() * 2 - 1) * Math.pow(1 - i / len, 3); }
+  conv.buffer = ir; revIn = ac.createGain(); const ro = ac.createGain(); ro.gain.value = .45; revIn.connect(conv); conv.connect(ro); ro.connect(out);
+}
+function voice(at, midi, dur, o = {}) {
+  const v = o.vol ?? .1, a = o.a ?? .01, rel = o.r ?? .2, det = o.det ?? [0], type = o.type || "sine";
+  const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = o.lp ?? 3000;
+  const gn = ac.createGain(), pan = ac.createStereoPanner(); pan.pan.value = o.pan || 0;
+  gn.gain.setValueAtTime(0, at); gn.gain.linearRampToValueAtTime(v, at + a);
+  gn.gain.setValueAtTime(v, at + Math.max(a, dur)); gn.gain.linearRampToValueAtTime(0, at + Math.max(a, dur) + rel);
+  det.forEach((d) => {
+    const osc = ac.createOscillator(); osc.type = type; osc.frequency.value = hz(midi); osc.detune.value = d;
+    if (o.glide) { osc.frequency.setValueAtTime(hz(midi + o.glide), at); osc.frequency.exponentialRampToValueAtTime(hz(midi), at + .08); }
+    const sg = ac.createGain(); sg.gain.value = 1 / Math.sqrt(det.length); osc.connect(sg); sg.connect(f); osc.start(at); osc.stop(at + dur + rel + .1);
+  });
+  if (o.trem) { const lfo = ac.createOscillator(), lg = ac.createGain(), tg = ac.createGain(); lfo.frequency.value = o.trem; lg.gain.value = .25; tg.gain.value = .75; lfo.connect(lg); lg.connect(tg.gain); f.connect(tg); tg.connect(gn); lfo.start(at); lfo.stop(at + dur + rel + .1); }
+  else f.connect(gn);
+  gn.connect(pan); pan.connect(out);
+  if (o.rev) { const s = ac.createGain(); s.gain.value = o.rev; pan.connect(s); s.connect(revIn); }
+}
+function nz(at, v, len, { type = "highpass", f = 8000, q = .7, pan = 0, rev = 0 } = {}) {
+  const s = ac.createBufferSource(), fl = ac.createBiquadFilter(), gn = ac.createGain(), p = ac.createStereoPanner();
+  s.buffer = noise(); fl.type = type; fl.frequency.value = f; fl.Q.value = q; p.pan.value = pan;
+  gn.gain.setValueAtTime(0, at); gn.gain.linearRampToValueAtTime(v, at + .001); gn.gain.setTargetAtTime(0, at + .001, len / 4);
+  s.connect(fl); fl.connect(gn); gn.connect(p); p.connect(out); if (rev) { const r = ac.createGain(); r.gain.value = rev; p.connect(r); r.connect(revIn); }
+  s.start(at, (at * 7.31) % 1.2); s.stop(at + len * 2 + .1);
+}
+function kick(at, v = .9, low = 45) {
+  const o = ac.createOscillator(), gn = ac.createGain(); o.frequency.setValueAtTime(120, at); o.frequency.exponentialRampToValueAtTime(low, at + .12);
+  gn.gain.setValueAtTime(v, at); gn.gain.setTargetAtTime(0, at + .05, .13); o.connect(gn); gn.connect(out); o.start(at); o.stop(at + .7);
+}
+const snare = (at, v = .22) => { nz(at, v, .16, { type: "bandpass", f: 1800, q: .9, rev: .2 }); };
+const clap = (at, v = .25) => { [0, .012, .024].forEach((d) => nz(at + d, v, .05, { type: "bandpass", f: 1400, q: 1.2, rev: .3 })); };
+const hat = (at, v = .04, pan = .2) => nz(at, v, .03, { f: 9000, pan });
+const tick = (at, v = .05) => nz(at, v, .012, { type: "bandpass", f: 3800, q: 6, pan: -.3 });   // the clock
+function crackle(from, to) { const r = mulberry(21); for (let t = from; t < to; t += .03 + r() * .09) nz(t, .012 + r() * .02, .004, { f: 5000, pan: r() * 2 - 1 }); }
+function riser(at, dur, v = .06) {
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gn = ac.createGain(); s.buffer = noise(); s.loop = true;
+  f.type = "bandpass"; f.Q.value = 2; f.frequency.setValueAtTime(600, at); f.frequency.exponentialRampToValueAtTime(8000, at + dur);
+  gn.gain.setValueAtTime(.0001, at); gn.gain.exponentialRampToValueAtTime(v, at + dur - .02); gn.gain.linearRampToValueAtTime(0, at + dur);
+  s.connect(f); f.connect(gn); gn.connect(out); s.start(at); s.stop(at + dur + .05);
+}
+// Am9 → Fmaj7 → Dm9 → E7(b9), voiced low and warm
+const KEYS = [[57, 60, 64, 67, 71], [53, 57, 60, 64, 67], [50, 57, 60, 64, 65], [52, 56, 59, 62, 65]], BASS = [33, 29, 26, 28];
+function score() {
+  crackle(0, SPLIT_END);
+  for (let t = 0; t < APPROVE - .05; t += BEAT) tick(t, .045);
+  // the grind: four bars of lazy keys and a dusty beat
+  for (let b = 0, t = 0; t < APPROVE - .1; b++, t += BAR) {
+    const c = b % 4;
+    KEYS[c].forEach((m, i) => voice(t + i * .025, m, Math.min(BAR, APPROVE - t) - .1, { type: "triangle", vol: .05, a: .01, r: .5, lp: 1600, trem: 4, rev: .3, pan: (i - 2) * .15 }));
+    voice(t, BASS[c], Math.min(BAR, APPROVE - t) - .1, { vol: .2, a: .02, r: .2, lp: 400 });
+    for (let k = 0; k < 4; k++) {
+      const at = t + k * BEAT; if (at >= APPROVE - .2) break;
+      if (k === 0 || k === 2) kick(at, .7);
+      if (k === 2 && at + BEAT * .75 < APPROVE - .2) kick(at + BEAT * .75, .45);
+      if (k === 1 || k === 3) snare(at + .02);
+      hat(at + BEAT * .5 + .03, .03); hat(at, .02, -.2);
+    }
+  }
+  // the approval: a rise, a hit, then the beat doubles up
+  riser(APPROVE - 1.1, 1.1, .05);
+  kick(APPROVE, 1, 38); clap(APPROVE, .3); nz(APPROVE, .06, 1.2, { f: 6000, rev: .3 });
+  [69, 72, 76, 79, 83].forEach((m, i) => voice(APPROVE, m, .9, { type: "sawtooth", det: [-10, 0, 10], vol: .03, a: .005, r: .7, lp: 4000, rev: .5, pan: (i - 2) * .25 }));
+  const H2 = BEAT / 2;
+  for (let t = APPROVE + H2, i = 1; t < SPLIT_END - .05; t += H2, i++) {
+    if (i % 2 === 0) kick(t, .85);
+    if (i % 4 === 2) clap(t, .22);
+    hat(t + H2 / 2, .05, i % 2 ? .3 : -.3);
+    voice(t, 45 + (i % 2 ? 12 : 0), H2 - .03, { type: "sawtooth", vol: .06, a: .004, r: .04, lp: 700 });
+  }
+  // the end card: C major 9, wide, and bells
+  kick(SPLIT_END, 1, 36);
+  voice(SPLIT_END, 36, 3, { vol: .22, a: .005, r: 1.2, glide: 12 });
+  [48, 55, 60, 64, 67, 71, 74].forEach((m, i) => voice(SPLIT_END, m, 3.2, { type: "sawtooth", det: [-12, 0, 12], vol: .022, a: .02, r: .9, lp: 2200, rev: .5, pan: (i - 3) * .2 }));
+  [[SPLIT_END + .35, 84], [SPLIT_END + .65, 88], [SPLIT_END + .95, 91], [SPLIT_END + 1.3, 96], [SPLIT_END + 1.75, 91]].forEach(([t, m], i) => {
+    voice(t, m, .05, { vol: .045, a: .003, r: 1.6, rev: .6, pan: i % 2 ? .35 : -.35 }); voice(t, m + 19, .02, { vol: .012, a: .002, r: .5, rev: .4 });
+  });
+}
+window.renderAudio = async () => {
+  await window.ready;
+  const rate = 48000, off = new OfflineAudioContext(2, Math.ceil(rate * LENGTH), rate);
+  ac = off; noiseBuf = null; studio();
+  out.gain.setValueAtTime(.9, LENGTH - 1); out.gain.linearRampToValueAtTime(0, LENGTH);
+  score();
+  const buf = await off.startRendering(), n = buf.length, Lc = buf.getChannelData(0), R = buf.getChannelData(1);
+  const pcm = new Int16Array(n * 2); for (let i = 0; i < n; i++) { pcm[i * 2] = clamp(Lc[i], -1, 1) * 32767; pcm[i * 2 + 1] = clamp(R[i], -1, 1) * 32767; }
+  let s = ""; const u8 = new Uint8Array(pcm.buffer); for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+</script>
+</body></html>
