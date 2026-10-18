@@ -7,7 +7,8 @@
 // A 30-second film of the real app and site: footage/*.mp4 recorded by capture.js, composited over the night sky.
 // render.js serves the repo, calls renderFrame(t) for each of 900 frames, then renderAudio() for the score.
 // Open film.html?t=12.5 for a still of any moment. ?v=1 is the vertical cut (1080x1920, for TikTok, Reels and Shorts).
-const Q = new URLSearchParams(location.search), V = Q.has("v");
+// &hook=1 is the short cut for the feed: it skips the slow open and starts on the run with the hook already on screen.
+const Q = new URLSearchParams(location.search), V = Q.has("v"), HOOK = Q.has("hook"), T0 = HOOK ? 8 : 0;   // the hook cut is film 8–30
 const W = V ? 1080 : 1920, H = V ? 1920 : 1080, LENGTH = 30;
 const cv = document.getElementById("cv"), g = cv.getContext("2d");
 cv.width = W; cv.height = H;
@@ -35,7 +36,7 @@ const SCENES = [
   { id: "run", clip: "run", t0: 8, t1: 14, map: [[8, 2.6], [9.6, 10.9], [14, 28.4]],
     cam: [[8, 960, 560, 1.18], [9.5, 960, 560, 1.18], [10.4, 760, 600, 1.3], [14, 820, 650, 1.26]],
     vcam: [[8, 970, 420, 1.3], [9.5, 970, 420, 1.3], [10.4, 790, 600, 1.0], [12.4, 790, 640, 1.0], [14, 600, 800, 1.2]],
-    cap: ["Hit run. They split the work.", "A scout hunts the web. Two checkers judge every find."] },
+    cap: HOOK ? ["I told AI agents to find products to sell.", "A scout hunts the web. Two checkers judge every find."] : ["Hit run. They split the work.", "A scout hunts the web. Two checkers judge every find."] },
   { id: "office", clip: "office", t0: 14, t1: 18, map: [[14, 19.0], [18, 27.0]],
     cam: [[14, 930, 300, 1.7], [18, 940, 290, 1.86]],
     vcam: [[14, 950, 260, 1.6], [18, 950, 240, 1.75]],
@@ -151,7 +152,7 @@ function wrap(words, widths, space, max) {
   return [all.slice(0, best), all.slice(best)];
 }
 function caption(t, s, big, small) {   // words rise in, one after another, then fade before the cut
-  const tin = s.t0 + .2, out = 1 - span(t, s.t1 - .35, s.t1 - .05);
+  const tin = HOOK && s.t0 === T0 ? s.t0 - 2 : s.t0 + .2, out = 1 - span(t, s.t1 - .35, s.t1 - .05);
   if (t < tin || out <= 0) return;
   const bf = V ? `600 70px ${F.pix}` : `600 58px ${F.pix}`, sf = V ? `400 27px ${F.mono}` : `400 22px ${F.mono}`;
   const top = V ? 300 : 112, lh = V ? 82 : 0;
@@ -296,7 +297,7 @@ function draw(t) {
   open(t);
   scenes(t);
   endCard(t);
-  [8, 14, 18, 22].forEach((c) => flash(t, c));
+  [8, 14, 18, 22].filter((c) => c > T0).forEach((c) => flash(t, c));
   flash(t, APPROVE_AT, .3, .35);
   post(t);
 }
@@ -314,7 +315,7 @@ async function prepare(t) {
   if (t >= 25.8) jobs.push(seek(bh, t - 25.8 + 6));
   await Promise.all(jobs);
 }
-window.renderFrame = async (t) => { await prepare(t); draw(t); };
+window.renderFrame = async (t) => { t += T0; await prepare(t); draw(t); };
 window.ready = (async () => {
   const load = (v, src) => new Promise((r, j) => { v.muted = true; v.preload = "auto"; v.oncanplaythrough = r; v.onerror = () => j(new Error(src)); v.src = src; v.load(); });
   const jobs = [load(bh, V ? "footage/hole-tall.mp4" : "footage/hole.mp4")];
