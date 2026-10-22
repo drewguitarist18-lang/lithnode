@@ -62,6 +62,8 @@ def install_pet():
     if SETTINGS.exists() and not backup.exists():
         shutil.copy2(SETTINGS, backup)
     hooks = data.setdefault("hooks", {})
+    if "claude-pet-cli" in json.dumps(hooks).lower():
+        return   # the standalone Claude Pet app is installed and runs the pet itself
     _strip(hooks, source_too=True)   # one pet only: the installed copy replaces a from-source one
     cli = _cli().as_posix()
     for event in PET_EVENTS:

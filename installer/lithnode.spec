@@ -12,9 +12,9 @@ WINDOWS = sys.platform == "win32"
 a = Analysis(
     [str(HERE / "lithnode_main.py")],
     pathex=[str(ROOT), str(PET)] if WINDOWS else [str(ROOT)],
-    datas=[(str(ROOT / "static"), "static")] + ([(str(PET / "office.html"), ".")] if WINDOWS else []),
+    datas=[(str(ROOT / "static"), "static")],
     hiddenimports=["hq", "flows", "agents", "claude_code", "engines", "office_feed", "shot"]
-                  + (["hook", "pet", "office", "shared", "tkinter", "tkinter.filedialog", "winsound"] if WINDOWS else []),
+                  + (["hook", "pet", "shared", "tkinter", "tkinter.filedialog", "winsound"] if WINDOWS else []),
     excludes=["test", "unittest", "pydoc_data"] + ([] if WINDOWS else ["tkinter"]),
 )
 pyz = PYZ(a.pure)
