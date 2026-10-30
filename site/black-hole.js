@@ -122,9 +122,10 @@
     gl.viewport(0, 0, W, H);
     gl.uniform2f(U("uRes"), W, H);
     const A = Math.max(.5, Math.min(2.4, r.width / r.height));
-    gl.uniform1f(U("uZoom"), .2 * 160 / DIST / A * (A > 1 ? 1.15 : .9));
+    const zoom = .2 * 160 / DIST / A * (A > 1 ? 2.3 : 1.08);   // a wide view: the hole sits small in the sky instead of looming over the page
+    gl.uniform1f(U("uZoom"), zoom);
     gl.uniform1f(U("uDist"), DIST);
-    gl.uniform1f(U("uPix"), .2 * 160 / DIST / A * (A > 1 ? 1.15 : .9) / (2 * H));
+    gl.uniform1f(U("uPix"), zoom / (2 * H));
     gl.uniform2f(U("uShift"), 0, tall ? .118 : .25);
   }
   // the camera eases toward the cursor: up flattens the disk, down tips it toward you. It never goes fully edge-on,
