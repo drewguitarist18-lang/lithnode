@@ -73,8 +73,9 @@
         vel += -1.5 * h2 * pos / (r2 * r2 * r) * dt;
         pos += vel * dt; trav += dt;
         glow += dt * exp(-pow((r - 1.53) * 12., 2.));
-        // the disk is a few thin sheets stacked through its flaring thickness: puffy edge-on, still crisp
-        float h0 = .03 + .04 * length(p0.xz), h1 = .03 + .04 * length(pos.xz);
+        // the disk is a few thin sheets stacked through its flaring thickness: puffy edge-on, still crisp. They pinch
+        // together at the inner edge: with the camera low, between two sheets, the hole would show through the slot as a black line
+        float l0 = length(p0.xz), l1 = length(pos.xz), h0 = (.03 + .04 * l0) * smoothstep(1.25, 2.5, l0), h1 = (.03 + .04 * l1) * smoothstep(1.25, 2.5, l1);
         for (int k = -2; k <= 2; k++) {
           float f0 = p0.y - float(k) * h0, f1 = pos.y - float(k) * h1;
           if (f0 * f1 < 0.) {
