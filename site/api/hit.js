@@ -1,5 +1,6 @@
-// Emails Drew when someone views lithnode.com or clicks a download button. Stores nothing: no IP, no cookie, no log.
-// The page sends {kind: "view" | "download", os} with sendBeacon. Bots, other sites' requests and floods are dropped.
+// Emails Drew when someone views lithnode.com, clicks a download button, or taps "Send me the link" on a phone.
+// Stores nothing: no IP, no cookie, no log.
+// The page sends {kind: "view" | "download" | "send", os} with sendBeacon. Bots, other sites' requests and floods are dropped.
 // Env (Vercel project settings): GMAIL_USER, GMAIL_APP_PASSWORD (a Google app password), NOTIFY_TO.
 const nodemailer = require("nodemailer");
 
@@ -11,13 +12,13 @@ module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).end();
   const from = req.headers.origin || req.headers.referer || "";
-  if (!/^https:\/\/(www\.)?lithnode\.com/.test(from) && !process.env.HIT_ANY_ORIGIN) return res.status(204).end();
+  if (!/^https:\/\/(www\.)?lithnode\.com(\/|$)/.test(from) && !process.env.HIT_ANY_ORIGIN) return res.status(204).end();
   if (BOT.test(req.headers["user-agent"] || "")) return res.status(204).end();
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
   body = body || {};
-  const kind = ["download", "test"].includes(body.kind) ? body.kind : "view";
+  const kind = ["download", "send", "test"].includes(body.kind) ? body.kind : "view";
   const os = OS[body.os] || null;
 
   const now = Date.now();
@@ -29,9 +30,14 @@ module.exports = async (req, res) => {
   const ua = req.headers["user-agent"] || "";
   const device = /iphone|ipad|android|mobile/i.test(ua) ? "phone" : "computer";
   const ref = typeof body.ref === "string" && body.ref && !/lithnode\.com/.test(body.ref) ? body.ref.slice(0, 200) : "";
-  const subject = kind === "test" ? "Lithnode: test email, site alerts are working" : kind === "download" ? `Lithnode: ${os || "a"} download from ${where}` : `Lithnode: someone's on the site from ${where}`;
+  const [subject, first] = {   // each kind's subject line and first line
+    view: [`Lithnode: someone's on the site from ${where}`, "Someone opened lithnode.com."],
+    download: [`Lithnode: ${os || "a"} download from ${where}`, `Someone clicked Download${os ? " for " + os : ""}.`],
+    send: [`Lithnode: someone on a phone tapped Send me the link, from ${where}`, "Someone on a phone tapped Send me the link, to get Lithnode on a computer later."],
+    test: ["Lithnode: test email, site alerts are working", "Test email from the site. If you got this, alerts work."],
+  }[kind];
   const text = [
-    kind === "test" ? "Test email from the site. If you got this, alerts work." : kind === "download" ? `Someone clicked Download${os ? " for " + os : ""}.` : "Someone opened lithnode.com.",
+    first,
     `From: ${where}, on a ${device}.`,
     ref ? `Came from: ${ref}` : "",
     new Date(now).toLocaleString("en-US", { timeZone: "America/New_York" }) + " ET",

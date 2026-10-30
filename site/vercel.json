@@ -1,0 +1,5 @@
+{
+  "redirects": [
+    { "source": "/(.*)", "has": [{ "type": "host", "value": "www.lithnode.com" }], "destination": "https://lithnode.com/$1", "permanent": true }
+  ]
+}
