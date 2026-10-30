@@ -1,12 +1,15 @@
-/* Lithnode's look, shared by every page of the app (and matching lithnode.com): black and white, one mono face,
-   pixel type for names and titles. Loaded after each page's own styles, so these tokens win.
+/* Lithnode's look, shared by every page of the app (and matching lithnode.com): black and white, Geist Mono for the
+   app's own words (buttons, names, chips, labels), Geist for titles and sentences, pixel type for the brand and the
+   small section labels. Loaded after each page's own styles, so these tokens win.
    Status colors keep their meaning: green done, red failed, amber waiting for you. */
+@font-face { font-family: "Geist"; src: url("/static/fonts/geist.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "Geist Mono"; src: url("/static/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "Silkscreen"; src: url("/static/fonts/silkscreen-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Silkscreen"; src: url("/static/fonts/silkscreen-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
 
 :root {
   --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+  --sans: "Geist", "Segoe UI", system-ui, -apple-system, sans-serif;
   --pixel: "Silkscreen", "Geist Mono", ui-monospace, monospace;
   /* light: the same idea, inverted */
   --bg: #f3f3f0; --bar: #f3f3f0; --panel: #fafaf8; --pad: #ffffff; --line: #e1e0db; --hover: #ecebe7;
@@ -26,12 +29,18 @@
   --grid: #17171b; --wire: #4c4c52; --running: #ecebe6; --working: #ecebe6; color-scheme: dark;
 }
 
-/* one mono face everywhere (pages set families in shorthands, so this has to reach every element) */
+/* Geist Mono for the app's own words (pages set families in shorthands, so this has to reach every element) */
 html body, html body * { font-family: var(--mono); }
 html body svg, html body svg * { font-family: inherit; }
-/* pixel type for names and titles */
-html body :is(h1, h2, .brand > span, .psec > h3, .isec > h4, .gs-top h4, .rp-sec > h3, dialog h2, .ui-pop h3,
-               .ihead input.title, .bar #flowName, .insp .big) { font-family: var(--pixel); letter-spacing: .01em; }
+/* Geist for sentences: descriptions, help and notes read as prose, like the lines under lithnode.com's headings */
+html body :is(.blk small, .bot small, .tile small, .makebot small, .tip, .tip *, .hint, .hint *, .sub, .note, .switch small,
+               .gs-step p, .usagedlg p, .usagedlg p *, .steps div, .steps strong, .enote, .risk span, .node .jb:not(.live),
+               .tpl small, .ui-pop p, #emptyHint, #emptyHint *, .ghost small, #toast, textarea, #empty > div > div:last-child) { font-family: var(--sans); }
+/* pixel type for the brand, page names and the small section labels */
+html body :is(h1, h2, .brand > span, .psec > h3, .isec > h4, .gs-top h4, .rp-sec > h3) { font-family: var(--pixel); letter-spacing: .01em; }
+/* titles: Geist, bold and tight, so a long flow name reads at a glance and never breaks into blocky lines */
+html body :is(dialog h2, .rp-top h2, .ihead input.title, .bar #flowName, .insp .big, .card .title, .ui-pop h3) {
+  font-family: var(--sans); font-weight: 650; letter-spacing: -.02em; }
 html body .brand small, html body .psec > h3 * { font-family: var(--mono); }
 
 /* white (or black, in light mode) is the action color: its text sits on it in the opposite tone */

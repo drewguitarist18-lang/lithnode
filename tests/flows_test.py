@@ -146,7 +146,8 @@ try:
     check("estimate counts every agent session; the template is lean (no planning step, Opus only for the final verdict)", d["estimate"]["sessions"] == 6
           and d["estimate"]["per_model"] == {"claude-sonnet-5-5": 4, "claude-haiku-4-5": 1, "claude-opus-5-5": 1}, d["estimate"])
     s, blank = call("/api/flows", {}, "POST")
-    check("a blank flow says what's missing", any("cluster" in p for p in blank["problems"]), blank["problems"])
+    check("a blank flow says what's missing: a team, and only that", blank["problems"] == ["Add a team: describe one, or drag a bot onto the canvas."], blank["problems"])
+    check("a blank flow passes your task straight on, so it counts no agents yet", blank["estimate"]["sessions"] == 0, blank["estimate"])
     two = {**blank["flow"], "nodes": blank["flow"]["nodes"] + [{"id": "done-2", "type": "done", "x": 0, "y": 0}],
            "edges": blank["flow"]["edges"] + [{"from": "master", "to": "done-2"}]}
     check("a second Done step is flagged, so the flow won't run", any("one Done" in p for p in call(f"/api/flows/{blank['flow']['id']}", two, "POST")[1]["problems"]))
@@ -174,6 +175,7 @@ try:
     check("node settings are clamped and cleaned", w["count"] == 15 and w["tools"] == "read"
           and w["shape"] == "crab", w)
     check("unconnected nodes reported", any("Not connected" in p for p in r["problems"]), r["problems"])
+    check("and a Done step nothing leads to says how to fix it", "Nothing leads to Complete yet: wire your last step into it." in r["problems"], r["problems"])
     hooky = {**base, "nodes": base["nodes"] + [{"id": "ap", "type": "approval", "x": 0, "y": 0, "webhook": "file:///etc/passwd"}]}
     check("non-http webhook rejected", call(f"/api/flows/{fid}", hooky, "POST")[0] == 400)
     check("bad flow id rejected", call("/api/flows/..%5Cx")[0] == 400)
@@ -269,7 +271,7 @@ try:
     check("a hand-edited flow file with a bad webhook won't load or run",
           call(f"/api/flows/{hid}")[0] == 400 and call(f"/api/flows/{hid}/run", {"task": "x"}, "POST")[0] == 400)
     s, r = call(f"/api/flows/{fid}/run", {"task": "x"}, "POST")
-    check("an unrunnable flow refuses to start", s == 400 and "Not connected to Start" in r["error"], r)
+    check("an unrunnable flow refuses to start, saying why", s == 400 and r["error"].startswith("Add a team"), r)
 
     # ---- run: quick review (parallel read-only reviewers -> summary) ---------------------------
     s, d = call("/api/flows", {"template": "review"}, "POST")

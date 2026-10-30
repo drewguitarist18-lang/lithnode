@@ -62,7 +62,7 @@
   .bar #flowName:focus { background: var(--pad); }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
           background: var(--pad); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
-  .chip.warn { color: var(--failed); border-color: color-mix(in srgb, var(--failed) 40%, var(--line)); }
+  .chip.warn { color: var(--approval); border-color: color-mix(in srgb, var(--approval) 40%, var(--line)); }
   .grow { flex: 1; }
   #saved { color: var(--muted); font-size: 12px; min-width: 56px; opacity: .8; }
   main.hideL { grid-template-columns: 0 1fr 350px; } main.hideL #palette { visibility: hidden; }
@@ -201,6 +201,21 @@
   #wires .cut path { stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; }
   #wires .cut:hover path { stroke: #fff; }
   #wires path.temp { stroke: var(--accent); stroke-dasharray: 6 5; }
+  #wires path.ghostw { stroke-width: 1.5; stroke-dasharray: 4 6; stroke-linecap: round; }
+  /* an empty flow: a dashed slot between Start and Done where the first team goes */
+  .ghost { position: absolute; width: 184px; display: flex; flex-direction: column; align-items: center; text-align: center;
+           padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; }
+  .ghost.off { visibility: hidden; pointer-events: none; }   /* not [hidden]: still measured, so it can be placed before it shows */
+  .ghost .gorb { width: 80px; height: 80px; border-radius: 50%; display: grid; place-items: center;
+                 border: 1.5px dashed color-mix(in srgb, var(--ink) 30%, var(--line)); background: color-mix(in srgb, var(--pad) 70%, transparent);
+                 transition: border-color .2s, color .2s, background .2s, transform .2s; }
+  .ghost .gorb svg { width: 28px; height: 28px; }
+  .ghost b { margin-top: 13px; font-size: 14px; font-weight: 650; color: var(--ink); text-shadow: 0 1px 8px var(--bg), 0 0 2px var(--bg); }
+  .ghost small { margin-top: 2px; font-size: 12px; line-height: 1.4; text-wrap: balance; text-shadow: 0 1px 8px var(--bg), 0 0 2px var(--bg); }
+  .ghost:hover, .ghost:active { background: none; border: 0; }
+  .ghost:hover .gorb, .ghost:focus-visible .gorb, .ghost.over .gorb { border-color: var(--accent); color: var(--ink);
+                 background: color-mix(in srgb, var(--accent) 9%, var(--pad)); transform: scale(1.05); }
+  .ghost:focus-visible { outline: none; }
   @keyframes flow { to { stroke-dashoffset: -14; } }
   /* nodes: teams are cards, every other step is a pill */
   .node { position: absolute; background: var(--pad); border: 1px solid var(--line); color: var(--ink); user-select: none; cursor: move;
@@ -551,7 +566,6 @@
   .gs-step.now { border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
                  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
   .gs-step.did { opacity: .62; }
-  .gs-step.did b { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
   .gs-step.next { opacity: .8; }
   .stats span { font-size: 11.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; background: var(--pad); }
   .isec details.more { margin: 0; }
@@ -656,8 +670,9 @@
   .runrow small { color: var(--muted); grid-column: 1 / -1; }
   .runrow:not(:has(.pill.items)) b { grid-column: span 2; }
   .pill.items { background: var(--pad); border: 1px solid var(--line); font-weight: 700; }
-  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #1f1f1f; color: #fff; padding: 8px 14px;
-           border-radius: 10px; display: none; z-index: 20; max-width: 80vw; }
+  #toast { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px;
+           border-radius: 12px; display: none; z-index: 20; max-width: min(560px, 80vw); font-size: 13px; line-height: 1.45; text-align: center;
+           box-shadow: 0 12px 32px -10px rgba(0, 0, 0, .45); }
   #toast.show { display: block; }
   /* ---- run view: status card, result card, activity ---- */
   .card { border: 1px solid var(--line); border-radius: 14px; background: var(--pad); padding: 14px; margin-bottom: 12px; }
@@ -859,7 +874,9 @@
     <div class="tip"><span aria-hidden="true">↳</span><span><b>Click</b> to add, or <b>drag</b> onto the canvas. Then connect a node's right dot to the next one's left dot.</span></div>
   </div>
   <div id="canvas">
-    <div id="world"><svg id="wires"></svg></div>
+    <div id="world"><svg id="wires"></svg>
+      <button id="ghost" class="ghost off" type="button"><span class="gorb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+        <b>Add a team</b><small>Describe one above, or drag a bot here</small></button></div>
     <form id="ask" autocomplete="off"><b>✦</b><input id="askIn" maxlength="4000"
       placeholder="Describe a team, e.g. plan it, build it, then 3 reviewers check for bugs and security">
       <button class="primary" id="askBtn">Build flow</button></form>
@@ -898,7 +915,7 @@
         <option value="1000000">1M tokens</option><option value="2000000">2M tokens</option>
         <option value="5000000">5M tokens</option><option value="0">No limit</option></select>
         <span class="sub" id="limitSub"></span></div></div>
-    <div class="field"><label>Models</label>
+    <div class="field" id="rolesField"><label>Models</label>
       <div class="roles">
         <label><span>Composer</span><select id="roleThink" data-role="think"></select></label>
         <label><span>Orchestrator</span><select id="roleBuild" data-role="build"></select></label>
@@ -948,6 +965,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML.replace(/"/g, "&quot;"); }   // quotes too: esc() also fills attributes
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const theme = {};
 function readTheme() { for (const n of ["muted", "waiting", "running", "done", "failed", "approval"]) theme[n] = getComputedStyle(document.documentElement).getPropertyValue("--" + n).trim(); }
 readTheme(); matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTheme);
@@ -1176,8 +1194,10 @@ document.addEventListener("dragend", () => { dragged = true; setTimeout(() => { 
 function addFromPalette(p) {
   if (locked()) return toast("A run is open. Close it to edit the flow.");
   const r = $("canvas").getBoundingClientRect(), c = toWorld(r.left + r.width / 2, r.top + r.height / 2);
-  addNode(p.dataset.type, c.x - 107, c.y - 40, p.dataset.bot || "");
-  toast(`Added ${p.dataset.bot ? (bots.find((b) => b.id === p.dataset.bot) || {}).name : p.querySelector("b").textContent}. Wire it into the flow.`);
+  const n = addNode(p.dataset.type, c.x - 107, c.y - 40, p.dataset.bot || "");
+  if (!n) return;   // a second Done: addNode said why
+  const into = flow.edges.find((e) => e.to === n.id), out = flow.edges.find((e) => e.from === n.id);
+  toast(`Added ${n.name}. ${into && out ? `It's wired in between ${nodeById(into.from).name} and ${nodeById(out.to).name}.` : into ? `It gets your task from ${nodeById(into.from).name}.` : "Wire it into the flow."}`);
 }
 $("palette").addEventListener("click", (e) => {
   if (e.target.closest("#makeBot")) return openBotEditor(null);
@@ -1204,9 +1224,15 @@ document.addEventListener("dragstart", (e) => {
   e.dataTransfer.setData("text/hq-node", JSON.stringify({ type: p.dataset.type, bot: p.dataset.bot || "" }));
   e.dataTransfer.effectAllowed = "copy";
 });
-$("canvas").addEventListener("dragover", (e) => { if (!locked()) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
+$("canvas").addEventListener("dragover", (e) => {
+  if (locked()) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = "copy";
+  $("ghost").classList.toggle("over", !!e.target.closest("#ghost"));
+});
+$("canvas").addEventListener("dragleave", (e) => { if (!$("canvas").contains(e.relatedTarget)) $("ghost").classList.remove("over"); });
 $("canvas").addEventListener("drop", (e) => {
   e.preventDefault();
+  $("ghost").classList.remove("over");
   if (locked()) return;
   let spec; try { spec = JSON.parse(e.dataTransfer.getData("text/hq-node")); } catch (err) { return; }
   const p = toWorld(e.clientX, e.clientY);
@@ -1228,9 +1254,15 @@ function addNode(type, x, y, botId) {
   }
   if (type === "checkpoint") Object.assign(n, { mode: "pass", role: "run", model: roleModel("run"), on_error: "stop" });
   if (type === "approval") Object.assign(n, { message: "", webhook: "" });
+  // the first team in a flow with no wires yet fills the slot between Start and Done, wired in and ready to run
+  const s = flow.nodes.find((x) => x.type === "master"), d = flow.nodes.find((x) => x.type === "done");
+  if (type === "cluster" && s && !flow.edges.length && !flow.nodes.some((x) => x.type === "cluster")) {
+    flow.edges.push({ from: s.id, to: n.id }, ...(d ? [{ from: n.id, to: d.id }] : []));
+  }
   flow.nodes.push(n);
   sel = { kind: "node", id: n.id };
   changed(); renderInspector();
+  return n;
 }
 const builtinOf = (n) => { const b = bots.find((x) => x.id === n.bot); return b && b.builtin ? b : null; };
 const teamBots = () => bots.filter((b) => b.team !== false);   // bots set to chat-only stay out of Flows
@@ -1284,7 +1316,8 @@ function fit() {
   const f = shown();
   if (nodes.length && f.auto !== false && f.dir !== "tb") { layoutFlow("lr", f); renderNodes(); renderWires(); }   // rows to suit this window
   if (!nodes.length) { view.x = 40; view.y = 20; view.k = 1; return applyView(); }
-  const box = nodes.map((n) => ({ n, ...nodeSize(n) }));
+  const box = nodes.map((n) => ({ n, ...nodeSize(n) })), g = ghostAt();
+  if (g) box.push({ n: g, w: TEAM_W, h: g.h });   // the empty team slot counts too
   const minX = Math.min(...box.map((b) => b.n.x)) - (!vertical() && (rowGaps.get(shown().id) || []).length ? 90 : 40), minY = Math.min(...box.map((b) => b.n.y)) - 40;
   const wraps = !vertical() && (rowGaps.get(f.id) || []).length;   // wires to the next row bulge out past both sides
   const maxX = Math.max(...box.map((b) => b.n.x + b.w)) + (wraps ? 90 : 40), maxY = Math.max(...box.map((b) => b.n.y + b.h)) + 40;
@@ -1305,7 +1338,7 @@ new ResizeObserver(() => {
     refitting = 0; fit();
   });
 }).observe($("canvas"));
-$("canvas").addEventListener("mousedown", () => { autoFit = false; }, true);
+$("canvas").addEventListener("mousedown", (e) => { if (!e.target.closest("#ghost")) autoFit = false; }, true);
 $("zIn").onclick = () => { const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k * 1.2); };
 $("zOut").onclick = () => { const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k / 1.2); };
 $("zFit").onclick = fit;
@@ -1352,11 +1385,12 @@ function layoutFlow(direction, f = flow) {
   }
   layoutAt(direction, f, best);
 }
-function layoutAt(direction, f, MAX_ROW_W) {   // same rules as the server's flows._layout
+function layoutAt(direction, f, MAX_ROW_W) {   // same rules as the server's flows._layout, plus a Done nothing reaches yet
   f.dir = direction;
   const WRAP = 5, STACK = 3, COL_GAP = 84, ROW_H = 180, edges = f.edges;
   const wired = new Set(edges.flatMap((e) => [e.from, e.to]));
-  const loose = f.nodes.filter((n) => !wired.has(n.id) && n.type !== "master");
+  const end = f.nodes.find((n) => n.type === "done" && !wired.has(n.id));   // still ends the line, not the row of loose nodes
+  const loose = f.nodes.filter((n) => !wired.has(n.id) && n.type !== "master" && n !== end);
   const main = f.nodes.filter((n) => wired.has(n.id) || n.type === "master");
   const depth = Object.fromEntries(main.map((n) => [n.id, 0]));
   for (let k = 0; k < main.length; k++) for (const e of edges) if (e.from in depth && e.to in depth) depth[e.to] = Math.max(depth[e.to], depth[e.from] + 1);
@@ -1370,6 +1404,7 @@ function layoutAt(direction, f, MAX_ROW_W) {   // same rules as the server's flo
     level.forEach((n, i) => { rank[n.id] = i - (level.length - 1) / 2; });
     for (let i = 0; i < level.length; i += STACK) stacks.push(level.slice(i, i + STACK));
   }
+  if (end) stacks.push(...(f.nodes.some((n) => n.type === "cluster") ? [] : [[{ type: "cluster" }]]), [end]);   // no team yet: room for one
   if (direction === "tb") {
     let y = 40;
     for (const stack of stacks) {   // each stage centered on one line down the middle, as tall as its tallest node
@@ -1427,6 +1462,7 @@ function renderAll() {
   const doneTile = document.querySelector('.blk[data-type="done"]'), hasDone = !locked() && flow.nodes.some((x) => x.type === "done");
   doneTile.classList.toggle("used", hasDone);
   doneTile.title = hasDone ? "This flow already has its Done step" : "Where the final result lands";
+  doneTile.querySelector("small").textContent = hasDone ? "in this flow" : "the result";
   $("zAuto").classList.toggle("on", !locked() && flow.auto !== false);
   $("zDir").textContent = vertical() ? "⇅" : "⇄";
   $("zDir").title = vertical() ? "Flow goes top to bottom. Click to tidy it left to right." : "Flow goes left to right. Click to tidy it top to bottom.";
@@ -1544,7 +1580,27 @@ function renderNodes() {
     }
     e.el.className = "node " + (team ? "nd-team" : "nd-step " + n.type) + (sel && sel.kind === "node" && sel.id === n.id ? " sel" : "") + (st ? " st-" + st.status : "");
   }
+  const g = ghostAt();
+  $("ghost").classList.toggle("off", !g);
+  if (g) { $("ghost").style.left = g.x + "px"; $("ghost").style.top = g.y + "px"; }
 }
+// A flow with no team yet shows where one goes: a dashed slot between Start and Done, with its in and out ends.
+function ghostAt() {
+  const f = shown(), s = f.nodes.find((n) => n.type === "master"), d = f.nodes.find((n) => n.type === "done");
+  if (locked() || !s || !d || f.nodes.some((n) => n.type === "cluster")) return null;
+  const S = nodeSize(s), D = nodeSize(d), h = $("ghost").offsetHeight, mid = TEAM_W / 2;
+  if (vertical()) {
+    const top = s.y + S.h, room = d.y - top;
+    if (room < h + 48 || Math.abs(s.x + S.w / 2 - (d.x + D.w / 2)) > 60) return null;   // Done isn't below Start: no room to show it
+    const x = Math.round(s.x + S.w / 2 - mid), y = Math.round(top + (room - h) / 2);
+    return { x, y, h, in: { x: x + mid, y }, out: { x: x + mid, y: y + h } };
+  }
+  const left = s.x + S.w, room = d.x - left, cy = s.y + S.h / 2;
+  if (room < TEAM_W + 48 || Math.abs(cy - (d.y + D.h / 2)) > 60) return null;
+  const x = Math.round(left + (room - TEAM_W) / 2), y = Math.round(cy - ORB_R);
+  return { x, y, h, in: { x: x + mid - ORB_R, y: cy }, out: { x: x + mid + ORB_R, y: cy } };
+}
+$("ghost").onclick = () => GS_ACTIONS.describe();
 
 const vertical = () => shown().dir === "tb";
 function portPos(id, side) {
@@ -1580,7 +1636,12 @@ function renderWires() {
     const fn = nodeById(ed.from), tn = nodeById(ed.to), wc = (fn && fn.type === "cluster" && fn.color) || (tn && tn.type === "cluster" && tn.color) || "";
     return `<g class="wire ${cls}" data-edge="${i}"${wc ? ` style="--wc:${esc(wc)}"` : ""}><path class="hit" d="${d}"/><path class="vis" d="${d}"/>
       <g class="cut" data-cut="${i}" transform="translate(${m.x},${m.y})"><title>Disconnect</title><circle r="11"/><path d="M-4,-4 L4,4 M4,-4 L-4,4"/></g></g>`;
-  }).join("") + (tempWire ? `<path class="temp" d="${wirePath(tempWire.a, tempWire.b)}"/>` : "");
+  }).join("") + ghostWires() + (tempWire ? `<path class="temp" d="${wirePath(tempWire.a, tempWire.b)}"/>` : "");
+}
+function ghostWires() {   // dashed: Start into the empty slot, and the slot on to Done
+  const g = ghostAt(); if (!g) return "";
+  const f = shown(), s = f.nodes.find((n) => n.type === "master"), d = f.nodes.find((n) => n.type === "done");
+  return [[portPos(s.id, "out"), g.in], [g.out, portPos(d.id, "in")]].map(([a, b]) => `<path class="ghostw" d="${wirePath(a, b)}"/>`).join("");
 }
 function wireMid(a, b) {   // the curve's point halfway along (t = 0.5)
   if (b.x < a.x - 40 && !vertical()) return { x: (a.x + b.x) / 2, y: gapBetween(a.y, b.y) };
@@ -1601,7 +1662,7 @@ function renderChips() {
   if (e) {
     const per = Object.entries(e.per_model).map(([m, c]) => `${c}× ${modelLabel(m)}`).join(", ");
     const steps = stepCount(flow);
-    $("estChip").textContent = `${e.sessions} agent${e.sessions === 1 ? "" : "s"} · ${steps} step${steps === 1 ? "" : "s"}`;
+    $("estChip").textContent = `${plural(e.sessions, "agent")} · ${plural(steps, "step")}`;
     $("estChip").title = per ? per + "." : "";
   }
   $("probChip").hidden = run || !problems.length;
@@ -1614,7 +1675,7 @@ function renderChips() {
 // ------------------------------------------------------------------ interaction
 let drag = null;
 $("canvas").addEventListener("mousedown", (e) => {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || e.target.closest("#ghost")) return;   // the empty team slot is a button, not somewhere to pan from
   const port = e.target.closest(".port"), nodeEl = e.target.closest(".node"), path = e.target.closest("[data-edge]");
   const cut = e.target.closest("[data-cut]");
   if (cut) { e.preventDefault(); disconnect(+cut.dataset.cut); return; }
@@ -1705,7 +1766,7 @@ $("canvas").addEventListener("contextmenu", (e) => {
   if (w) return ui.menu(x, y, [{ icon: "✕", label: "Disconnect", danger: true, action: () => disconnect(+w.dataset.edge) }]);
   const p = toWorld(x, y), at = (type) => () => addNode(type, p.x - 107, p.y - 30);
   ui.menu(x, y, [
-    { icon: "＋", label: "Add agent cluster", action: at("cluster") },
+    { icon: "＋", label: "Add a team", action: at("cluster") },
     { icon: "◆", label: "Add checkpoint", action: at("checkpoint") },
     { icon: "!", label: "Add approval", action: at("approval") },
     { icon: "✓", label: "Add done", action: at("done"), disabled: flow.nodes.some((x) => x.type === "done") },
@@ -1776,7 +1837,7 @@ let moreOpen = false;   // remembered while you click between nodes
 function more(inner) { return `<details class="more"${moreOpen ? " open" : ""} data-more><summary>More settings</summary>${inner}</details>`; }
 let recentFolders = [];
 function folderField(id, value) {
-  return `<div class="folder"><input id="${id}" list="recentFolders" value="${esc(value || "")}" placeholder="Pick a folder or paste its path">
+  return `<div class="folder"><input id="${id}" list="recentFolders" value="${esc(value || "")}" placeholder="Pick or paste a folder">
     <button type="button" data-browse="${id}">Browse…</button></div>`;
 }
 function wireFolder(id, onChange) {
@@ -2172,7 +2233,8 @@ $("runBtn").onclick = () => {
   roleSelects.forEach((el) => { el.innerHTML = opt(meta.models.map((m) => [m.id, m.label]), roleModel(el.dataset.role)); el.value = roleModel(el.dataset.role); });
   const roleCount = (r) => flow.nodes.filter((n) => n.role === r && !(n.type === "master" && n.mode === "pass") && !(n.type === "checkpoint" && n.mode !== "summarize")).length;
   const counts = ["think", "build", "run"].map((r) => [ROLE_NAME[r], roleCount(r)]).filter(([, c]) => c);
-  $("rolesSub").textContent = (counts.length ? `Stages in this flow: ${counts.map(([r, c]) => `${c} ${r}`).join(", ")}. ` : "No stage uses a role yet. ")
+  $("rolesField").hidden = !counts.length;   // nothing to pick for yet
+  $("rolesSub").textContent = `Stages in this flow: ${counts.map(([r, c]) => `${c} ${r}`).join(", ")}. `
     + "A stage with a model picked by hand keeps it. Each stage stays on one model, so nothing is paid for twice.";
   $("runDlg").showModal(); $("taskIn").focus(); $("taskIn").select();
 };
@@ -2204,7 +2266,7 @@ function renderRunTeam() {   // the team in running order, as little avatars
   $("runTeam").innerHTML = members.map((n, i) => {
     const look = n.type === "cluster" ? { shape: n.shape, color: n.color } : n.type === "master" ? { shape: "owl", color: "#7aa2f7" } : { icon: "approval", color: "#e0a23c" };
     return (i ? '<span class="arrow">›</span>' : "") + `<span class="m" title="${esc(n.name)}" style="--c:${esc(look.color)}"><canvas width="96" height="72" ${look.icon ? `data-icon="${look.icon}"` : `data-shape="${esc(look.shape)}" data-color="${esc(look.color)}"`}></canvas>${n.count > 1 ? `<i>×${n.count}</i>` : ""}</span>`;
-  }).join("") + `<span class="sum">${est ? est.sessions : 0} agents · ${steps} steps</span>`;
+  }).join("") + `<span class="sum">${plural(est ? est.sessions : 0, "agent")} · ${plural(steps, "step")}</span>`;
   $("runTeam").querySelectorAll("canvas").forEach((cv) => {
     const c = cv.getContext("2d");
     if (cv.dataset.icon) drawIcon(c, cv.dataset.icon, 6, 8, 7, { t: 0 });
@@ -2647,7 +2709,7 @@ $("flowPick").onchange = async (e) => {
   dirty = false; openFlow(to);
 };
 $("flowName").oninput = (e) => { flow.name = e.target.value || "Untitled flow"; changed(false); };
-$("newBtn").onclick = async () => { if (!(await leaveFlow())) return; dirty = false; await createFlow(null); toast("New blank flow. Describe a team above, or drag nodes in from the left."); };
+$("newBtn").onclick = async () => { if (!(await leaveFlow())) return; dirty = false; await createFlow(null); toast("New blank flow. Describe a team above, or drag a bot in from the left."); };
 $("newDlg").addEventListener("click", async (e) => {
   const t = e.target.closest("[data-tpl]"); if (!t) return;
   $("newDlg").close(); if (!(await leaveFlow())) return; dirty = false; await createFlow(t.dataset.tpl || null);

@@ -378,7 +378,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"error": "unknown template"}, 400)
         if not flow:
             flow = {"id": uuid.uuid4().hex[:12], "name": "New flow", "folder": "", "edges": [], "dir": "lr",
-                    "nodes": [{"id": "master", "type": "master", "x": 60, "y": 220, "name": "Start"},
+                    "nodes": [{"id": "master", "type": "master", "x": 60, "y": 220, "name": "Start", "mode": "pass"},
                               {"id": "done", "type": "done", "x": 600, "y": 220, "name": "Complete"}]}
         flow = {**flows.clean_flow(flow), "id": flow["id"]}
         HQ_STORE.save_flow(flow)

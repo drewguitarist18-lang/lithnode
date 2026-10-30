@@ -173,5 +173,28 @@ finally:
     server_proc.terminate()
     server_proc.wait()
 
+# ---- finding the Claude desktop app's own Claude Code, wherever the app keeps it ----------------------
+def found_claude(**folders):
+    """find_command() with no `claude` on PATH and these folders as APPDATA and LOCALAPPDATA."""
+    env = {k: v for k, v in os.environ.items() if k != "CLAWD_BOT_CLAUDE_CMD"}
+    env.update(PATH=tempfile.mkdtemp(dir=cli_dir), **folders)
+    done = subprocess.run([sys.executable, "-c", "import json, claude_code; print(json.dumps(claude_code.find_command()))"],
+                          cwd=ROOT, env=env, capture_output=True, text=True, timeout=30)
+    return json.loads(done.stdout or "null")
+
+
+def fake_exe(base, version):
+    exe = Path(base, version, "a1b2c3", "claude.exe")
+    exe.parent.mkdir(parents=True)
+    exe.write_text("")
+    return str(exe)
+
+
+local = Path(cli_dir, "local")
+older = fake_exe(local / "Packages" / "Claude_pzs8sxrjxfjjc" / "LocalCache" / "Roaming" / "Claude" / "claude-code", "2.1.289")
+check("finds the desktop app's Claude Code in its package folder", found_claude(APPDATA=str(Path(cli_dir, "roaming")), LOCALAPPDATA=str(local)) == [older])
+newer = fake_exe(local / "Claude-Data" / "claude_pzs8sxrjxfjjc" / "claude-code", "2.1.309")
+check("and in Claude-Data, where newer builds keep it, picking the newest", found_claude(APPDATA=str(Path(cli_dir, "roaming")), LOCALAPPDATA=str(local)) == [newer])
+
 print(f"\n{'ALL PASSED' if not failures else str(len(failures)) + ' FAILED: ' + ', '.join(failures)}")
 sys.exit(1 if failures else 0)

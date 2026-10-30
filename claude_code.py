@@ -283,11 +283,15 @@ def find_command():
         return unwrapped
     # The Claude desktop app's own copy. The Store/MSIX build keeps it in its package folder: only processes the app
     # started see it under %APPDATA%, so Lithnode launched from the Start menu or taskbar must look there directly.
+    # Newer builds of the app moved it to %LOCALAPPDATA%\Claude-Data\claude_<id>\claude-code.
     bases = [Path(os.environ.get("APPDATA", "")) / "Claude" / "claude-code"]
-    packages = Path(os.environ.get("LOCALAPPDATA", "")) / "Packages"
-    if os.environ.get("LOCALAPPDATA") and packages.is_dir():
-        bases += list(packages.glob("Claude_*/LocalCache/Roaming/Claude/claude-code"))
+    local = os.environ.get("LOCALAPPDATA")
+    if local:
+        bases += list((Path(local) / "Packages").glob("Claude_*/LocalCache/Roaming/Claude/claude-code"))
+        bases += list((Path(local) / "Claude-Data").glob("*/claude-code"))
     found = [exe for base in bases if base.is_dir() for exe in base.glob("*/*/claude.exe")]
+    if WINDOWS and not found and (Path.home() / ".local" / "bin" / "claude.exe").is_file():
+        found = [Path.home() / ".local" / "bin" / "claude.exe"]   # Anthropic's own installer, if PATH hasn't caught up
 
     def version(path):
         return [int(p) if p.isdigit() else 0 for p in path.parent.parent.name.split(".")]

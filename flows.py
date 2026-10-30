@@ -321,7 +321,7 @@ def check_runnable(flow):
         problems.append("A flow needs exactly one Start step, where your task goes in.")
     workers = [n for n in flow["nodes"] if n["type"] == "cluster"]
     if not workers:
-        problems.append("Add at least one agent cluster.")
+        problems.append("Add a team: describe one, or drag a bot onto the canvas.")
     dones = sum(n["type"] == "done" for n in flow["nodes"])
     if dones > 1:
         problems.append("A flow has one Done step. Remove the extra one and wire everything into the other.")
@@ -335,9 +335,12 @@ def check_runnable(flow):
                 if e["from"] == cur and e["to"] not in reach:
                     reach.add(e["to"])
                     frontier.append(e["to"])
-        loose = [n["name"] for n in flow["nodes"] if n["id"] not in reach]
-        if loose:
-            problems.append("Not connected to Start: " + ", ".join(loose[:5]) + ".")
+        loose = [n for n in flow["nodes"] if n["id"] not in reach]
+        steps = [n["name"] for n in loose if n["type"] != "done"]
+        if steps:
+            problems.append("Not connected to Start: " + ", ".join(steps[:5]) + ".")
+        if workers and len(steps) < len(loose):   # with no team yet, adding one is the fix, not this
+            problems.append(f"Nothing leads to {next(n['name'] for n in loose if n['type'] == 'done')} yet: wire your last step into it.")
     return problems
 
 
