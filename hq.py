@@ -11,12 +11,15 @@ Lithnode runs only on Claude Code and your Claude sign-in: there are no API keys
 reaches the page. Bots live in ~/.clawd-bot; flows and runs live in ~/.lithnode.
 """
 import json
+import logging
+import logging.handlers
 import os
 import re
 import shutil
 import subprocess
 import sys
 import threading
+import time
 import uuid
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -47,6 +50,31 @@ try:
 except OSError:
     pass
 RUNNER = flows.Runner(HQ_STORE)
+log = logging.getLogger("lithnode")
+
+
+def setup_logging():
+    """lithnode.log in the app's folder (rotated at 1 MB, 3 kept). LITHNODE_DEBUG=1 also logs every GET."""
+    level = logging.DEBUG if os.environ.get("LITHNODE_DEBUG") else logging.INFO
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    log.setLevel(level)
+    try:
+        HQ_STORE.root.mkdir(parents=True, exist_ok=True)
+        to_file = logging.handlers.RotatingFileHandler(HQ_STORE.root / "lithnode.log", maxBytes=1_000_000,
+                                                       backupCount=3, encoding="utf-8")
+        to_file.setFormatter(fmt)
+        log.addHandler(to_file)
+    except OSError:
+        pass
+    if sys.stderr:   # the packaged app has no console
+        to_console = logging.StreamHandler()
+        to_console.setFormatter(fmt)
+        to_console.setLevel(logging.WARNING)
+        log.addHandler(to_console)
+
+
+class BadRequest(ValueError):
+    """The page sent something the API can't use: answered with a 400 and this message."""
 
 
 def _backfill_tasks():
@@ -248,7 +276,18 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- plumbing ----------------------------------------------------------
     def log_message(self, *args):
-        pass
+        pass   # route() logs each request itself, with its time
+
+    def send_response(self, code, message=None):
+        self.status = code
+        super().send_response(code, message)
+
+    def end_headers(self):
+        # nothing here is meant to be framed by another site, sniffed as another type, or leak its URL
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "SAMEORIGIN")
+        self.send_header("Referrer-Policy", "no-referrer")
+        super().end_headers()
 
     def trusted(self):
         """Only talk to our own page: blocks other sites and DNS-rebinding tricks."""
@@ -267,9 +306,29 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def read_json(self):
-        return json.loads(self.raw_body or b"{}")
+        try:
+            body = json.loads(self.raw_body or b"{}")
+        except ValueError:
+            raise BadRequest("The request wasn't valid JSON.") from None
+        if not isinstance(body, dict):
+            raise BadRequest("The request should be a JSON object.")
+        return body
 
     def route(self, method):
+        start, self.status = time.monotonic(), 0
+        try:
+            self.serve(method)
+        finally:
+            ms = (time.monotonic() - start) * 1000
+            line = f"{method} {self.path.split('?')[0]} {self.status} {ms:.0f}ms"
+            if self.status >= 500:
+                log.warning(line)
+            elif method != "GET":
+                log.info(line)
+            else:
+                log.debug(line)
+
+    def serve(self, method):
         # Always consume the request body, even for routes that ignore it: on a
         # keep-alive connection, unread bytes would corrupt the next request.
         try:
@@ -301,7 +360,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "not found"}, 404)
         except (BrokenPipeError, ConnectionResetError):
             pass
+        except BadRequest as exc:
+            self.send_json({"error": str(exc)}, 400)
         except Exception as exc:  # keep the server alive; tell the page
+            log.exception("%s %s failed", method, path)
             try:
                 self.send_json({"error": f"{type(exc).__name__}: {exc}"}, 500)
             except OSError:
@@ -620,12 +682,14 @@ def main():
         return
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     server.daemon_threads = True
+    setup_logging()
+    log.info("Lithnode started on %s", URL)
     # Only now does this process own the port: touching runs and flows any earlier could clobber a live server's.
     RUNNER.mark_interrupted()
     try:
         _backfill_tasks()
     except (OSError, ValueError, KeyError):
-        pass
+        log.warning("Couldn't backfill flow tasks", exc_info=True)
     if "--no-open" not in sys.argv:
         open_window()
     try:

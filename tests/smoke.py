@@ -151,6 +151,16 @@ try:
     check("keep-alive connection survives POSTs with bodies", statuses == [200] * 6, statuses)
     check("foreign Origin blocked", call("/api/bots", headers={"Origin": "https://evil.example"})[0] == 403)
     check("foreign Host blocked (DNS rebinding)", call("/api/bots", headers={"Host": "evil.example:8791"})[0] == 403)
+    bad = request.Request(URL + "/api/flows", data=b"{not json", method="POST", headers={"Content-Type": "application/json"})
+    try:
+        request.urlopen(bad, timeout=15); bad_status = 200
+    except error.HTTPError as e:
+        bad_status, bad_body = e.code, e.read().decode()
+    check("broken JSON is a 400 that says so", bad_status == 400 and "JSON" in bad_body, bad_status)
+    check("a JSON list is a 400 too", call("/api/flows", body=[1, 2])[0] == 400)
+    with request.urlopen(URL + "/api/ping", timeout=15) as r:
+        check("responses can't be framed or sniffed", r.headers.get("X-Frame-Options") == "SAMEORIGIN"
+              and r.headers.get("X-Content-Type-Options") == "nosniff", dict(r.headers))
 finally:
     server_proc.terminate()
     server_proc.wait()
