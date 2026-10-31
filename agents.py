@@ -12,7 +12,9 @@ import subprocess
 import threading
 import time
 import uuid
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 import claude_code
 import engines
@@ -29,7 +31,7 @@ RETRY_PAUSE = float(os.environ.get("LITHNODE_RETRY_PAUSE") or 5)
 USAGE_KEYS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
 
 
-def short_tokens(n):
+def short_tokens(n: int) -> str:
     """1500000 -> '1.5M tokens', 400000 -> '400k tokens'."""
     return f"{n / 1e6:g}M tokens" if n >= 1_000_000 else f"{round(n / 1000):g}k tokens"
 
@@ -47,7 +49,8 @@ LOOKS = {"read", "research", "edit"}   # levels that also get lithnode-shot, to 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")   # what `claude --effort` accepts
 
 
-def build_args(command, *, model, effort, tools, system, session_id, max_turns=0, connectors=(), known=(), clis=()):
+def build_args(command: list[str], *, model: str, effort: str, tools: str, system: str, session_id: str, max_turns: int = 0,
+               connectors: Sequence[str] = (), known: Sequence[str] = (), clis: Sequence[str] = ()) -> list[str]:
     names = list(TOOLSETS[tools])
     cli_rules = []
     if tools in LOOKS:
@@ -84,7 +87,7 @@ def build_args(command, *, model, effort, tools, system, session_id, max_turns=0
     return args
 
 
-def describe(name, args):
+def describe(name: Any, args: dict[str, Any] | None) -> str:
     """A short human line for a tool call, shown on the agent's desk."""
     a = args or {}
     short = lambda p: Path(str(p)).name or str(p)   # noqa: E731
@@ -116,7 +119,7 @@ def describe(name, args):
 TOOL_TEXT_RE = re.compile(r"<(function_calls|invoke|antml:invoke|antml:function_calls)\b.*?(</\1>|\Z)", re.S)
 
 
-def report_of(text, limit):
+def report_of(text: str | None, limit: int) -> str:
     """The part of an agent's answer that is handed on: after 'REPORT:' if it wrote one."""
     text = TOOL_TEXT_RE.sub("", text or "").strip()
     marker = text.upper().rfind("REPORT:")
@@ -126,7 +129,7 @@ def report_of(text, limit):
     return text if len(text) <= limit else text[:limit].rstrip() + "\n[...cut to save credits]"
 
 
-def kill_tree(proc):
+def kill_tree(proc: subprocess.Popen[str]) -> None:
     """Kill a session and everything it started: its Bash commands outlive a plain kill()."""
     if not claude_code.WINDOWS:   # Mac and Linux: each agent leads its own process group (NEW_GROUP)
         try:
@@ -154,8 +157,9 @@ def kill_tree(proc):
 class Agent:
     """Runs one session. `on_update` is called (with no arguments) whenever its state changes."""
 
-    def __init__(self, *, model, effort, tools, system, prompt, cwd, on_update, max_turns=0, connectors=(), known=(), clis=(), token_cap=0,
-                 engine="claude", engine_model=""):
+    def __init__(self, *, model: str, effort: str, tools: str, system: str, prompt: str, cwd: str | Path, on_update: Callable[[], None], max_turns: int = 0,
+                 connectors: Sequence[str] = (), known: Sequence[str] = (), clis: Sequence[str] = (), token_cap: int = 0, engine: str = "claude",
+                 engine_model: str = "") -> None:
         self.model, self.effort, self.tools, self.clis = model, effort, tools, list(clis)
         self.engine, self.engine_model = engine if engine in engines.ENGINES else "claude", engine_model
         self.connectors, self.known = [s for s in connectors if s in known], list(known)
@@ -178,19 +182,19 @@ class Agent:
         self.timed_out = False
         self._lock = threading.Lock()
 
-    def stop(self):
+    def stop(self) -> None:
         with self._lock:
             self.stopped = True
             if self.proc and self.proc.poll() is None:
                 kill_tree(self.proc)
 
-    def _time_out(self):
+    def _time_out(self) -> None:
         with self._lock:
             if self.proc and self.proc.poll() is None:
                 self.timed_out = True
                 kill_tree(self.proc)
 
-    def _feed(self, proc):
+    def _feed(self, proc: subprocess.Popen[str]) -> None:
         """Send the prompt over stdin (prompts with handoffs are too long for a command line)."""
         try:
             proc.stdin.write(self.prompt)
@@ -198,7 +202,7 @@ class Agent:
         except OSError:      # the agent was stopped before it read its prompt
             pass
 
-    def _count(self, obj, used):
+    def _count(self, obj: dict[str, Any], used: dict[str, int]) -> bool:
         """Adds an assistant message's tokens to the live total (Claude Code repeats a message once per content
         block, so each message id counts once, at its latest numbers). True once the total passes the cap."""
         msg = obj.get("message") or {}
@@ -209,12 +213,12 @@ class Agent:
         self.tokens = sum(used.values())
         return bool(self.token_cap) and self.tokens > self.token_cap
 
-    def _set_step(self, line):
+    def _set_step(self, line: str) -> None:
         self.step = line
         self.steps = (self.steps + [line])[-30:]
         self.on_update()
 
-    def run(self):
+    def run(self) -> bool:
         """Blocks until the session ends. Returns True on success."""
         if self.engine != "claude":
             return self._run_other()
@@ -230,7 +234,7 @@ class Agent:
             return False
         return self._run_claude()
 
-    def _run_claude(self):
+    def _run_claude(self) -> bool:
         command = claude_code.find_command()
         if not command:
             self.error = "Claude Code isn't installed on this computer."
@@ -328,7 +332,7 @@ class Agent:
         self.on_update()
         return not self.error
 
-    def _run_other(self):
+    def _run_other(self) -> bool:
         """The same session on Codex or Cursor: their own command line and JSON events, same steps and report."""
         name = engines.LABELS[self.engine]
         command = engines.FINDERS[self.engine]()

@@ -9,12 +9,13 @@ import json
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 PET_DIR = Path(os.environ.get("CLAWD_PET_HOME") or Path.home() / ".claude-pet")
 STALE_AFTER = 12 * 3600
 
 
-def pid_alive(pid):
+def pid_alive(pid: int) -> bool:
     try:
         k32 = ctypes.windll.kernel32
     except AttributeError:        # not Windows: trust the timestamp instead
@@ -28,7 +29,7 @@ def pid_alive(pid):
     return code.value == 259  # STILL_ACTIVE
 
 
-def hook_sessions():
+def hook_sessions() -> dict[str, dict[str, Any]]:
     """{session id: entry} for live sessions the pet's hooks know about."""
     try:
         data = json.loads((PET_DIR / "sessions.json").read_text())
@@ -46,7 +47,7 @@ def hook_sessions():
     return live
 
 
-def flow_agents(runner):
+def flow_agents(runner: Any) -> dict[str, dict[str, Any]]:
     """{session id: office entry} for agents of active runs that are still working."""
     out = {}
     for run in runner.active() if runner else []:
@@ -79,7 +80,7 @@ def flow_agents(runner):
     return out
 
 
-def snapshot(runner=None):
+def snapshot(runner: Any = None) -> dict[str, Any]:
     agents = flow_agents(runner)
     sessions = []
     for sid, s in hook_sessions().items():

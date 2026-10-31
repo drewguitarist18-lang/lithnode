@@ -10,6 +10,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import claude_code
 
@@ -21,7 +22,7 @@ STATUS_TTL = 60
 
 # ------------------------------------------------------------------- finding them
 
-def codex_command():
+def codex_command() -> list[str] | None:
     """`codex`, as installed by npm (`npm i -g @openai/codex`). LITHNODE_CODEX_CMD (a JSON list) replaces it."""
     override = os.environ.get("LITHNODE_CODEX_CMD")
     if override:
@@ -30,7 +31,7 @@ def codex_command():
     return [found] if found else None
 
 
-def cursor_command():
+def cursor_command() -> list[str] | None:
     """Cursor's agent CLI. On Windows its launcher is a PowerShell script, so run its node.exe and index.js
     directly (that also keeps stdin, where the prompt goes, intact). LITHNODE_CURSOR_CMD replaces it."""
     override = os.environ.get("LITHNODE_CURSOR_CMD")
@@ -52,7 +53,7 @@ _status = {}
 _status_lock = threading.Lock()
 
 
-def _run(cmd, *args, timeout=40):
+def _run(cmd: list[str], *args: str, timeout: float = 40) -> tuple[int, str]:
     try:
         out = subprocess.run(claude_code.host([*cmd, *args]), capture_output=True, text=True, encoding="utf-8", errors="replace",
                              timeout=timeout, creationflags=NO_WINDOW, stdin=subprocess.DEVNULL, cwd=str(Path.home()))
@@ -61,7 +62,7 @@ def _run(cmd, *args, timeout=40):
         return -1, str(exc)
 
 
-def status(engine, force=False):
+def status(engine: str, force: bool = False) -> dict[str, Any]:
     """{"installed", "signed_in", "note"} for codex or cursor: free local checks, cached for a minute.
     For Codex it also says whether its Windows sandbox works ("sandbox"): when it doesn't, Codex can only run
     commands with full access."""
@@ -101,7 +102,7 @@ _models = {}
 ZERO_WIDTH = dict.fromkeys(map(ord, "​‌‍﻿"))
 
 
-def models(engine, force=False):
+def models(engine: str, force: bool = False) -> list[dict[str, Any]]:
     """The models this account can pick on an engine, [{"id", "label"}], from the CLI itself (free, no tokens).
     Cached for 10 minutes. Empty when the CLI can't say; the team then uses the CLI's own default."""
     hit = _models.get(engine)
@@ -126,7 +127,7 @@ def models(engine, force=False):
     return found
 
 
-def all_status(force=False):
+def all_status(force: bool = False) -> dict[str, dict[str, Any]]:
     return {"claude": {"installed": bool(claude_code.find_command()), "signed_in": True, "note": ""},
             **{e: status(e, force) for e in ("codex", "cursor")}}
 
@@ -137,7 +138,7 @@ CODEX_SANDBOX = {"none": "read-only", "read": "read-only", "web": "read-only", "
                  "edit": "workspace-write", "full": "danger-full-access"}
 
 
-def codex_sandbox(tools):
+def codex_sandbox(tools: str) -> str:
     """The sandbox for a tool level. If the Windows sandbox is broken, only full access can run anything."""
     info = status("codex")
     if info.get("sandbox") is False:
@@ -145,7 +146,7 @@ def codex_sandbox(tools):
     return CODEX_SANDBOX.get(tools, "read-only")
 
 
-def build_args(engine, command, *, tools, model=""):
+def build_args(engine: str, command: list[str], *, tools: str, model: str = "") -> list[str]:
     if engine == "codex":
         search = ["--search"] if tools in ("web", "research") else []   # a top-level option: before `exec`
         args = [*command, *search, "exec", "--json", "--skip-git-repo-check", "--ephemeral", "--sandbox", codex_sandbox(tools)]
@@ -162,16 +163,16 @@ def build_args(engine, command, *, tools, model=""):
     raise ValueError(engine)
 
 
-def wrap_prompt(system, prompt):
+def wrap_prompt(system: str, prompt: str) -> str:
     """Neither CLI takes an extra system prompt on the command line, so the role goes first in the prompt."""
     return f"# Your instructions\n{system}\n\n{prompt}"
 
 
-def short(path):
+def short(path: Any) -> str:
     return Path(str(path)).name or str(path)
 
 
-def codex_event(obj, out):
+def codex_event(obj: dict[str, Any], out: dict[str, Any]) -> str | None:
     """Feed one Codex JSON event into `out` = {"steps": [], "texts": [], "final": None, "error": ""}.
     Returns a step line to show, if any."""
     kind = obj.get("type")
@@ -212,7 +213,7 @@ CURSOR_TOOLS = {"readToolCall": "Reading", "editToolCall": "Editing", "writeTool
                 "grepToolCall": "Searching", "globToolCall": "Finding", "lsToolCall": "Listing", "shellToolCall": "Running"}
 
 
-def cursor_event(obj, out):
+def cursor_event(obj: dict[str, Any], out: dict[str, Any]) -> str | None:
     """Same as codex_event, for Cursor's stream-json (shaped much like Claude Code's)."""
     kind = obj.get("type")
     if kind == "assistant":
@@ -241,7 +242,7 @@ def cursor_event(obj, out):
 PARSERS = {"codex": codex_event, "cursor": cursor_event}
 
 
-def friendly_error(engine, text):
+def friendly_error(engine: str, text: str | None) -> str | None:
     """Plain words for the errors people actually hit."""
     low = (text or "").lower()
     if "usage limit" in low or "rate limit" in low or "quota" in low:

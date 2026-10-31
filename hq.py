@@ -24,6 +24,7 @@ import uuid
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 from urllib import request as urlrequest
 
 import claude_code
@@ -53,7 +54,7 @@ RUNNER = flows.Runner(HQ_STORE)
 log = logging.getLogger("lithnode")
 
 
-def setup_logging():
+def setup_logging() -> None:
     """lithnode.log in the app's folder (rotated at 1 MB, 3 kept). LITHNODE_DEBUG=1 also logs every GET."""
     level = logging.DEBUG if os.environ.get("LITHNODE_DEBUG") else logging.INFO
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -77,7 +78,7 @@ class BadRequest(ValueError):
     """The page sent something the API can't use: answered with a 400 and this message."""
 
 
-def _backfill_tasks():
+def _backfill_tasks() -> None:
     """Flows saved before the Run menu remembered tasks open with their newest run's task."""
     latest = {}
     for r in HQ_STORE.list_runs(limit=5000):   # newest first
@@ -212,7 +213,7 @@ BUILTIN_EDITABLE = ("name", "model")
 OLD_DEFAULT_NAMES = {"clawd": ("Clawd", "Ace", "Claude")}   # renamed built-ins: an old default name means "never renamed"
 
 
-def load_bots():
+def load_bots() -> list[dict[str, Any]]:
     """All bots, built-ins first. Built-ins always exist and always use their own settings."""
     try:
         saved = json.loads(BOTS.read_text(encoding="utf-8")).get("bots")
@@ -232,21 +233,21 @@ def load_bots():
     return bots
 
 
-def public_bot(bot):
+def public_bot(bot: dict[str, Any]) -> dict[str, Any]:
     """What the page may see: a built-in bot's instructions stay on the server."""
     return {**bot, "instructions": ""} if bot.get("builtin") else bot
 
 
-def save_bots(bots):
+def save_bots(bots: list[dict[str, Any]]) -> None:
     STORE.mkdir(parents=True, exist_ok=True)
     tmp = BOTS.with_suffix(".tmp")
     tmp.write_text(json.dumps({"bots": bots}, indent=2), encoding="utf-8")
     tmp.replace(BOTS)
 
 
-def clean_bot(bot_id, raw):
+def clean_bot(bot_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     """A validated bot dict from page input; raises ValueError with a readable reason."""
-    def text(key, limit, required=False):
+    def text(key: str, limit: int, required: bool = False) -> str:
         value = str(raw.get(key) or "").strip()
         if required and not value:
             raise ValueError(f"{key} is required")
@@ -275,28 +276,28 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "Lithnode/1.0"
 
     # -- plumbing ----------------------------------------------------------
-    def log_message(self, *args):
+    def log_message(self, *args: Any) -> None:
         pass   # route() logs each request itself, with its time
 
-    def send_response(self, code, message=None):
+    def send_response(self, code: int, message: str | None = None) -> None:
         self.status = code
         super().send_response(code, message)
 
-    def end_headers(self):
+    def end_headers(self) -> None:
         # nothing here is meant to be framed by another site, sniffed as another type, or leak its URL
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "SAMEORIGIN")
         self.send_header("Referrer-Policy", "no-referrer")
         super().end_headers()
 
-    def trusted(self):
+    def trusted(self) -> bool:
         """Only talk to our own page: blocks other sites and DNS-rebinding tricks."""
         if self.headers.get("Host", "") not in (f"{HOST}:{PORT}", f"localhost:{PORT}"):
             return False
         origin = self.headers.get("Origin")
         return not origin or origin in (f"http://{HOST}:{PORT}", f"http://localhost:{PORT}")
 
-    def send_json(self, obj, status=200):
+    def send_json(self, obj: Any, status: int = 200) -> None:
         body = json.dumps(obj).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -305,7 +306,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def read_json(self):
+    def read_json(self) -> dict[str, Any]:
         try:
             body = json.loads(self.raw_body or b"{}")
         except ValueError:
@@ -314,7 +315,7 @@ class Handler(BaseHTTPRequestHandler):
             raise BadRequest("The request should be a JSON object.")
         return body
 
-    def route(self, method):
+    def route(self, method: str) -> None:
         start, self.status = time.monotonic(), 0
         try:
             self.serve(method)
@@ -328,7 +329,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 log.debug(line)
 
-    def serve(self, method):
+    def serve(self, method: str) -> None:
         # Always consume the request body, even for routes that ignore it: on a
         # keep-alive connection, unread bytes would corrupt the next request.
         try:
@@ -369,17 +370,17 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 pass
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         self.route("GET")
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         self.route("POST")
 
-    def do_DELETE(self):
+    def do_DELETE(self) -> None:
         self.route("DELETE")
 
     # -- pages and settings --------------------------------------------------
-    def send_static(self, name):
+    def send_static(self, name: str) -> None:
         path = (STATIC / name).resolve()
         if path.parent not in (STATIC.resolve(), STATIC.resolve() / "fonts") or path.suffix not in STATIC_TYPES or not path.is_file():
             return self.send_json({"error": "not found"}, 404)
@@ -391,15 +392,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def GET_api_ping(self):
+    def GET_api_ping(self) -> None:
         self.send_json({"app": "lithnode"})
 
-    def GET_api_connectors(self):
+    def GET_api_connectors(self) -> None:
         """Connectors a team can be given (a free check, cached; ?refresh=1 checks again)."""
         info = claude_code.list_connectors(force="refresh=1" in self.path)
         self.send_json({k: info[k] for k in ("ok", "connectors", "error")})
 
-    def GET_api_engines(self):
+    def GET_api_engines(self) -> None:
         """Which agent CLIs a team can run on (Claude Code, Codex, Cursor): installed, signed in, any note."""
         info = engines.all_status(force="refresh=1" in self.path)
         force = "refresh=1" in self.path
@@ -407,15 +408,15 @@ class Handler(BaseHTTPRequestHandler):
                                      "models": engines.models(e, force) if e != "claude" and info[e]["signed_in"] else []}
                                     for e in engines.ENGINES]})
 
-    def GET_api_clis(self):
+    def GET_api_clis(self) -> None:
         """Command-line tools installed on this computer that a team can be allowed to run."""
         self.send_json({"clis": claude_code.list_clis()})
 
     # -- office ----------------------------------------------------------------
-    def GET_api_sessions(self):
+    def GET_api_sessions(self) -> None:
         self.send_json(office_feed.snapshot(RUNNER))
 
-    def GET_api_hq(self):
+    def GET_api_hq(self) -> None:
         """Little numbers for the tab badges."""
         active = RUNNER.active()
         waiting = sum(1 for r in active for st in r.nodes.values() if st["status"] == "approval")
@@ -424,16 +425,16 @@ class Handler(BaseHTTPRequestHandler):
                         "claude_code": claude_code.auth_status(force="fresh=1" in self.path)})
 
     # -- flows -------------------------------------------------------------------
-    def flow_payload(self, flow):
+    def flow_payload(self, flow: dict[str, Any]) -> dict[str, Any]:
         return {"flow": flow, "estimate": flows.estimate(flow), "problems": flows.check_runnable(flow)}
 
-    def GET_api_flows(self):
+    def GET_api_flows(self) -> None:
         self.send_json({"flows": HQ_STORE.list_flows(),
                         "templates": [{"id": t["id"], "name": t["name"], "blurb": t["blurb"]} for t in flows.TEMPLATES],
                         "models": MODELS, "tools": list(flows.agents.TOOLSETS), "shapes": list(flows.SHAPES),
                         "max_agents": flows.MAX_AGENTS})
 
-    def POST_api_flows(self):
+    def POST_api_flows(self) -> None:
         body = self.read_json()
         flow = flows.from_template(body["template"]) if body.get("template") else None
         if body.get("template") and not flow:
@@ -446,7 +447,7 @@ class Handler(BaseHTTPRequestHandler):
         HQ_STORE.save_flow(flow)
         self.send_json(self.flow_payload(flow))
 
-    def POST_api_flows_design(self):
+    def POST_api_flows_design(self) -> None:
         """Describe a team in words; one agent drafts the flow, which is saved as a new flow."""
         prompt = str(self.read_json().get("prompt") or "").strip()[:4000]
         if not prompt:
@@ -466,7 +467,7 @@ class Handler(BaseHTTPRequestHandler):
         HQ_STORE.save_flow(flow)
         self.send_json({**self.flow_payload(flow), "cost": round(agent.cost, 4)})
 
-    def flow_item(self, method, parts):
+    def flow_item(self, method: str, parts: list[str]) -> None:
         if not parts or not FLOW_ID_RE.match(parts[0]):
             return self.send_json({"error": "bad id"}, 400)
         flow_id, action = parts[0], (parts[1] if len(parts) > 1 else "")
@@ -515,7 +516,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"error": "not found"}, 404)
 
     # -- folders ------------------------------------------------------------------
-    def POST_api_pick_folder(self):
+    def POST_api_pick_folder(self) -> None:
         """Open the normal Windows folder dialog on this computer and return the folder picked ("" if cancelled)."""
         if os.environ.get("LITHNODE_PICKER"):            # tests: a fixed answer instead of a window
             return self.send_json({"folder": os.environ["LITHNODE_PICKER"]})
@@ -530,7 +531,7 @@ class Handler(BaseHTTPRequestHandler):
             folder = ""
         self.send_json({"folder": folder})
 
-    def GET_api_folders(self):
+    def GET_api_folders(self) -> None:
         """Folders you've run flows in, newest first, for the folder box's suggestions."""
         seen, out = set(), []
         for r in HQ_STORE.list_runs(limit=200):
@@ -542,10 +543,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"folders": out[:10]})
 
     # -- runs ---------------------------------------------------------------------
-    def GET_api_runs(self):
+    def GET_api_runs(self) -> None:
         self.send_json({"runs": HQ_STORE.list_runs()})
 
-    def run_item(self, method, parts):
+    def run_item(self, method: str, parts: list[str]) -> None:
         if not parts or not FLOW_ID_RE.match(parts[0]):
             return self.send_json({"error": "bad id"}, 400)
         run_id, action = parts[0], (parts[1] if len(parts) > 1 else "")
@@ -566,7 +567,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok": ok}) if ok else self.send_json({"error": "Nothing is waiting there."}, 400)
         self.send_json({"error": "not found"}, 404)
 
-    def open_run_file(self, run_id, rel):
+    def open_run_file(self, run_id: str, rel: str) -> None:
         """Open a file a run made (or its folder, when rel is empty). Only files recorded on the run are
         allowed, and only plain documents open directly; anything that could run is shown in its folder."""
         snap = RUNNER.snapshot(run_id)
@@ -595,13 +596,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"ok": True, "revealed": reveal})
 
     # -- bots ----------------------------------------------------------------
-    def GET_api_bots(self):
+    def GET_api_bots(self) -> None:
         self.send_json({"bots": [public_bot(b) for b in load_bots()], "shapes": list(SHAPES)})
 
-    def POST_api_bots(self):
+    def POST_api_bots(self) -> None:
         self.send_json({"id": "bot-" + uuid.uuid4().hex[:10]})
 
-    def bot_item(self, method, bot_id):
+    def bot_item(self, method: str, bot_id: str) -> None:
         if not BOT_ID_RE.match(bot_id):
             return self.send_json({"error": "bad id"}, 400)
         bots = load_bots()
@@ -625,20 +626,20 @@ class Handler(BaseHTTPRequestHandler):
         save_bots([bot if b["id"] == bot_id else b for b in bots] if any(b["id"] == bot_id for b in bots) else bots + [bot])
         self.send_json({"ok": True, "bot": public_bot(bot)})
 
-    def POST_api_signin(self):
+    def POST_api_signin(self) -> None:
         """Start Claude Code's sign-in. The user completes it in the window and browser it opens."""
         if claude_code.start_login():
             return self.send_json({"ok": True})
         self.send_json({"ok": False, "error": "Claude Code isn't installed on this computer."})
 
-    def POST_api_quit(self):
+    def POST_api_quit(self) -> None:
         self.send_json({"ok": True})
         threading.Timer(0.3, self.server.shutdown).start()
 
 
 # ---------------------------------------------------------------------- launch
 
-def app_window_command():
+def app_window_command() -> list[str] | None:
     """Edge or Chrome in app mode (no tabs or address bar), like a desktop program."""
     candidates = [shutil.which(n) for n in ("msedge", "chrome", "google-chrome", "google-chrome-stable", "chromium", "chromium-browser")]
     candidates += ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"]
@@ -658,7 +659,7 @@ def app_window_command():
     return None
 
 
-def open_window():
+def open_window() -> None:
     command = app_window_command()
     if command:
         subprocess.Popen(command)
@@ -666,7 +667,7 @@ def open_window():
         webbrowser.open(URL)
 
 
-def already_running():
+def already_running() -> bool:
     try:
         with urlrequest.urlopen(URL + "/api/ping", timeout=1.5) as resp:
             return json.loads(resp.read()).get("app") == "lithnode"
@@ -674,7 +675,7 @@ def already_running():
         return False
 
 
-def main():
+def main() -> None:
     claude_code.fix_path()
     if already_running():
         if "--no-open" not in sys.argv:

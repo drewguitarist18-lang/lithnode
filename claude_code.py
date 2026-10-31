@@ -11,14 +11,16 @@ import subprocess
 import tempfile
 import threading
 import time
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 WINDOWS = os.name == "nt"
 NO_WINDOW = 0x08000000 if WINDOWS else 0   # CREATE_NO_WINDOW: don't flash a console (Windows only; 0 elsewhere)
 NEW_GROUP = {} if WINDOWS else {"start_new_session": True}   # so stopping an agent can stop what it started
 
 
-def own_exe(name):
+def own_exe(name: str) -> str:
     """One of the installed app's own programs (lithnode-cli), next to the running one."""
     import sys
     return str(Path(sys.executable).with_name(name + (".exe" if WINDOWS else "")))
@@ -31,7 +33,7 @@ COMMON_BINS = ["~/.local/bin", "~/.claude/local", "~/.npm-global/bin", "~/.bun/b
 
 # Inside the Linux Flatpak, Lithnode is sandboxed: Claude Code, Codex, Cursor and your CLIs live outside it, on
 # your system. Every one of them is started there with `flatpak-spawn --host` (see host), and found there (which).
-def _host_spawn_allowed():
+def _host_spawn_allowed() -> bool:
     """Under Flatpak: may this sandbox start programs on the system (org.freedesktop.Flatpak)? The published Flatpak
     doesn't ask for that: it runs claude inside the sandbox, from your home folder, like any other Linux install."""
     try:
@@ -45,7 +47,7 @@ FLATPAK = bool(os.environ.get("FLATPAK_ID")) and not WINDOWS and _host_spawn_all
 HOST_PATH = ""   # your system's PATH, under Flatpak
 
 
-def _login_path(prefix=()):
+def _login_path(prefix: Sequence[str] = ()) -> str:
     """The PATH your login shell sets up (nvm, Homebrew, ~/.local/bin, ...), or ""."""
     try:
         done = subprocess.run([*prefix, "sh", "-c", 'exec "${SHELL:-/bin/sh}" -ilc \'printf "\\n%s" "$PATH"\''],
@@ -57,7 +59,7 @@ def _login_path(prefix=()):
         return ""
 
 
-def _merge(*paths):
+def _merge(*paths: str | None) -> str:
     seen, out = set(), []
     for p in os.pathsep.join(filter(None, paths)).split(os.pathsep):
         if p and p not in seen:
@@ -66,7 +68,7 @@ def _merge(*paths):
     return os.pathsep.join(out)
 
 
-def fix_path():
+def fix_path() -> None:
     """Mac and Linux: add your login shell's PATH and the usual install folders, so `claude`, `codex`, `node` and
     your own CLIs are found even when Lithnode wasn't started from a terminal."""
     global HOST_PATH
@@ -79,7 +81,7 @@ def fix_path():
         os.environ["PATH"] = _merge(os.environ.get("PATH", ""), _login_path(), common)
 
 
-def which(name):
+def which(name: str) -> str | None:
     """Where a command is: on this computer, or under Flatpak on your system outside the sandbox."""
     if not FLATPAK:
         return shutil.which(name)
@@ -98,7 +100,7 @@ def which(name):
 _which_cache = {}
 
 
-def shared_tmp():
+def shared_tmp() -> str | None:
     """A temp folder both Lithnode and the programs it starts can see (the sandbox has its own /tmp)."""
     if not FLATPAK:
         return None
@@ -108,7 +110,7 @@ def shared_tmp():
 PASS_ON = ("ENABLE_CLAUDEAI_MCP_SERVERS", "ENABLE_TOOL_SEARCH", "LITHNODE_AGENT")
 
 
-def host(args, env=None, cwd=None):
+def host(args: Sequence[str], env: dict[str, str] | None = None, cwd: str | None = None) -> list[str]:
     """`args` as it should be started: unchanged, or under Flatpak run on your system with Lithnode's own settings
     (the env keys it sets, its tools on the PATH) and the working folder passed along. When this process ends,
     flatpak-spawn ends what it started (--watch-bus)."""
@@ -134,7 +136,7 @@ NO_CONNECTORS_ARGS = ["--strict-mcp-config", "--disallowedTools", "mcp__*"]
 TOOLS_BIN = None   # Lithnode's own commands for agents (lithnode-shot), set by setup_tools at startup
 
 
-def setup_tools(home):
+def setup_tools(home: str | Path) -> str:
     """Puts `lithnode-shot` (shot.py) in home/bin for the agents' PATH. Returns that folder."""
     global TOOLS_BIN
     import sys
@@ -147,17 +149,17 @@ def setup_tools(home):
     return TOOLS_BIN
 
 
-def _with_tools(env):
+def _with_tools(env: dict[str, str]) -> dict[str, str]:
     if TOOLS_BIN:
         env["PATH"] = TOOLS_BIN + os.pathsep + env.get("PATH", "")
     return env
 
 
-def lean_env():
+def lean_env() -> dict[str, str]:
     return _with_tools({**os.environ, **NO_CONNECTORS_ENV, **AGENT_ENV})
 
 
-def connectors_env():
+def connectors_env() -> dict[str, str]:
     """For a team given connectors: claude.ai connectors on, and every tool loaded only when the agent searches
     for it (ENABLE_TOOL_SEARCH). That keeps the context near 15k tokens instead of ~200k."""
     env = {k: v for k, v in os.environ.items() if k != "ENABLE_CLAUDEAI_MCP_SERVERS"}
@@ -166,7 +168,7 @@ def connectors_env():
     return _with_tools(env)
 
 
-def tool_prefix(server):
+def tool_prefix(server: str) -> str:
     """Claude Code names a server's tools mcp__<server>__<tool>, with anything but letters, digits, _ and - as _."""
     return "mcp__" + re.sub(r"[^A-Za-z0-9_-]", "_", server)
 
@@ -178,7 +180,7 @@ _connectors = {"at": 0.0, "value": None}
 _connectors_lock = threading.Lock()
 
 
-def list_connectors(force=False):
+def list_connectors(force: bool = False) -> dict[str, Any]:
     """The connectors an agent session on this computer really loads: claude.ai ones and other MCP servers.
 
     Found with a free probe: a session asked for a model that doesn't exist still connects its servers and
@@ -242,14 +244,14 @@ KNOWN_CLIS = [
 ]
 
 
-def cli_installed(name):
+def cli_installed(name: str | None) -> bool:
     if not CLI_RE.match(name or ""):
         return False
     fake = os.environ.get("LITHNODE_CLIS")
     return name in fake.split(",") if fake is not None else which(name) is not None
 
 
-def list_clis():
+def list_clis() -> list[dict[str, str]]:
     """The known command-line tools installed on this computer: [{"id", "name", "blurb"}].
     LITHNODE_CLIS (comma-separated) replaces the check, for tests."""
     fake = os.environ.get("LITHNODE_CLIS")
@@ -268,7 +270,7 @@ _sessions_lock = threading.Lock()
 
 # ------------------------------------------------------------------- the CLI
 
-def find_command():
+def find_command() -> list[str] | None:
     """The command that runs Claude Code, as a list, or None if it isn't installed."""
     override = os.environ.get("CLAWD_BOT_CLAUDE_CMD")
     if override:
@@ -294,7 +296,7 @@ def find_command():
     if WINDOWS and not found and (Path.home() / ".local" / "bin" / "claude.exe").is_file():
         found = [Path.home() / ".local" / "bin" / "claude.exe"]   # Anthropic's own installer, if PATH hasn't caught up
 
-    def version(path):
+    def version(path: Path) -> list[int]:
         return [int(p) if p.isdigit() else 0 for p in path.parent.parent.name.split(".")]
 
     if found:
@@ -305,7 +307,7 @@ def find_command():
 _SHIM_TARGET_RE = re.compile(r'"%~?dp0%?\\(node_modules\\[^"%]+?\.(?:c?js|mjs|exe))"', re.I)
 
 
-def unwrap_shim(path):
+def unwrap_shim(path: str | Path) -> list[str] | None:
     """What an npm .cmd shim really runs, as a command list, or None if it can't tell."""
     try:
         m = _SHIM_TARGET_RE.search(Path(path).read_text(encoding="utf-8", errors="replace"))
@@ -323,7 +325,7 @@ def unwrap_shim(path):
     return [node, str(target)] if node else None
 
 
-def auth_status(force=False):
+def auth_status(force: bool = False) -> dict[str, Any]:
     """{'available', 'logged_in', 'method'}; cached briefly because it spawns a process."""
     now = time.time()
     if not force and _status_cache["value"] and now - _status_cache["at"] < STATUS_TTL:
@@ -344,7 +346,7 @@ def auth_status(force=False):
     return value
 
 
-def start_login():
+def start_login() -> bool:
     """Open Claude Code's own sign-in (a console window, then your browser). You finish it there."""
     command = find_command()
     if not command:

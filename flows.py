@@ -20,8 +20,10 @@ import socket
 import threading
 import time
 import uuid
+from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
+from typing import Any
 from urllib import request as urlrequest
 from urllib.parse import urlparse
 
@@ -53,14 +55,14 @@ MODEL_WEIGHT = {"claude-haiku-4-5": 1, "claude-sonnet-5-5": 3, "claude-opus-5-5"
 class Store:
     """Flows and run records on disk, under one folder (default ~/.lithnode)."""
 
-    def __init__(self, root):
+    def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
         self.flows_dir = self.root / "flows"
         self.runs_dir = self.root / "runs"
         self.work_dir = self.root / "workspaces"
         self._lock = threading.Lock()
 
-    def _write(self, path, obj):
+    def _write(self, path: Path, obj: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(f".{uuid.uuid4().hex[:6]}.tmp")
         tmp.write_text(json.dumps(obj, indent=1), encoding="utf-8")
@@ -75,7 +77,7 @@ class Store:
                 time.sleep(0.02 * (attempt + 1))
 
     # flows
-    def list_flows(self):
+    def list_flows(self) -> list[dict[str, Any]]:
         out = []
         for path in self.flows_dir.glob("*.json") if self.flows_dir.exists() else []:
             try:
@@ -87,30 +89,30 @@ class Store:
         out.sort(key=lambda f: f["updated"], reverse=True)
         return out
 
-    def get_flow(self, flow_id):
+    def get_flow(self, flow_id: str) -> dict[str, Any] | None:
         try:
             return json.loads((self.flows_dir / f"{flow_id}.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
 
-    def save_flow(self, flow):
+    def save_flow(self, flow: dict[str, Any]) -> None:
         flow["updated"] = time.time()
         self._write(self.flows_dir / f"{flow['id']}.json", flow)
 
-    def delete_flow(self, flow_id):
+    def delete_flow(self, flow_id: str) -> None:
         (self.flows_dir / f"{flow_id}.json").unlink(missing_ok=True)
 
     # runs
-    def save_run(self, record):
+    def save_run(self, record: dict[str, Any]) -> None:
         self._write(self.runs_dir / f"{record['id']}.json", record)
 
-    def get_run(self, run_id):
+    def get_run(self, run_id: str) -> dict[str, Any] | None:
         try:
             return json.loads((self.runs_dir / f"{run_id}.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
 
-    def list_runs(self, limit=40):
+    def list_runs(self, limit: int = 40) -> list[dict[str, Any]]:
         items = []
         for path in self.runs_dir.glob("*.json") if self.runs_dir.exists() else []:
             try:
@@ -131,11 +133,11 @@ class Store:
 
 # --------------------------------------------------------------- validation
 
-def _text(raw, key, limit, default=""):
+def _text(raw: dict[str, Any], key: str, limit: int, default: str = "") -> str:
     return str(raw.get(key) if raw.get(key) is not None else default).strip()[:limit]
 
 
-def _connectors(raw):
+def _connectors(raw: Any) -> list[str]:
     """A team's connectors: server names like "claude.ai Vercel", as Claude Code lists them."""
     out = []
     for c in raw if isinstance(raw, list) else []:
@@ -145,7 +147,7 @@ def _connectors(raw):
     return out[:10]
 
 
-def _clis(raw):
+def _clis(raw: Any) -> list[str]:
     """A team's command-line tools: plain command names like "gh" or "vercel"."""
     out = []
     for c in raw if isinstance(raw, list) else []:
@@ -155,17 +157,17 @@ def _clis(raw):
     return out[:12]
 
 
-def _model(raw, default):
+def _model(raw: dict[str, Any], default: str) -> str:
     model = _text(raw, "model", 60, default)
     return model if MODEL_RE.match(model) else default
 
 
-def _coord(raw, key):
+def _coord(raw: dict[str, Any], key: str) -> float:
     value = float(raw.get(key) or 0)
     return value if math.isfinite(value) else 0.0
 
 
-def webhook_ok(url):
+def webhook_ok(url: str) -> bool:
     """An http(s) URL with a host: the only kind of webhook Lithnode will call."""
     try:
         parts = urlparse(url)
@@ -174,7 +176,7 @@ def webhook_ok(url):
     return parts.scheme in ("http", "https") and bool(parts.hostname) and not any(ch.isspace() for ch in url)
 
 
-def clean_node(raw):
+def clean_node(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("bad node")
     kind = raw.get("type")
@@ -224,7 +226,7 @@ def clean_node(raw):
     return node
 
 
-def clean_models(raw):
+def clean_models(raw: Any) -> dict[str, str]:
     """Which model fills each role; anything missing or malformed falls back to the default."""
     raw = raw if isinstance(raw, dict) else {}
     out = {}
@@ -234,7 +236,7 @@ def clean_models(raw):
     return out
 
 
-def clean_flow(raw):
+def clean_flow(raw: Any) -> dict[str, Any]:
     """A validated flow dict from page input or disk; raises ValueError with a readable reason."""
     if not isinstance(raw, dict) or not isinstance(raw.get("nodes") or [], list) or not isinstance(raw.get("edges") or [], list):
         raise ValueError("bad flow")
@@ -276,7 +278,7 @@ def clean_flow(raw):
 DEFAULT_LIMIT = 1_000_000   # tokens a run may use before it's stopped; no agent may use more than half of it
 
 
-def clean_limit(value):
+def clean_limit(value: Any) -> int:
     """A run's token limit: 0 for none, otherwise between 50k and 100M."""
     try:
         n = int(value)
@@ -285,13 +287,13 @@ def clean_limit(value):
     return 0 if n <= 0 else max(50_000, min(100_000_000, n))
 
 
-def _has_cycle(ids, edges):
+def _has_cycle(ids: list[str], edges: list[dict[str, str]]) -> bool:
     out = {i: [] for i in ids}
     for e in edges:
         out[e["from"]].append(e["to"])
     state = {}
 
-    def visit(n):
+    def visit(n: str) -> bool:
         if state.get(n) == 1:
             return True
         if state.get(n) == 2:
@@ -305,7 +307,7 @@ def _has_cycle(ids, edges):
     return any(visit(i) for i in ids)
 
 
-def fed_by_start(flow):
+def fed_by_start(flow: dict[str, Any]) -> list[str]:
     """Steps with no wire coming in but wired onward (say, a planner beside Start). Saving a flow wires Start
     to them, so they get the task. Steps with no wires at all stay loose."""
     into = {e["to"] for e in flow["edges"]}
@@ -313,7 +315,7 @@ def fed_by_start(flow):
     return [n["id"] for n in flow["nodes"] if n["type"] not in ("master", "done") and n["id"] not in into and n["id"] in out_of]
 
 
-def check_runnable(flow):
+def check_runnable(flow: dict[str, Any]) -> list[str]:
     """Problems that stop a flow from running, as plain sentences (empty list = good to go)."""
     problems = []
     masters = [n for n in flow["nodes"] if n["type"] == "master"]
@@ -344,11 +346,11 @@ def check_runnable(flow):
     return problems
 
 
-def estimate(flow):
+def estimate(flow: dict[str, Any]) -> dict[str, Any]:
     """Sessions per model and a relative weight, before anything runs."""
     per_model = {}
 
-    def add(model, n=1):
+    def add(model: str, n: int = 1) -> None:
         per_model[model] = per_model.get(model, 0) + n
 
     for n in flow["nodes"]:
@@ -377,12 +379,12 @@ VERDICTS = {"pass": "pass", "keep": "pass", "yes": "pass", "approve": "pass", "a
             "cut": "cut", "reject": "cut", "rejected": "cut", "no": "cut", "drop": "cut", "fail": "cut", "skip": "cut"}
 
 
-def _clean_url(v):
+def _clean_url(v: Any) -> str:
     v = str(v or "").strip()
     return v if v.startswith("https://") and len(v) <= 1000 and not re.search(r"[\s\"'<>]", v) else ""
 
 
-def clean_item(raw):
+def clean_item(raw: Any) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
     title = str(raw.get("title") or raw.get("name") or "").strip()[:120]
@@ -412,7 +414,7 @@ def clean_item(raw):
     return item
 
 
-def parse_items(text):
+def parse_items(text: str | None) -> list[dict[str, Any]]:
     """The last ```items block in an agent's answer, cleaned; [] when there isn't one (or it isn't JSON)."""
     blocks = ITEMS_RE.findall(text or "")
     if not blocks:
@@ -433,15 +435,15 @@ def parse_items(text):
     return [i for i in (clean_item(r) for r in data[:MAX_ITEMS]) if i]
 
 
-def strip_items(text):
+def strip_items(text: str | None) -> str:
     return ITEMS_RE.sub("", text or "").strip()
 
 
-def items_block(items):
+def items_block(items: list[dict[str, Any]]) -> str:
     return "```items\n" + json.dumps(items, ensure_ascii=False) + "\n```" if items else ""
 
 
-def merge_items(lists):
+def merge_items(lists: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """Several agents' lists as one: first seen order, later details fill gaps, and one cut is enough to cut."""
     merged, order = {}, []
     for items in lists:
@@ -480,7 +482,7 @@ ITEMS_NOTE = ('Only if your stage produces or judges a list of things (parts of 
 ROLE_OF = {"claude-opus-5-5": "think", "claude-sonnet-5-5": "build", "claude-haiku-4-5": "run"}
 
 
-def _n(nid, kind, x, y, **kw):
+def _n(nid: str, kind: str, x: int, y: int, **kw: Any) -> dict[str, Any]:
     if "model" in kw and "role" not in kw:
         kw["role"] = ROLE_OF.get(kw["model"], "")
     return {"id": nid, "type": kind, "x": x, "y": y, **kw}
@@ -582,7 +584,7 @@ TEMPLATES = [
 ]
 
 
-def from_template(template_id):
+def from_template(template_id: str) -> dict[str, Any] | None:
     t = next((t for t in TEMPLATES if t["id"] == template_id), None)
     if not t:
         return None
@@ -635,7 +637,7 @@ Only builders get "edit"; only testers get "full". Prefer clis over "full" when 
 Name the flow in 2-5 words."""
 
 
-def designer_system(bots, models):
+def designer_system(bots: list[dict[str, Any]], models: list[dict[str, Any]]) -> str:
     return (DESIGNER_SYSTEM
             .replace("<<MODELS>>", ", ".join(m["id"] for m in models))
             .replace("<<CLIS>>", ", ".join(c["id"] for c in claude_code.list_clis()) or "none installed")
@@ -643,7 +645,7 @@ def designer_system(bots, models):
                                            for b in bots if b.get("team", True)) or "none"))
 
 
-def parse_design(text):
+def parse_design(text: str) -> Any:
     """The JSON object in the designer's answer (it may wrap it in a code fence anyway)."""
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end <= start:
@@ -654,7 +656,7 @@ def parse_design(text):
         raise ValueError("The designer's flow wasn't valid. Try again, or describe it a bit differently.") from None
 
 
-def build_design(raw, bots):
+def build_design(raw: Any, bots: list[dict[str, Any]]) -> dict[str, Any]:
     """Turn a designer draft into a clean, laid-out flow. Raises ValueError with a readable reason."""
     if not isinstance(raw, dict) or not isinstance(raw.get("nodes"), list):
         raise ValueError("The designer's flow had no nodes. Try again.")
@@ -708,7 +710,7 @@ ORB_R = 40   # the orb's radius: wires meet a team at its middle
 STACK = 3   # most nodes stacked in one column; a busier stage spreads into extra columns
 
 
-def _layout(flow, direction="lr"):
+def _layout(flow: dict[str, Any], direction: str = "lr") -> None:
     """Neat layout: stages by depth from Start, at most STACK nodes per column, rows that wrap after
     WRAP columns ("lr") or rows going down ("tb"). Nodes with no wires yet wait in a row underneath."""
     flow["dir"] = direction
@@ -726,7 +728,7 @@ def _layout(flow, direction="lr"):
         levels.setdefault(depth[n["id"]], []).append(n)
     rank = {}                                         # order within a stage, so wires cross less
 
-    def pull(n):
+    def pull(n: dict[str, Any]) -> float:
         ins = [rank[e["from"]] for e in edges if e["to"] == n["id"] and e["from"] in rank]
         return sum(ins) / len(ins) if ins else 0
 
@@ -783,7 +785,7 @@ TERMINAL = ("done", "failed", "stopped", "skipped")
 class Run:
     """One execution of a flow. Thread-safe; `snapshot()` is what the page polls."""
 
-    def __init__(self, store, flow, task, folder, roles=None):
+    def __init__(self, store: Store, flow: dict[str, Any], task: str, folder: str | Path, roles: dict[str, str] | None = None) -> None:
         self.store = store
         self.id = uuid.uuid4().hex[:12]
         self.flow = flow
@@ -813,13 +815,13 @@ class Run:
         self._wake = threading.Event()
 
     # -- bookkeeping ------------------------------------------------------------
-    def say(self, text):
+    def say(self, text: str) -> None:
         with self.lock:
             self.log.append({"t": time.time(), "text": text})
             self.log = self.log[-200:]
         self.changed()
 
-    def changed(self, force=False):
+    def changed(self, force: bool = False) -> None:
         self._wake.set()
         now = time.time()
         if force or now - self._last_save > 1.0:
@@ -832,14 +834,14 @@ class Run:
                     pass
 
     @property
-    def cost(self):
+    def cost(self) -> float:
         return round(sum(a["cost"] for s in self.nodes.values() for a in s["agents"]), 4)
 
     @property
-    def tokens(self):
+    def tokens(self) -> int:
         return sum(a.get("tokens", 0) for s in self.nodes.values() for a in s["agents"])
 
-    def snapshot(self):
+    def snapshot(self) -> dict[str, Any]:
         with self.lock:
             return {
                 "id": self.id, "flow_id": self.flow["id"], "flow_name": self.flow["name"], "flow": self.flow,
@@ -849,17 +851,17 @@ class Run:
                 "final": self.final_output(), "files": list(self.files),
             }
 
-    def final_output(self):
+    def final_output(self) -> str:
         dones = [nid for nid, n in self.by_id.items() if n["type"] == "done"]
         parts = [self.nodes[nid]["output"] for nid in dones if self.nodes[nid]["output"]]
         return "\n\n".join(parts)
 
     # -- control ------------------------------------------------------------------
-    def start(self):
+    def start(self) -> None:
         self.say(f"Run started in {self.folder}")
         threading.Thread(target=self._loop, daemon=True).start()
 
-    def stop(self):
+    def stop(self) -> None:
         with self.lock:
             if self.status not in ("running", "waiting"):
                 return
@@ -870,17 +872,17 @@ class Run:
                 ev.set()
         self.say("Stopped by you.")
 
-    def stop_at_limit(self):
+    def stop_at_limit(self) -> None:
         """The run's agents together passed its token limit: stop everything, and say why."""
         self._halt(f"Stopped: this run reached its token limit of {agents.short_tokens(self.limit)}. "
                    "You can raise it in the Run menu.")
 
-    def stop_out_of_usage(self):
+    def stop_out_of_usage(self) -> None:
         """Claude says the plan has no usage left: every later agent would fail too, so stop now."""
         self._halt("Stopped: your Claude plan is out of usage for now, so nothing more can run. "
                    "The work finished so far is kept; run it again once your usage resets.")
 
-    def _halt(self, message):
+    def _halt(self, message: str) -> None:
         with self.lock:
             if self.over_limit or self.status not in ("running", "waiting"):
                 return
@@ -892,7 +894,7 @@ class Run:
                 ev.set()
         self.changed(force=True)
 
-    def decide(self, node_id, approved, note=""):
+    def decide(self, node_id: str, approved: bool, note: str = "") -> bool:
         with self.lock:
             ev = self.approvals.get(node_id)
             if not ev or self.nodes[node_id]["status"] != "approval":
@@ -902,7 +904,7 @@ class Run:
         return True
 
     # -- scheduler ----------------------------------------------------------------
-    def _loop(self):
+    def _loop(self) -> None:
         while True:
             with self.lock:
                 if self.status == "stopped":
@@ -941,7 +943,7 @@ class Run:
                   "stopped": "Run stopped."}.get(self.status, "Run ended."))
         self.changed(force=True)
 
-    def _run_node(self, nid):
+    def _run_node(self, nid: str) -> None:
         node, st = self.by_id[nid], self.nodes[nid]
         try:
             kind = node["type"]
@@ -969,7 +971,7 @@ class Run:
         self.changed(force=True)
 
     # -- prompts ------------------------------------------------------------------
-    def _handoff(self, nid, labels=True):
+    def _handoff(self, nid: str, labels: bool = True) -> str:
         """The outputs wired into a node. Labels say which stage each came from (skipped for a single input)."""
         outs = [(src, self.nodes[src]["output"].strip()) for src in self.inputs[nid]]
         outs = [(src, out) for src, out in outs if out]
@@ -977,7 +979,7 @@ class Run:
             return outs[0][1]
         return "\n\n".join(f"## From {self.by_id[src]['name']}\n{out}" for src, out in outs)
 
-    def _connectors_for(self, node, st):
+    def _connectors_for(self, node: dict[str, Any], st: dict[str, Any]) -> tuple[list[str], list[str]]:
         """The node's connectors this computer really has, plus every server name (to block the rest)."""
         want = node.get("connectors") or []
         if not want:
@@ -995,7 +997,7 @@ class Run:
             self.say(f"{node['name']}: {note}")
         return use, info["seen"]
 
-    def _clis_for(self, node, st):
+    def _clis_for(self, node: dict[str, Any], st: dict[str, Any]) -> list[str]:
         """The node's command-line tools that are installed here; notes the ones that aren't."""
         want = node.get("clis") or []
         if node.get("tools") == "full" or node.get("engine", "claude") != "claude":   # can already run commands, or picks its own
@@ -1008,7 +1010,7 @@ class Run:
             self.say(f"{node['name']}: {note}")
         return use
 
-    def _system(self, node, i, n, apps=(), clis=()):
+    def _system(self, node: dict[str, Any], i: int, n: int, apps: Sequence[str] = (), clis: Sequence[str] = ()) -> str:
         role = (node.get("instructions") or self.roles.get(node.get("bot") or "")
                 or f"You are part of the {node['name']} stage.")
         tool_note = {
@@ -1063,7 +1065,7 @@ class Run:
         ]
         return "\n".join(lines)
 
-    def _prompt(self, nid, focus, teammates=""):
+    def _prompt(self, nid: str, focus: str, teammates: str = "") -> str:
         parts = [f"# Task\n{self.task}"]
         if self.brief:
             parts.append(f"# Brief from the lead\n{self.brief}")
@@ -1076,14 +1078,15 @@ class Run:
         return "\n\n".join(parts)
 
     # -- node kinds -----------------------------------------------------------------
-    def _agent(self, node, st, label, *, model, effort, tools, system, prompt, max_turns=0, shape=None, color=None,
-               connectors=(), known=(), clis=(), engine="claude", engine_model=""):
+    def _agent(self, node: dict[str, Any], st: dict[str, Any], label: str, *, model: str, effort: str, tools: str, system: str, prompt: str, max_turns: int = 0,
+               shape: str | None = None, color: str | None = None, connectors: Sequence[str] = (), known: Sequence[str] = (), clis: Sequence[str] = (),
+               engine: str = "claude", engine_model: str = "") -> dict[str, Any]:
         """Run one agent to completion, tracked in the node's state. Returns its record."""
         rec = {"name": label, "status": "running", "step": "", "steps": [], "report": "", "items": [], "error": "",
                "cost": 0.0, "turns": 0, "model": model if engine == "claude" else engines.LABELS[engine], "engine": engine, "session_id": "", "started": time.time(), "ended": None,
                "shape": shape or node.get("shape") or "crab", "color": color or node.get("color") or "#ecebe6"}
 
-        def update():
+        def update() -> None:
             with self.lock:
                 rec.update(step=agent.step, steps=list(agent.steps), tokens=agent.tokens)
             if self.limit and self.tokens > self.limit:
@@ -1117,7 +1120,7 @@ class Run:
         self.changed(force=True)
         return rec
 
-    def _master(self, node, st):
+    def _master(self, node: dict[str, Any], st: dict[str, Any]) -> None:
         if node.get("mode") == "pass":
             st["output"], st["status"] = "", "done"
             st["note"] = "Passed your task straight on (no planning step)."
@@ -1141,15 +1144,15 @@ class Run:
         else:
             st["status"], st["error"] = ("stopped" if rec["status"] == "stopped" else "failed"), rec["error"]
 
-    def _stage_list(self):
+    def _stage_list(self) -> str:
         names = [n["name"] for n in self.flow["nodes"] if n["type"] == "cluster"]
         return ", ".join(names) or "none"
 
-    def _cluster(self, node, st):
+    def _cluster(self, node: dict[str, Any], st: dict[str, Any]) -> None:
         n = node.get("count", 1)
         focuses = [f.strip() for f in (node.get("focuses") or "").splitlines() if f.strip()]
 
-        def focus(i):
+        def focus(i: int) -> str:
             if node.get("split") and n > 1:
                 return f"Part {i} of {n}." + (f" {focuses[(i - 1) % len(focuses)]}" if focuses else "")
             if focuses:
@@ -1165,7 +1168,7 @@ class Run:
         if engine == "codex" and engines.status("codex").get("sandbox") is False and node["tools"] != "full":
             st["note"] = (st.get("note", "") + " Codex's sandbox doesn't work on this computer, so this team ran with full access.").strip()
 
-        def one(i, teammates=""):
+        def one(i: int, teammates: str = "") -> dict[str, Any]:
             return self._agent(node, st, f"{node['name']} {i}" if n > 1 else node["name"],
                                model=node["model"], effort=node.get("effort", "low"), tools=node["tools"],
                                system=self._system(node, i, n, apps, clis), prompt=self._prompt(node["id"], focus(i), teammates),
@@ -1187,7 +1190,7 @@ class Run:
                     if rec["report"]:
                         so_far += f"## {rec['name']}\n{rec['report']}\n\n"
         else:
-            def all_at_once():
+            def all_at_once() -> list[dict[str, Any]]:
                 threads, results = [], {}
                 for i in range(1, n + 1):
                     t = threading.Thread(target=lambda i=i: results.__setitem__(i, one(i)), daemon=True)
@@ -1220,7 +1223,7 @@ class Run:
                 st["note"] = f"{len(recs) - len(good)} of {len(recs)} agents failed; passing on the rest."
             st["status"] = "done"
 
-    def _checkpoint(self, node, st):
+    def _checkpoint(self, node: dict[str, Any], st: dict[str, Any]) -> None:
         handoff = self._handoff(node["id"])
         if node.get("mode") != "summarize" or not handoff:
             st["output"], st["status"] = handoff, "done"
@@ -1240,7 +1243,7 @@ class Run:
         else:
             st["status"], st["error"] = ("stopped" if rec["status"] == "stopped" else "failed"), rec["error"]
 
-    def _approval(self, node, st):
+    def _approval(self, node: dict[str, Any], st: dict[str, Any]) -> None:
         ev = threading.Event()
         with self.lock:
             if self.status == "stopped":   # Stop came first: nothing would ever set this event
@@ -1266,7 +1269,7 @@ class Run:
             st["status"], st["error"] = "failed", "Rejected" + (f": {note}" if note else "")
 
 
-def _reaches_this_machine(host):
+def _reaches_this_machine(host: str) -> bool:
     """True when a webhook host is this computer (Lithnode's own API lives there) or a link-local address
     like a cloud metadata service. Your home network stays allowed, for a self-hosted ntfy."""
     if os.environ.get("LITHNODE_WEBHOOK_LOCAL"):   # the tests' own receiver runs on 127.0.0.1
@@ -1283,14 +1286,14 @@ def _reaches_this_machine(host):
 
 
 class _NoRedirect(urlrequest.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
         return None   # a webhook that redirects isn't followed: the new address could be anything
 
 
 _WEBHOOK_OPENER = urlrequest.build_opener(_NoRedirect)
 
 
-def _ping(url, flow_name, message):
+def _ping(url: str, flow_name: str, message: str) -> None:
     """Tell a phone or chat app that a run needs you. Works with ntfy, IFTTT, Discord and Slack webhooks."""
     if not webhook_ok(url) or _reaches_this_machine(urlparse(url).hostname):
         return
@@ -1308,7 +1311,7 @@ def _ping(url, flow_name, message):
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".lithnode-shots", ".next", "dist", "build", ".cache"}
 
 
-def changed_files(folder, since, limit=40):
+def changed_files(folder: str | Path, since: float, limit: int = 40) -> list[str]:
     """Files under folder modified since a time, newest first, as paths relative to it (forward slashes).
     Skips hidden and build folders, and gives up on huge trees rather than stall the end of a run."""
     found, seen = [], 0
@@ -1337,13 +1340,13 @@ def changed_files(folder, since, limit=40):
 class Runner:
     """All runs in this server process."""
 
-    def __init__(self, store):
+    def __init__(self, store: Store) -> None:
         self.store = store
         self.runs = {}
         self.lock = threading.Lock()
         self.bot_roles = dict         # set by the server: {bot id: hidden instructions}
 
-    def mark_interrupted(self):
+    def mark_interrupted(self) -> None:
         """Runs left unfinished by a server that's gone. Call only once this process owns the port,
         or a second launch would mark the live server's runs as interrupted."""
         for item in self.store.list_runs(limit=200):
@@ -1363,7 +1366,7 @@ class Runner:
                     rec.setdefault("log", []).append({"t": last, "text": "Interrupted: Lithnode closed while this was running."})
                     self.store.save_run(rec)
 
-    def start(self, flow, task, folder):
+    def start(self, flow: dict[str, Any], task: str, folder: str | Path) -> Run:
         flow = {**clean_flow(flow), "id": flow["id"]}   # never trust a flow just because it came from disk
         run = Run(self.store, flow, task, folder, self.bot_roles())
         with self.lock:
@@ -1371,17 +1374,17 @@ class Runner:
         run.start()
         return run
 
-    def stop_all(self):
+    def stop_all(self) -> None:
         """Stop every live run and its agents (on quit), so no Claude Code session outlives the app."""
         for run in self.active():
             run.stop()
 
-    def get(self, run_id):
+    def get(self, run_id: str) -> Run | None:
         return self.runs.get(run_id)
 
-    def snapshot(self, run_id):
+    def snapshot(self, run_id: str) -> dict[str, Any] | None:
         run = self.runs.get(run_id)
         return run.snapshot() if run else self.store.get_run(run_id)
 
-    def active(self):
+    def active(self) -> list[Run]:
         return [r for r in self.runs.values() if r.status in ("running", "waiting")]
