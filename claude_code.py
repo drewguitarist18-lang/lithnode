@@ -340,26 +340,91 @@ def auth_status(force: bool = False) -> dict[str, Any]:
             data = json.loads(done.stdout or "{}")
             value["logged_in"] = bool(data.get("loggedIn"))
             value["method"] = data.get("authMethod")
+            value["email"] = data.get("email") or ""
         except (OSError, ValueError, subprocess.TimeoutExpired):
             pass
     _status_cache.update(at=now, value=value)
     return value
 
 
+LOGIN_TIMEOUT = 600
+_LOGIN_URL_RE = re.compile(r"https://[^\s\x07\x1b]+")
+_login: dict[str, Any] = {"proc": None, "url": "", "error": ""}
+_login_lock = threading.Lock()
+
+
 def start_login() -> bool:
-    """Open Claude Code's own sign-in (a console window, then your browser). You finish it there."""
+    """Start Claude Code's own sign-in with no window of its own. It opens your browser; its fallback link and the
+    paste-a-code box show in Lithnode instead of a console (login_state, send_login_code)."""
     command = find_command()
     if not command:
         return False
-    # The tests swap in a mock CLI; don't pop a console for that. On Mac and Linux it opens your browser itself.
-    flags = NO_WINDOW if os.environ.get("CLAWD_BOT_CLAUDE_CMD") or not WINDOWS else 0x00000010   # CREATE_NEW_CONSOLE
+    stop_login()
     try:
-        subprocess.Popen(host([*command, "auth", "login", "--claudeai"]), cwd=str(Path.home()), creationflags=flags,
-                         stdin=None if flags == 0x00000010 else subprocess.DEVNULL, **NEW_GROUP)
+        proc = subprocess.Popen(host([*command, "auth", "login", "--claudeai"]), cwd=str(Path.home()), creationflags=NO_WINDOW,
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **NEW_GROUP)
     except OSError:
         return False
-    _status_cache["value"] = None   # so the next status check really asks
+    with _login_lock:
+        _login.update(proc=proc, url="", error="")
+    threading.Thread(target=_watch_login, args=(proc,), daemon=True).start()
+    _status_cache["value"] = None
     return True
+
+
+def _watch_login(proc: subprocess.Popen) -> None:
+    """Picks the sign-in link and any complaint about a pasted code out of the login's output. When the login ends,
+    the next status check really asks, so the top bar turns green within a poll."""
+    timer = threading.Timer(LOGIN_TIMEOUT, proc.kill)
+    timer.daemon = True
+    timer.start()
+    for raw in iter(proc.stdout.readline, b""):
+        line = raw.decode("utf-8", "replace")
+        with _login_lock:
+            if _login["proc"] is not proc:
+                continue
+            m = _LOGIN_URL_RE.search(line)
+            if m and not _login["url"]:
+                _login["url"] = m.group(0)
+            if "Invalid code" in line or "not from this sign-in" in line:
+                _login["error"] = "That code didn't work. Copy the whole code from the sign-in page and paste it again."
+    proc.wait()
+    timer.cancel()
+    _status_cache["value"] = None
+    with _login_lock:
+        if _login["proc"] is proc:
+            _login.update(proc=None, url="", error="" if proc.returncode == 0 else
+                          "The sign-in stopped before it finished. Click Sign in to try again.")
+
+
+def login_state() -> dict[str, Any]:
+    """{'active', 'url', 'error'}: whether a sign-in is waiting on you, its fallback link, and what went wrong."""
+    with _login_lock:
+        proc = _login["proc"]
+        return {"active": bool(proc and proc.poll() is None), "url": _login["url"], "error": _login["error"]}
+
+
+def send_login_code(code: str) -> bool:
+    """Hands the code the sign-in page shows to the waiting login, as if pasted into its prompt."""
+    with _login_lock:
+        proc = _login["proc"]
+        if not proc or proc.poll() is not None:
+            return False
+        _login["error"] = ""
+    try:
+        proc.stdin.write((code.strip() + "\n").encode())
+        proc.stdin.flush()
+    except OSError:
+        return False
+    return True
+
+
+def stop_login() -> None:
+    with _login_lock:
+        proc, _login["proc"] = _login["proc"], None
+        _login.update(url="", error="")
+    if proc and proc.poll() is None:
+        proc.kill()
 
 
 SIGN_IN_HINT = ("Claude Code isn't signed in. Click \"Sign in\" at the top right of Lithnode, "

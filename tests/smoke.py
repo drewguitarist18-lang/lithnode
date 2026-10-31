@@ -172,13 +172,26 @@ try:
     hq = json.loads(call("/api/hq")[1])
     check("signed out: the top bar knows", not hq["claude_code"]["logged_in"] and hq["claude_code"]["available"], hq)
     started = json.loads(call("/api/signin", {}, "POST")[1])["ok"]
-    for _ in range(50):   # the login runs as its own process
-        if {"login": ["--claudeai"]} in cli_calls():
-            break
-        time.sleep(0.1)
+
+    def hq_until(test, tries=60):
+        for _ in range(tries):   # the login runs as its own process
+            d = json.loads(call("/api/hq")[1])
+            if test(d):
+                return d
+            time.sleep(0.1)
+        return d
+
+    hq = hq_until(lambda d: d["signin"]["url"])
     check("sign-in starts Claude Code's own login", started and {"login": ["--claudeai"]} in cli_calls(), cli_calls()[-1:])
-    time.sleep(16)    # the sign-in status is cached for 15s
-    check("after signing in, the top bar sees it", json.loads(call("/api/hq")[1])["claude_code"]["logged_in"])
+    check("the sign-in's fallback link shows in Lithnode", hq["signin"]["active"] and hq["signin"]["url"].startswith("https://claude.com/"), hq["signin"])
+    check("an empty code is refused", call("/api/signin/code", {"code": " "}, "POST")[0] == 400)
+    call("/api/signin/code", {"code": "half-a-code"}, "POST")
+    hq = hq_until(lambda d: d["signin"]["error"])
+    check("a wrong code says so, and the sign-in keeps waiting", "didn't work" in hq["signin"]["error"] and hq["signin"]["active"], hq["signin"])
+    check("the right code is handed to the login", call("/api/signin/code", {"code": "abc#def"}, "POST")[0] == 200)
+    hq = hq_until(lambda d: d["claude_code"]["logged_in"], 40)
+    check("the top bar sees the sign-in within seconds", hq["claude_code"]["logged_in"] and not hq["signin"]["active"], hq)
+    check("a code with no sign-in waiting is refused", call("/api/signin/code", {"code": "abc#def"}, "POST")[0] == 409)
 finally:
     server_proc.terminate()
     server_proc.wait()

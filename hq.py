@@ -422,7 +422,7 @@ class Handler(BaseHTTPRequestHandler):
         waiting = sum(1 for r in active for st in r.nodes.values() if st["status"] == "approval")
         working = sum(1 for r in active for st in r.nodes.values() for a in st["agents"] if a["status"] == "running")
         self.send_json({"runs": len(active), "approvals": waiting, "agents": working,
-                        "claude_code": claude_code.auth_status(force="fresh=1" in self.path)})
+                        "claude_code": claude_code.auth_status(force="fresh=1" in self.path), "signin": claude_code.login_state()})
 
     # -- flows -------------------------------------------------------------------
     def flow_payload(self, flow: dict[str, Any]) -> dict[str, Any]:
@@ -632,7 +632,17 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok": True})
         self.send_json({"ok": False, "error": "Claude Code isn't installed on this computer."})
 
+    def POST_api_signin_code(self) -> None:
+        """The code the sign-in page shows, pasted into Lithnode instead of a console."""
+        code = self.read_json().get("code")
+        if not isinstance(code, str) or not code.strip() or len(code) > 1000:
+            return self.send_json({"error": "Paste the code the sign-in page shows."}, 400)
+        if claude_code.send_login_code(code):
+            return self.send_json({"ok": True})
+        self.send_json({"error": "The sign-in isn't waiting for a code. Click Sign in to start again."}, 409)
+
     def POST_api_quit(self) -> None:
+        claude_code.stop_login()
         self.send_json({"ok": True})
         threading.Timer(0.3, self.server.shutdown).start()
 

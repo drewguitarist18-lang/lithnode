@@ -71,6 +71,18 @@
   .acct .row .go:hover { background: var(--ink); filter: brightness(1.1); }
   .acct .row .go:disabled { opacity: .6; cursor: default; }
   .acct small { display: block; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+  .acct p a { color: var(--ink); font-weight: 600; }
+  .acct .code { display: flex; gap: 8px; margin: 0 0 10px; }
+  .acct .code input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: transparent;
+                      color: var(--ink); font: 12px var(--mono); outline: none; }
+  .acct .code input:focus { border-color: var(--accent); }
+  .acct .code button { height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--ink); background: var(--ink); color: var(--bg);
+                       font: 600 12.5px inherit; cursor: pointer; }
+  .acct .err { color: var(--warn); }
+  .acct small a { color: var(--muted); }
+  .acct small a:hover { color: var(--ink); }
+  .acct.wait h3 i { background: var(--accent); animation: acctPulse 1.2s ease-in-out infinite; }
+  @keyframes acctPulse { 50% { opacity: .3; } }
   /* round icon buttons: theme and quit */
   .icon { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; border: 1px solid transparent;
           background: transparent; color: var(--muted); cursor: pointer; padding: 0; }
@@ -170,19 +182,27 @@ show(first);
 function badge(id, n, warn) {
   const b = $(id); b.textContent = n; b.classList.toggle("show", n > 0); b.classList.toggle("warn", !!warn);
 }
+let account = {}, signin = {}, greeted = false, trouble = false, polls = 0;
 async function poll() {
   try {
-    const d = await (await fetch("/api/hq", { cache: "no-store" })).json();
+    // signed out: ask Claude Code again now and then, so signing in elsewhere shows up by itself
+    const fresh = !account.logged_in && !signin.active && ++polls % 5 === 0;
+    const d = await (await fetch("/api/hq" + (fresh ? "?fresh=1" : ""), { cache: "no-store" })).json();
     badge("b-flows", d.approvals || d.runs, d.approvals > 0);
     badge("b-office", d.agents);
-    const cc = d.claude_code || {}, st = $("status");
-    if (signingIn && cc.logged_in) { signingIn = false; resetSignin(); }
-    const changed = JSON.stringify(cc) !== JSON.stringify(account);
-    account = cc;
+    const cc = d.claude_code || {}, si = d.signin || {}, st = $("status");
+    const changed = JSON.stringify([cc, si]) !== JSON.stringify([account, signin]);
+    account = cc; signin = si;
     st.className = "status " + (cc.logged_in ? "ok" : "bad");
     st.querySelector("span").textContent = cc.logged_in ? "Claude Code signed in"
       : cc.available ? "Claude Code isn't signed in" : "Claude Code not found";
-    $("signinBtn").hidden = !!cc.logged_in || !cc.available;
+    const b = $("signinBtn");
+    b.hidden = !!cc.logged_in || !cc.available;
+    b.textContent = si.active ? "Finish signing in…" : "Sign in";
+    // first look at a signed-out Lithnode: open the card so signing in is one click away, once the first-launch notice
+    // (flows.html's usage dialog) is out of the way, so there's one thing on screen at a time
+    let noticed = true; try { noticed = localStorage.getItem("hq-usage-ok-2") === "1"; } catch (e) {}
+    if (!greeted && noticed) { greeted = true; if (cc.available && !cc.logged_in) toggleAcct(true); }
     if (changed && !$("acct").hidden) renderAcct();
     document.title = (d.approvals ? "(!) " : "") + "Lithnode" + (d.agents ? ` · ${d.agents} working` : "");
   } catch (e) {
@@ -192,42 +212,51 @@ async function poll() {
 poll(); setInterval(poll, 2000);
 
 // Lithnode has no account of its own: agents run as Claude Code, so "signed in" means Claude Code is.
-// The card under the status pill says that, and walks through signing in when it isn't.
-let account = {}, signingIn = false, signinTimers = [];
-function resetSignin() {
-  signinTimers.forEach(clearTimeout); signinTimers = [];
-  const b = $("signinBtn"); b.disabled = false; b.textContent = "Sign in";
-  if (!$("acct").hidden) renderAcct();
-}
+// The card under the status pill says so, and makes signing in one button.
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function renderAcct() {
-  const cc = account, a = $("acct");
-  a.className = "acct" + (cc.logged_in ? " ok" : "");
-  const how = { "claude.ai": "your Claude account", "oauth_token": "a Claude sign-in token", "api_key": "an Anthropic API key",
-                "apiKey": "an Anthropic API key" }[cc.method] || "your Claude account";
+  const cc = account, si = signin, a = $("acct");
+  const typed = $("codeIn")?.value || "", focused = document.activeElement?.id === "codeIn";   // a poll mustn't eat a half-pasted code
+  a.className = "acct" + (cc.logged_in ? " ok" : si.active ? " wait" : "");
+  const how = { "oauth_token": "a Claude sign-in token", "api_key": "an Anthropic API key", "apiKey": "an Anthropic API key" }[cc.method] || "your Claude account";
+  const err = si.error ? `<p class="err">${esc(si.error)}</p>` : "";
   a.innerHTML = cc.logged_in ? `
-    <h3><i></i>Signed in through Claude Code</h3>
-    <p>Lithnode has no account of its own. Every agent runs as Claude Code on this computer, signed in with <b>${how}</b>, so runs use that plan.</p>
-    <p>Codex and Cursor teams use their own sign-ins. Each team's Model section shows if one isn't ready.</p>
-    <div class="row"><button data-act="check">Check again</button><button data-act="login">Switch account</button></div>`
+    <h3><i></i>Signed in</h3>
+    <p>${cc.email ? `as <b>${esc(cc.email)}</b>` : `with <b>${how}</b>`}. Your agents run on this account's plan.</p>
+    <div class="row"><button data-act="login">Switch account</button></div>`
+  : cc.available && si.active ? `
+    <h3><i></i>Approve in your browser</h3>
+    <p>Waiting for you to approve. This turns green by itself.</p>
+    ${trouble || si.error ? `
+    <p>${si.url ? `<a href="${esc(si.url)}" target="_blank" rel="noopener">Open the sign-in page</a>, then paste` : "Paste"} the code it shows:</p>
+    <form class="code"><input id="codeIn" placeholder="Paste the code" autocomplete="off" spellcheck="false" aria-label="Sign-in code"><button>Sign in</button></form>
+    ${err}<small><a href="#" data-act="login">Start over</a></small>`
+    : `<small><a href="#" data-act="trouble">Having trouble?</a></small>`}`
   : cc.available ? `
-    <h3><i></i>Claude Code isn't signed in</h3>
-    <p>Lithnode has no account of its own. Its agents run as Claude Code, so Claude Code needs to be signed in with your Claude account.</p>
-    <ol><li>Click <b>Sign in</b>. A small window opens, then your browser.</li><li>Approve in the browser.</li><li>Come back. This turns green by itself.</li></ol>
-    <div class="row"><button class="go" data-act="login"${signingIn ? " disabled" : ""}>${signingIn ? "Waiting for your browser…" : "Sign in"}</button><button data-act="check">Check again</button></div>
-    <small>If the browser shows a code, paste it into the small window. Or run <code>claude auth login</code> in a terminal.</small>`
+    <h3><i></i>Sign in to start</h3>
+    <p>Lithnode uses your Claude account.</p>
+    ${err}<div class="row"><button class="go" data-act="login">Sign in with Claude</button></div>`
   : `
     <h3><i></i>Claude Code not found</h3>
     <p>Lithnode runs its agents on Claude Code and couldn't find it on this computer. Install it, or open the Claude desktop app once: Lithnode can use the Claude Code inside it.</p>
     <div class="row"><a class="go" href="https://claude.com/claude-code" target="_blank" rel="noopener">Get Claude Code</a><button data-act="check">Check again</button></div>`;
+  const input = $("codeIn");
+  if (input) { input.value = typed; if (focused) input.focus(); }
 }
 async function startSignin() {
-  signingIn = true; signinTimers.forEach(clearTimeout);
-  const b = $("signinBtn"); b.disabled = true; b.textContent = "Finish in your browser…";
-  if (!$("acct").hidden) renderAcct();
+  signin = { active: true, url: "", error: "" }; trouble = false;
+  $("signinBtn").textContent = "Finish signing in…";
+  toggleAcct(true);
   try { await fetch("/api/signin", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) {}
-  // no browser yet (Mac and Linux have no console window to run it in): say how to do it by hand
-  signinTimers = [setTimeout(() => { if (!b.hidden) b.textContent = "No browser? Run: claude auth login"; }, 20000),
-                  setTimeout(() => { signingIn = false; resetSignin(); }, 90000)];
+  poll();
+}
+async function sendCode(code) {
+  signin = { ...signin, error: "" };
+  try {
+    const r = await fetch("/api/signin/code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+    if (!r.ok) signin = { ...signin, error: (await r.json()).error || "That didn't work." };
+  } catch (e) {}
+  renderAcct(); setTimeout(poll, 600);
 }
 async function checkNow() {
   try { await fetch("/api/hq?fresh=1", { cache: "no-store" }); } catch (e) {}
@@ -239,10 +268,17 @@ function toggleAcct(open = $("acct").hidden) {
   if (open) renderAcct();
 }
 $("status").onclick = () => toggleAcct();
-$("signinBtn").onclick = startSignin;
+$("signinBtn").onclick = () => signin.active ? toggleAcct(true) : startSignin();
+$("acct").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const code = $("codeIn").value.trim();
+  if (code) sendCode(code);
+});
 $("acct").addEventListener("click", (e) => {
   const act = e.target.closest("[data-act]")?.dataset.act;
+  if (act) e.preventDefault();
   if (act === "login") startSignin();
+  if (act === "trouble") { trouble = true; renderAcct(); $("codeIn")?.focus(); }
   if (act === "check") { e.target.textContent = "Checking…"; checkNow(); }
 });
 document.addEventListener("mousedown", (e) => { if (!$("acct").hidden && !e.target.closest("#acct, #status")) toggleAcct(false); });

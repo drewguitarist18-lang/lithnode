@@ -71,10 +71,16 @@ def parse(argv):
 
 
 argv = sys.argv[1:]
-if argv[:2] == ["auth", "login"]:   # pretend the user finished signing in
-    STATE.write_text(json.dumps({"logged_in": True}))
+if argv[:2] == ["auth", "login"]:   # like the real one: print the fallback link, then wait for the code ("a#b") on stdin
     log({"login": argv[2:]})
-    sys.exit(0)
+    print("Opening browser to sign in…\nIf the browser didn't open, visit: https://claude.com/cai/oauth/authorize?code=true&state=mock", flush=True)
+    for line in sys.stdin:
+        if "#" in line:
+            STATE.write_text(json.dumps({"logged_in": True}))
+            print("Login successful.", flush=True)
+            sys.exit(0)
+        print("Invalid code. Please make sure the full code was copied.", flush=True)
+    sys.exit(1)
 if argv[:2] == ["auth", "status"]:
     ok = logged_in()
     print(json.dumps({"loggedIn": ok, "authMethod": "claude.ai" if ok else "none", "apiProvider": "firstParty"}))
