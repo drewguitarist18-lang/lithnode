@@ -218,8 +218,8 @@ reports are kept.
 - `engines.py`: the Codex and Cursor engines: finding them, sign-in, models, command lines and their live output.
 - `shot.py`: `lithnode-shot`, the screenshot command agents use to look at pages and HTML they make or check.
 - `static/`:
-  - pages: `shell.html` (tabs), `flows.html`, `office.html`
-  - shared: `sprites.js` (pixel art) and `ui.js` (styled dialogs and right-click menus)
+  - pages: `shell.html` (tabs), `flows.html` (styles in `flows.css`), `office.html`
+  - shared: `theme.css` (fonts and colors), `sprites.js` (pixel art) and `ui.js` (styled dialogs and right-click menus)
 - `installer/`: the Windows build. `build.ps1` runs PyInstaller (the engine), Electron (the window) and
   Inno Setup (the installer) and writes `dist\LithnodeSetup.exe`.
 - `packaging/`: the Mac and Linux builds. `build.sh` builds the engine and the window; `linux/` holds the
@@ -231,10 +231,15 @@ reports are kept.
 ## Tests
 
 ```
+.venv\Scripts\python tests\unit_test.py    # the pure helpers, in about a second
 .venv\Scripts\python tests\flows_test.py   # flows, runs, approvals, stop, office feed, the designer, built-in roles
-.venv\Scripts\python tests\smoke.py        # the window, bots and locking, sign-in, localhost checks
+.venv\Scripts\python tests\smoke.py        # the window, bots and locking, sign-in, localhost checks, headers, bad JSON
+.venv\Scripts\python -m pip install -r requirements-dev.txt
+.venv\Scripts\python -m ruff check .       # lint (settings in pyproject.toml)
 ```
 
-On Mac and Linux, use `python3 tests/flows_test.py` and `python3 tests/smoke.py`; CI runs both there on every push.
+On Mac and Linux, use `python3 tests/...`; CI lints and runs all three there on every push.
+The server logs to `~/.lithnode/lithnode.log` (POSTs, DELETEs, failures with their traceback); set
+`LITHNODE_DEBUG=1` to log every GET too.
 Both suites run the real server against `tests/mock_claude.py`, a stand-in `claude` CLI, so they cost
 nothing. Real runs have been tested against Claude Code 2.1.289 with the *Quick code review* template.
