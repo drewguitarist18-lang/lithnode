@@ -30,81 +30,75 @@
   [hidden] { display: none !important; }
   html, body { height: 100%; margin: 0; }
   body { background: var(--bg); color: var(--ink); font: 13.5px/1.45 "Segoe UI", system-ui, sans-serif;
-         display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+         display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
   button, input, select, textarea { font: inherit; color: inherit; }
-  button { cursor: pointer; border: 1px solid var(--line); background: var(--pad); border-radius: 8px; padding: 6px 12px; }
+  button { cursor: pointer; border: 1px solid var(--line); background: var(--pad); border-radius: 9px; padding: 6px 12px; font-weight: 500; }
   button:hover { background: var(--hover); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   button.primary:hover { filter: brightness(1.06); }
   button.danger { color: var(--failed); }
   button:disabled { opacity: .5; cursor: default; }
-  input, select, textarea { background: var(--pad); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; width: 100%; }
-  textarea { resize: vertical; min-height: 70px; }
+  input, select, textarea { background: var(--pad); border: 1px solid var(--line); border-radius: 9px; padding: 6px 9px; width: 100%; }
+  textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-
-  /* toolbar */
-  .bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; min-height: 52px; }
-  .bar button { height: 34px; display: inline-flex; align-items: center; gap: 6px; }
-  .bar .ib { width: 34px; padding: 0; justify-content: center; color: var(--muted); background: transparent; border-color: transparent; }
-  .bar .ib:hover { color: var(--ink); background: var(--hover); }
-  .bar .ib[aria-pressed="false"] { color: color-mix(in srgb, var(--muted) 70%, transparent); }
-  .bar .ib svg { width: 18px; height: 18px; }
-  .bar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 2px; }
-  /* the flow's name is the title; the small switch beside it opens your other flows */
-  .fswitch { position: relative; width: 28px; height: 34px; flex: none; border-radius: 8px; color: var(--muted); display: grid; place-items: center; }
-  .fswitch:hover { background: var(--hover); color: var(--ink); }
-  .fswitch svg { width: 16px; height: 16px; pointer-events: none; }
-  .fswitch select { position: absolute; inset: 0; opacity: 0; cursor: pointer; padding: 0; }
-  .fswitch select option { color: var(--ink); background: var(--panel); }
-  .bar #flowName { width: auto; min-width: 120px; max-width: 340px; field-sizing: content; font-size: 15px; font-weight: 650; letter-spacing: -.01em;
-                   background: transparent; border-color: transparent; padding: 5px 8px; margin-left: -2px; margin-right: -6px; }
-  .bar #flowName:hover:not(:focus) { border-color: var(--line); }
-  .bar #flowName:focus { background: var(--pad); }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
-          background: var(--pad); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
-  .chip.warn { color: var(--approval); border-color: color-mix(in srgb, var(--approval) 40%, var(--line)); }
+  ::placeholder { color: var(--faint, var(--muted)); opacity: 1; }
+  /* square icon buttons: the panel headers, the flow menu and the canvas controls */
+  .ib { width: 30px; height: 30px; padding: 0; flex: none; display: inline-grid; place-items: center; color: var(--muted);
+        background: transparent; border-color: transparent; border-radius: 8px; }
+  .ib:hover { color: var(--ink); background: var(--hover); }
+  .ib svg, svg.ico { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  svg.play { width: 11px; height: 11px; fill: currentColor; stroke: none; }
   .grow { flex: 1; }
-  #saved { color: var(--muted); font-size: 12px; min-width: 56px; opacity: .8; }
-  main.hideL { grid-template-columns: 0 1fr 350px; } main.hideL #palette { visibility: hidden; }
-  main.hideR { grid-template-columns: 240px 1fr 0; } main.hideR #insp { visibility: hidden; }
-  main.hideL.hideR, main.running.hideR { grid-template-columns: 0 1fr 0; }
 
-  main { display: grid; grid-template-columns: 240px 1fr 350px; min-height: 0; transition: grid-template-columns .25s ease; }
-  main.running { grid-template-columns: 0 1fr 350px; }   /* building blocks aren't needed while a run goes */
-  main.running #palette { visibility: hidden; }
-  /* the run's steps, live, in the side panel */
-  .runsteps { display: grid; gap: 2px; margin: 2px 0 12px; }
-  .runsteps button { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; text-align: left;
-                  padding: 7px 8px; border: 0; border-radius: 9px; background: transparent; color: var(--ink); font-size: 12.5px; }
-  .runsteps button:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
-  .runsteps .rs-dot { width: 10px; height: 10px; border-radius: 50%; justify-self: center; background: color-mix(in srgb, var(--waiting) 55%, transparent); }
-  .runsteps .rs-dot.running { background: var(--running); animation: agent-pulse 1.1s ease-in-out infinite; }
-  .runsteps .rs-dot.done { background: var(--done); } .runsteps .rs-dot.failed { background: var(--failed); } .runsteps .rs-dot.approval { background: var(--approval); }
-  .runsteps .rs-name { min-width: 0; }
-  .runsteps .rs-name b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .runsteps .rs-name small { display: block; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .runsteps .rs-name small.live { color: var(--running); font-family: ui-monospace, Consolas, monospace; }
-  .runsteps .rs-time { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
-  .runsteps .waiting { opacity: .6; }
-  .rp-top .meta .mono { font-family: ui-monospace, Consolas, monospace; }
+  /* three columns, like a design tool: what you can add | the flow | the settings of what's selected */
+  main { --lw: 252px; --rw: 344px; display: grid; grid-template-columns: var(--lw) minmax(0, 1fr) var(--rw); min-height: 0;
+         transition: grid-template-columns .22s ease; }
+  main.hideL, main.running { --lw: 0px; }   /* building blocks aren't needed while a run goes */
+  main.hideR { --rw: 0px; }
+  main:is(.hideL, .running) #palette, main.hideR #rside { visibility: hidden; }
+  @media (max-width: 1180px) { main { --lw: 226px; --rw: 304px; } }
+  /* both panels start with a header of the same height, so their edges line up across the canvas */
+  .phead, .rtop { flex: none; height: 58px; display: flex; align-items: center; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+  .ftitle { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .fname { display: flex; align-items: center; min-width: 0; border-radius: 8px; transition: background .12s; }
+  .fname:hover { background: var(--hover); }
+  #flowName { flex: 1; min-width: 0; width: auto; font-size: 14px; padding: 3px 2px 3px 8px; background: transparent; border-color: transparent; text-overflow: ellipsis; }
+  #flowName:focus { background: var(--pad); border-color: var(--line); }
+  #flowMenu { width: 26px; height: 28px; }
+  #flowMenu svg { width: 15px; height: 15px; }
+  .pmeta { display: flex; align-items: center; gap: 8px; padding: 0 6px 0 9px; font-size: 11.5px; color: var(--muted); white-space: nowrap; min-height: 17px; }
+  .pmeta #estChip { overflow: hidden; text-overflow: ellipsis; }
+  .pmeta #saved { margin-left: auto; opacity: .8; }
+  .rtop { gap: 6px; padding: 0 8px 0 10px; }
+  .rtop button:not(.ib) { height: 32px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; white-space: nowrap; }
+  #runsBtn { background: transparent; border-color: transparent; color: var(--muted); padding: 0 10px 0 8px; }
+  #runsBtn:hover { color: var(--ink); background: var(--hover); }
+  #runsBtn svg { width: 16px; height: 16px; }
+  /* what stops the flow from running, right under the Run button */
+  .probs { flex: none; display: flex; gap: 8px; align-items: flex-start; padding: 9px 14px; font-size: 12.5px; line-height: 1.45;
+           color: var(--approval); background: color-mix(in srgb, var(--approval) 8%, var(--panel));
+           border-bottom: 1px solid color-mix(in srgb, var(--approval) 28%, var(--line)); }
+  .probs svg { flex: none; width: 15px; height: 15px; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .probs small { color: var(--muted); white-space: nowrap; }
+  .rside { background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .rp-top .meta .mono { font-family: var(--mono); }
   /* palette */
-  .palette { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 14px 12px;
-             display: flex; flex-direction: column; gap: 16px; }
-  .psec h3 { display: flex; align-items: center; justify-content: space-between; margin: 0 2px 8px; }
-  .psec h3 .count { font-size: 10.5px; letter-spacing: 0; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
+  .palette { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .plib { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 18px; }
+  .psec h3 { display: flex; align-items: center; gap: 6px; margin: 0 2px 8px; }
+  .psec h3 .count { font-size: 11.5px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .psec h3 .newbot { margin-left: auto; }
   .pal { user-select: none; cursor: grab; }
   .pal:active { cursor: grabbing; }
   .pal:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  /* building blocks look like the nodes they make: a team card, then step pills */
-  .blocks { display: grid; gap: 7px; }
-  .blk { display: flex; align-items: center; gap: 10px; background: var(--pad); border: 1px solid var(--line); color: var(--ink);
+  /* building blocks look like the nodes they make: a team card, then the round steps */
+  .blocks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .blk { display: flex; align-items: center; gap: 10px; min-width: 0; background: var(--pad); border: 1px solid var(--line); color: var(--ink);
          transition: border-color .15s, transform .15s, box-shadow .15s; }
   .blk:hover { border-color: color-mix(in srgb, var(--ink) 24%, var(--line)); transform: translateY(-1px); box-shadow: 0 8px 20px -12px var(--shadow); }
-  .blk b { font-size: 13px; font-weight: 650; }
+  .blk b { font-size: 13px; font-weight: 600; white-space: nowrap; }
   .blk small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .blk b { white-space: nowrap; }
-  .bteam { padding: 10px; border-radius: 12px; }
+  .bteam { grid-column: 1 / -1; padding: 10px; border-radius: 12px; }
   .bteam .bt { width: 34px; height: 34px; border-radius: 9px; flex: none; display: grid; place-items: center;
                background: color-mix(in srgb, #5b8def 17%, var(--pad)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #5b8def 24%, transparent); }
   .bteam .bt canvas { width: 26px; height: 19.5px; image-rendering: pixelated; }
@@ -112,45 +106,37 @@
   .bteam .bdots { display: flex; flex: none; }
   .bteam .bdots i { width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, #5b8def 70%, var(--pad)); box-shadow: 0 0 0 2px var(--pad); }
   .bteam .bdots i + i { margin-left: -3px; }
-  .bstep { height: 34px; padding: 0 14px 0 10px; border-radius: 999px; }
-  .bstep .bi { width: 17px; height: 17px; flex: none; color: var(--muted); display: grid; place-items: center; }
-  .bstep .bi svg { width: 17px; height: 17px; }
-  .bstep small { margin-left: auto; }
+  .bstep { flex-direction: column; justify-content: center; gap: 1px; padding: 10px 2px 8px; border-radius: 12px; text-align: center; }
+  .bstep .bi { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; margin-bottom: 4px;
+               color: var(--muted); background: var(--panel); border: 1px solid var(--line); }
+  .bstep .bi svg { width: 16px; height: 16px; }
+  .bstep b { font-size: 11.5px; letter-spacing: -.01em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .bstep small { font-size: 11px; max-width: 100%; }
   .blk.used { opacity: .4; }
-  .tile { --c: var(--accent); position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px 10px;
-          text-align: center; border: 1px solid var(--line); border-radius: 14px; background: var(--pad); overflow: hidden;
-          transition: border-color .15s, transform .15s; }
-  .tile::before { content: ""; position: absolute; inset: -40% -20% auto; height: 90%; pointer-events: none;
-                  background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 22%, transparent), transparent); opacity: .7; transition: opacity .15s; }
-  .tile:hover { border-color: color-mix(in srgb, var(--c) 60%, var(--line)); transform: translateY(-1px); }
-  .tile:hover::before { opacity: 1; }
-  .tile canvas { position: relative; width: 44px; height: 33px; margin-bottom: 4px; }
-  .tile b { position: relative; font-size: 12.5px; line-height: 1.2; }
-  .tile.used { opacity: .4; }
-  .tile small { position: relative; color: var(--muted); font-size: 10.5px; line-height: 1.25; }
-  .find { position: relative; margin-bottom: 6px; }
-  .find svg { position: absolute; left: 9px; top: 50%; width: 14px; height: 14px; transform: translateY(-50%); stroke: var(--muted); fill: none; stroke-width: 2; }
-  .find input { padding: 7px 10px 7px 30px; font-size: 12.5px; }
-  .bot { position: relative; display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 10px; align-items: center; padding: 6px 8px;
-         border: 1px solid transparent; border-radius: 12px; transition: background .12s, border-color .12s; }
+  .find { position: relative; display: block; margin-bottom: 4px; }
+  .find svg { position: absolute; left: 10px; top: 50%; width: 14px; height: 14px; transform: translateY(-50%); stroke: var(--muted); fill: none; stroke-width: 2; }
+  .find input { padding: 7px 10px 7px 31px; font-size: 12.5px; }
+  .bot { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; align-items: center; padding: 6px 8px;
+         border: 1px solid transparent; border-radius: 11px; transition: background .12s, border-color .12s; }
   .bot:hover { background: var(--pad); border-color: var(--line); }
-  .bot .ava { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+  .bot .ava { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
               background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 28%, transparent); }
-  .bot canvas { width: 30px; height: 22px; }
+  .bot canvas { width: 28px; height: 21px; }
   .bot .plus { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 8px;
-               display: grid; place-items: center; font-weight: 700; color: var(--ink); background: var(--accent); opacity: 0; transition: opacity .12s; }
+               display: grid; place-items: center; font-weight: 700; color: var(--on-accent, #fff); background: var(--accent); opacity: 0; transition: opacity .12s; }
   .bot:hover .plus, .bot:focus-visible .plus { opacity: 1; }
   .bot .edit { position: absolute; right: 38px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border-radius: 8px;
                display: grid; place-items: center; opacity: 0; transition: opacity .12s; background: var(--pad); }
   .bot .edit svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .bot:hover .edit, .bot:focus-within .edit { opacity: 1; }
-  .makebot { display: grid; grid-template-columns: 38px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left;
-             width: 100%; margin-top: 10px; padding: 8px; border: 1px dashed var(--line); border-radius: 12px; background: transparent; }
+  .bot:is(:hover, :focus-within) .can { visibility: hidden; }   /* the edit and add buttons take its place */
+  .makebot { display: grid; grid-template-columns: 36px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left;
+             width: 100%; margin-top: 10px; padding: 8px; border: 1px dashed var(--line); border-radius: 11px; background: transparent; font-weight: 600; }
   .makebot:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
-  .makebot span { grid-row: 1 / 3; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-size: 20px;
+  .makebot span { grid-row: 1 / 3; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 19px; font-weight: 400;
                   color: var(--accent); border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--line)); }
-  .makebot small { color: var(--muted); font-size: 11.5px; }
-  .newbot { font-size: 11px; padding: 2px 9px; border-radius: 999px; text-transform: none; letter-spacing: 0; }
+  .makebot small { color: var(--muted); font-size: 11.5px; font-weight: 400; }
+  .newbot { font-size: 11.5px; padding: 2px 10px; border-radius: 999px; }
   dialog.botdlg { width: min(560px, 94vw); }
   .botdlg .bt { display: grid; grid-template-columns: 76px 1fr; gap: 14px; align-items: center; margin-bottom: 12px; }
   .botdlg .bigava { width: 76px; height: 76px; border-radius: 18px; display: grid; place-items: center;
@@ -166,20 +152,22 @@
   .swatches button.on { border-color: var(--ink); }
   .swatches input { width: 34px; height: 28px; padding: 2px; }
   .botdlg.locked .unlocked { display: none; }
-  .grp { font-size: 10.5px; font-weight: 600; color: var(--muted); margin: 10px 4px 4px; }
+  .grp { font-size: 11.5px; font-weight: 500; color: var(--muted); margin: 12px 4px 4px; }
   .grp:first-child { margin-top: 2px; }
   .bot .top { display: flex; align-items: center; gap: 6px; min-width: 0; }
-  .bot b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bot b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bot small { display: block; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .can { flex: none; font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px;
+  /* what a bot can touch, in a word, tinted by how much it can change */
+  .can { flex: none; margin-left: auto; font-size: 11px; font-weight: 500; padding: 0 7px; line-height: 17px; border-radius: 999px;
          color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
-  .can.edit { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-  .can.full { color: var(--failed); border-color: color-mix(in srgb, var(--failed) 45%, var(--line)); }
-  .can.web { color: #7aa2f7; border-color: color-mix(in srgb, #7aa2f7 45%, var(--line)); }
-  .tip { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.45; color: var(--muted);
-         border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; margin-top: auto; }
+  .can.edit { color: var(--approval); border-color: color-mix(in srgb, var(--approval) 40%, var(--line)); }
+  .can.full { color: var(--failed); border-color: color-mix(in srgb, var(--failed) 40%, var(--line)); }
+  .can.web { color: #7aa2f7; border-color: color-mix(in srgb, #7aa2f7 40%, var(--line)); }
+  /* how to use the palette, pinned under it */
+  .tip { flex: none; display: flex; gap: 8px; align-items: flex-start; font-size: 11.5px; line-height: 1.45; color: var(--muted);
+         border-top: 1px solid var(--line); padding: 10px 14px 12px; }
   .tip b { color: var(--ink); font-weight: 600; }
-  h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 6px 2px 8px; font-weight: 600; }
+  h3 { font-size: 12.5px; color: var(--ink); margin: 6px 2px 8px; font-weight: 600; }
   .hint { color: var(--muted); font-size: 12.5px; }
 
   /* canvas */
@@ -210,8 +198,8 @@
                  border: 1.5px dashed color-mix(in srgb, var(--ink) 30%, var(--line)); background: color-mix(in srgb, var(--pad) 70%, transparent);
                  transition: border-color .2s, color .2s, background .2s, transform .2s; }
   .ghost .gorb svg { width: 28px; height: 28px; }
-  .ghost b { margin-top: 13px; font-size: 14px; font-weight: 650; color: var(--ink); text-shadow: 0 1px 8px var(--bg), 0 0 2px var(--bg); }
-  .ghost small { margin-top: 2px; font-size: 12px; line-height: 1.4; text-wrap: balance; text-shadow: 0 1px 8px var(--bg), 0 0 2px var(--bg); }
+  .ghost b { margin-top: 13px; font-size: 14px; font-weight: 600; color: var(--ink); }
+  .ghost small { margin-top: 2px; font-size: 12px; line-height: 1.4; text-wrap: balance; }
   .ghost:hover, .ghost:active { background: none; border: 0; }
   .ghost:hover .gorb, .ghost:focus-visible .gorb, .ghost.over .gorb { border-color: var(--accent); color: var(--ink);
                  background: color-mix(in srgb, var(--accent) 9%, var(--pad)); transform: scale(1.05); }
@@ -244,11 +232,9 @@
   .node .orb .ok svg { width: 13px; height: 13px; }
   .node.st-done .orb .ok { display: grid; }
   .node .tt { min-width: 0; max-width: 100%; margin-top: 13px; }
-  .node .nm { font-size: 14px; font-weight: 650; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-              text-shadow: 0 1px 8px var(--bg), 0 0 2px var(--bg); }
-  .node .jb { font-size: 12px; line-height: 1.4; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-              text-shadow: 0 1px 8px var(--bg), 0 0 2px var(--bg); }
-  .node .jb.live { color: var(--running); font: 500 11.5px/1.4 ui-monospace, Consolas, monospace; }
+  .node .nm { font-size: 14px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .jb { font-size: 12px; line-height: 1.4; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .jb.live { color: var(--running); font-weight: 550; }
   .node .jb.warn { color: var(--approval); }
   .node .jb.err { color: var(--failed); }
   .node .jb .y { color: var(--done); font-weight: 600; } .node .jb .n { color: var(--failed); font-weight: 600; }
@@ -286,12 +272,12 @@
   .node:hover .x, .node.sel .x { display: grid; }
   .node .x:hover { background: var(--failed); border-color: var(--failed); color: #fff; }
   .locked .node .x { display: none !important; }
-  .chipc { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; padding: 2px 7px 2px 3px; border-radius: 999px;
+  .chipc { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 7px 2px 3px; border-radius: 999px;
            background: color-mix(in srgb, var(--c) 16%, transparent); color: color-mix(in srgb, var(--c) 85%, var(--ink)); }
   .cico { width: 15px; height: 15px; border-radius: 4px; display: inline-grid; place-items: center; font: 800 9px/1 system-ui; font-style: normal;
           background: var(--c); color: #111; flex: none; }
   /* the items tray: what the teams found, and how they judged it */
-  #tray { position: absolute; left: 12px; right: 12px; bottom: 52px; z-index: 4; display: none;
+  #tray { position: absolute; left: 12px; right: 64px; bottom: 12px; z-index: 4; display: none;
           background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 16px;
           box-shadow: 0 18px 50px var(--shadow); }
   #tray.show { display: block; animation: tray-in .35s cubic-bezier(.2,.8,.1,1); }
@@ -303,7 +289,7 @@
   #tray .src button { font-size: 11.5px; padding: 3px 10px; border-radius: 999px; }
   #tray .src button.on { border-color: var(--accent); color: var(--accent); }
   #tray .sum { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-  #tray .sum .y { color: var(--done); font-weight: 700; } #tray .sum .n { color: var(--failed); font-weight: 700; }
+  #tray .sum .y { color: var(--done); font-weight: 600; } #tray .sum .n { color: var(--failed); font-weight: 600; }
   #tray .fold { padding: 3px 9px; font-size: 12px; }
   #tray .grid { display: flex; gap: 10px; padding: 8px 12px 12px; overflow-x: auto; scroll-snap-type: x proximity; }
   #tray .grid .item { flex: 0 0 230px; scroll-snap-align: start; }
@@ -319,16 +305,16 @@
   .item .thumb img { width: 100%; height: 100%; object-fit: cover; background: #fff; }
   .item.noimg { grid-template-columns: 1fr; }   /* no photo: just the text, never a stand-in of initials */
   .item .info { min-width: 0; }
-  .item .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; font-weight: 700; line-height: 1.3; padding-right: 16px; }
+  .item .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; font-weight: 600; line-height: 1.3; padding-right: 16px; }
   .item .row { display: flex; gap: 8px; align-items: baseline; margin-top: 3px; font-size: 12px; }
-  .item .price { font-weight: 700; }
+  .item .price { font-weight: 600; }
   .item .rate { color: var(--approval); font-size: 11px; font-weight: 600; }
   .item .swatches { display: flex; gap: 3px; margin-top: 5px; flex-wrap: wrap; }
   .item .swatches i { width: 15px; height: 15px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
   .item .facts { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
   .item .stamp { position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
                  font-size: 12px; font-weight: 900; color: #0a0a0a; box-shadow: 0 2px 8px var(--shadow); }
-  .item .why { grid-column: 1 / -1; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; justify-self: start; max-width: 100%;
+  .item .why { grid-column: 1 / -1; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; justify-self: start; max-width: 100%;
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .item.v-pass { border-color: color-mix(in srgb, var(--done) 55%, var(--line)); }
   .item.v-pass .stamp { background: var(--done); } .item.v-pass .why { background: color-mix(in srgb, var(--done) 16%, transparent); color: var(--done); }
@@ -345,7 +331,7 @@
   .switch.conn:has(input:checked) { border-color: color-mix(in srgb, var(--done) 45%, var(--line)); background: color-mix(in srgb, var(--done) 7%, var(--pad)); }
   .switch.conn input:checked { background: var(--done); }
   .switch.conn .cico { width: 22px; height: 22px; border-radius: 6px; font-size: 11px; }
-  .cico.cli { background: #1d1f24; color: #9ece6a; font-family: ui-monospace, Consolas, monospace; box-shadow: inset 0 0 0 1px #3a3d45; }
+  .cico.cli { background: #1d1f24; color: #9ece6a; font-family: var(--mono); box-shadow: inset 0 0 0 1px #3a3d45; }
   .cico svg { width: 72%; height: 72%; display: block; }
   /* toggle chips: connectors and command-line tools, many to a row */
   .tchips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -378,7 +364,7 @@
   .estat a { margin-left: auto; }
   .engines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .engines button { display: grid; justify-items: start; gap: 3px; text-align: left; padding: 9px 10px; border-radius: 10px;
-                     font-size: 12.5px; font-weight: 700; white-space: nowrap; min-width: 0; }
+                     font-size: 12.5px; font-weight: 600; white-space: nowrap; min-width: 0; }
   .engines button .eico { margin-bottom: 3px; }
   .engines button small { white-space: normal; line-height: 1.3; }
   .eico { width: 26px; height: 26px; border-radius: 7px; display: inline-grid; place-items: center; flex: none; overflow: hidden; background: #161616; }
@@ -387,13 +373,13 @@
   .eico canvas { width: 20px; height: 15px; image-rendering: pixelated; }
   .chipc .eico { width: 15px; height: 15px; border-radius: 4px; }
   .chipc .eico canvas { width: 12px; height: 9px; }
-  .engines button small { font-size: 10.5px; font-weight: 500; color: var(--muted); }
+  .engines button small { font-size: 11px; font-weight: 500; color: var(--muted); }
   .engines button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--pad)); }
   .engines button.off { opacity: .55; }
   .enote { margin-top: 8px; padding: 8px 10px; border-radius: 9px; font-size: 12px; line-height: 1.45; color: var(--muted);
            background: color-mix(in srgb, var(--approval) 8%, var(--pad)); border: 1px solid color-mix(in srgb, var(--approval) 30%, var(--line)); }
   .cliadd { display: flex; gap: 6px; margin-top: 8px; }
-  .cliadd input { flex: 1; min-width: 0; font-family: ui-monospace, Consolas, monospace; }
+  .cliadd input { flex: 1; min-width: 0; font-family: var(--mono); }
   .port { position: absolute; top: calc(50% - 7px); width: 14px; height: 14px; border-radius: 50%; background: var(--pad);
           border: 2px solid var(--wire); cursor: crosshair; transition: transform .15s, border-color .15s, background .15s; }
   .node:hover .port { border-color: color-mix(in srgb, var(--ink) 40%, var(--wire)); }
@@ -405,68 +391,75 @@
   .locked .port { display: none; }
   .locked .node { cursor: pointer; }
   #banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--pad); border: 1px solid var(--line);
-            border-radius: 999px; padding: 6px 8px 6px 14px; display: none; align-items: center; gap: 10px; box-shadow: 0 6px 18px var(--shadow); z-index: 5; }
+            border-radius: 999px; padding: 5px 6px 5px 14px; display: none; align-items: center; gap: 10px; box-shadow: var(--lift); z-index: 5; }
   #banner.show { display: flex; }
   #banner, #banner button { white-space: nowrap; }
+  #banner button { height: 30px; padding: 0 12px; border-radius: 999px; }
   #banner i { width: 9px; height: 9px; border-radius: 50%; background: var(--running); animation: blink 1s infinite; }
+  #bannerText { font-weight: 550; font-variant-numeric: tabular-nums; }
   @keyframes blink { 50% { opacity: .3; } }
-  #ask { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: min(620px, calc(100% - 32px)); z-index: 6;
+  /* the composer: describe a team in words and Lithnode draws it, at the bottom like a chat box */
+  #ask { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); width: min(600px, calc(100% - 140px)); z-index: 6;
          display: flex; gap: 8px; align-items: center; padding: 6px 6px 6px 14px; border-radius: 14px; background: var(--pad);
-         border: 1px solid var(--line); box-shadow: 0 10px 30px var(--shadow); }
-  #ask:focus-within { border-color: var(--accent); }
+         border: 1px solid var(--line); box-shadow: var(--lift); transition: border-color .15s, box-shadow .15s; }
+  #ask:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+                      box-shadow: var(--lift), 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
   #ask b { color: var(--accent); font-size: 15px; }
-  #ask input { border: 0; background: transparent; padding: 6px 0; outline: none; }
+  #ask input { border: 0; background: transparent; padding: 7px 0; outline: none; min-width: 0; text-overflow: ellipsis; }
   #ask input:focus { outline: none; }
-  #ask button { white-space: nowrap; }
+  #ask button { white-space: nowrap; height: 34px; padding: 0 14px; border-radius: 10px; }
   #ask.busy { opacity: .85; }
   #ask.busy b { animation: blink 1s infinite; }
   .locked #ask { display: none; }
-  .zoom { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; z-index: 5; }
-  .zoom button { padding: 4px 10px; }
-  .zoom button.on { border-color: var(--accent); color: var(--accent); }
-  #emptyHint { position: absolute; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; color: var(--muted); }
+  /* view controls: one slim column at the bottom right */
+  .zoom { position: absolute; right: 14px; bottom: 16px; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 1px;
+          padding: 4px; border-radius: 12px; background: var(--pad); border: 1px solid var(--line); box-shadow: var(--lift); }
+  .zoom button { width: 32px; height: 30px; padding: 0; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); border-radius: 8px; }
+  .zoom button:hover { color: var(--ink); background: var(--hover); }
+  .zoom button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .zoom button.on { color: var(--ink); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  .zoom #zPct { height: 22px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .zoom hr { width: 20px; margin: 3px 0; border: 0; border-top: 1px solid var(--line); }
+  .locked .zoom .edit-only { display: none; }
+  /* with a side panel tucked away, its essentials float on the canvas instead */
+  .float { position: absolute; top: 12px; z-index: 6; display: none; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; min-width: 0;
+           max-width: calc(50% - 24px); background: var(--pad); border: 1px solid var(--line); box-shadow: var(--lift); }
+  #floatL { left: 12px; } #floatR { right: 12px; }
+  main.hideL:not(.running) #floatL, main.hideR #floatR { display: flex; }
+  #floatName { display: flex; align-items: center; gap: 4px; min-width: 0; height: 30px; padding: 0 6px 0 8px; border: 0; background: transparent; font-weight: 600; }
+  #floatName span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #floatName svg { flex: none; width: 14px; height: 14px; color: var(--muted); }
+  #floatName:hover { background: var(--hover); }
+  #floatRun { height: 30px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; white-space: nowrap; }
+  main.running #floatRun { display: none; }
+  #emptyHint { position: absolute; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; color: var(--muted); padding: 24px; }
   #emptyHint.show { display: grid; }
+  #emptyHint > div { max-width: 340px; line-height: 1.55; text-wrap: balance; }
+  #emptyHint b { display: block; margin-bottom: 4px; font-size: 15px; font-weight: 600; color: var(--ink); }
 
   /* inspector */
-  .insp { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0; }
+  .insp { flex: 1; min-height: 0; overflow-y: auto; padding: 0; }
   .insp.padded { padding: 14px; }   /* the run view */
   /* ---- right panel: header, sections and tap-to-pick controls ---- */
-  .ihead { --c: var(--accent); display: flex; gap: 12px; align-items: center; padding: 16px; border-bottom: 1px solid var(--line);
-           background: linear-gradient(180deg, color-mix(in srgb, var(--c) 10%, transparent), transparent); }
-  .ihead .ava { flex: none; width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center;
-                background: color-mix(in srgb, var(--c) 18%, var(--pad)); border: 1px solid color-mix(in srgb, var(--c) 35%, var(--line)); }
-  .ihead .ava canvas { width: 40px; height: 30px; }
-  .ihead .who { flex: 1; min-width: 0; }
-  .ihead input.title { font-size: 17px; font-weight: 650; border: 1px solid transparent; background: transparent; padding: 2px 6px; margin-left: -7px; }
+  .ihead { --c: var(--accent); display: flex; gap: 12px; align-items: center; padding: 14px 10px 14px 16px; border-bottom: 1px solid var(--line);
+           background: linear-gradient(180deg, color-mix(in srgb, var(--c) 9%, transparent), transparent); }
+  .ihead .ava { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+                background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--c) 30%, var(--pad)), color-mix(in srgb, var(--c) 9%, var(--pad)) 75%);
+                border: 1px solid color-mix(in srgb, var(--c) 38%, var(--line)); }
+  .ihead .ava canvas { width: 36px; height: 27px; image-rendering: pixelated; }
+  .ihead .who { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .ihead input.title { font-size: 15px; border: 1px solid transparent; background: transparent; padding: 2px 6px; margin-left: -7px; width: calc(100% + 7px); text-overflow: ellipsis; }
   .ihead input.title:hover { border-color: var(--line); }
+  .ihead input.title:focus { background: var(--pad); border-color: var(--line); }
   .ihead .kind { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .iconbtn { flex: none; width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border-radius: 10px; color: var(--muted); }
-  .iconbtn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .iconbtn:hover { color: var(--failed); border-color: color-mix(in srgb, var(--failed) 50%, var(--line)); }
-  /* the header as a portrait: the bot in a glowing orb, its name under it, other bots to pick from */
-  .ihead.hero { position: relative; flex-direction: column; gap: 6px; padding: 22px 16px 14px; text-align: center; border-bottom: 0;
-                background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%); }
-  .ihead.hero .ava { width: 84px; height: 84px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c) 45%, var(--line));
-                     background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--c) 32%, var(--pad)), color-mix(in srgb, var(--c) 8%, var(--pad)) 72%);
-                     box-shadow: 0 0 0 7px color-mix(in srgb, var(--c) 8%, transparent), 0 12px 40px -10px color-mix(in srgb, var(--c) 80%, transparent); }
-  .ihead.hero .ava canvas { width: 64px; height: 48px; image-rendering: pixelated; }
-  .ihead.hero input.title { margin: 6px 0 0; text-align: center; font-size: 19px; width: 100%; border-radius: 10px; }
-  .ihead.hero .kind { white-space: normal; }
-  .ihead.hero .iconbtn { position: absolute; top: 10px; right: 10px; border-color: transparent; background: transparent; }
-  .botstrip { display: flex; gap: 8px; width: calc(100% + 32px); margin: 8px -16px 0; padding: 6px 16px 4px; overflow-x: auto; scrollbar-width: none;
-              mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent); }
-  .botstrip::-webkit-scrollbar { display: none; }
-  .botstrip button { flex: none; width: 42px; height: 42px; padding: 0; border-radius: 50%; display: grid; place-items: center;
-                     background: color-mix(in srgb, var(--bc) 12%, var(--pad)); border: 1.5px solid color-mix(in srgb, var(--bc) 22%, var(--line));
-                     opacity: .6; transition: opacity .15s, transform .15s, border-color .15s; }
-  .botstrip button:hover { opacity: 1; transform: translateY(-2px); }
-  .botstrip button.on { opacity: 1; border-color: var(--bc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bc) 25%, transparent), 0 6px 18px -6px var(--bc); }
-  .botstrip canvas { width: 32px; height: 24px; image-rendering: pixelated; }
+  .iconbtn { flex: none; width: 32px; height: 32px; padding: 0; display: grid; place-items: center; border-radius: 9px; color: var(--muted); background: transparent; border-color: transparent; }
+  .iconbtn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .iconbtn:hover { color: var(--failed); background: color-mix(in srgb, var(--failed) 10%, transparent); }
   /* sliders: a soft track that fills in the control's color, a glowing thumb, the value up top */
   .sl { --c: var(--accent); display: grid; gap: 4px; }
   .sl-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); }
-  .sl-top b { color: var(--ink); font-size: 13.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .sl-ends { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); letter-spacing: .04em; opacity: .8; }
+  .sl-top b { color: var(--ink); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sl-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); letter-spacing: .04em; opacity: .8; }
   .sl input[type=range], .mslider input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; }
   .sl input[type=range]:focus { outline: none; }
   .sl input[type=range]::-webkit-slider-runnable-track, .mslider input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 999px;
@@ -476,30 +469,100 @@
     transition: box-shadow .15s; }
   .sl input[type=range]:hover::-webkit-slider-thumb, .mslider input[type=range]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 8px color-mix(in srgb, var(--c, var(--accent)) 30%, transparent), 0 3px 14px color-mix(in srgb, var(--c, var(--accent)) 70%, transparent); }
   .sl input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--c); outline-offset: 3px; }
-  /* how many agents, drawn: one circle each, lit up to the count */
-  .agviz { --c: var(--accent); display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 4px; }
-  .agviz button { width: 15px; height: 15px; padding: 0; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c) 30%, var(--line)); background: transparent; transition: background .15s, transform .15s, box-shadow .15s; }
-  .agviz button.on { background: var(--c); border-color: var(--c); box-shadow: 0 0 10px -2px var(--c); }
-  .agviz button:hover { transform: scale(1.25); }
-  /* what a team may touch, safe to powerful: icons that light up in the level's color */
-  .acviz { --c: var(--accent); display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-  .acviz button { height: 38px; padding: 0; border-radius: 12px; display: grid; place-items: center; color: var(--muted);
-                  background: color-mix(in srgb, var(--ink) 4%, transparent); border: 1px solid var(--line); transition: all .15s; }
-  .acviz button svg { width: 17px; height: 17px; }
-  .acviz button.on { color: var(--c); border-color: color-mix(in srgb, var(--c) 45%, var(--line)); background: color-mix(in srgb, var(--c) 12%, transparent); }
-  .acviz button:hover { color: var(--ink); }
-  .usespill { justify-self: start; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--accent) 10%, transparent); }
-  .usespill b { color: var(--ink); }
+  /* the bot a team starts from */
+  .bpick { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
+  .bpick select { flex: 1; min-width: 0; padding: 5px 8px; color: var(--ink); }
+  /* how many agents, and how they share the job */
+  .agents { display: flex; align-items: center; gap: 12px; }
+  .agents .how { min-width: 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  .agents .how b { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+  .stepper button:disabled { opacity: .35; }
+  /* which model: a role (the Run menu says which model fills it) or one picked by hand */
+  .rolecards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .rolecards button { display: grid; gap: 1px; min-width: 0; padding: 7px 10px; border-radius: 10px; text-align: left; }
+  .rolecards b { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rolecards small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rolecards button.on { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); background: color-mix(in srgb, var(--accent) 10%, var(--pad));
+                         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .rolecards button.on small { color: color-mix(in srgb, var(--accent) 65%, var(--ink)); }
+  /* what a team may touch, safe to powerful: each level named, in its own color */
+  .access { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .access button { --c: var(--muted); display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 9px; border-radius: 10px; font-size: 12.5px; text-align: left; }
+  .access button svg { flex: none; width: 16px; height: 16px; color: var(--c); }
+  .access button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .access button.on { border-color: color-mix(in srgb, var(--c) 60%, var(--line)); background: color-mix(in srgb, var(--c) 12%, var(--pad)); font-weight: 600;
+                      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent); }
+  /* the overview: how the flow works, then where it works and its latest runs */
+  .isec > h4 .aside { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--muted); text-decoration: none; }
+  .isec > h4 a.aside:hover { color: var(--ink); }
+  .rruns { display: grid; gap: 1px; margin: 0 -8px; }
+  .rrun { display: grid; grid-template-columns: 14px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 10px;
+          background: transparent; text-align: left; }
+  .rrun:hover { background: var(--hover); }
+  .rrun .ot { min-width: 0; }
+  .rrun b { display: block; font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rrun small { display: block; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* How it works: the flow stage by stage on one line, each team with its agents and what each works on; live during a run */
+  .hw { position: relative; display: grid; gap: 2px; margin: 0 -8px; }
+  .hw::before { content: ""; position: absolute; left: 22px; top: 22px; bottom: 28px; width: 1.5px; border-radius: 1px; background: var(--line); }
+  .hw-par { display: grid; gap: 2px; }
+  .hw-par > small { margin: 6px 8px 0 48px; font-size: 11px; font-weight: 500; color: var(--faint); }
+  .hw-node { --c: var(--accent); position: relative; display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 7px 8px; border: 0;
+             border-radius: 10px; background: transparent; color: var(--ink); text-align: left; font-weight: 400; }
+  .hw-node:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .hw-ava { position: relative; flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+            background: color-mix(in srgb, var(--c) 15%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 28%, transparent); }
+  .hw-ava canvas { width: 24px; height: 18px; image-rendering: pixelated; }
+  .hw-ava .st { position: absolute; right: -4px; bottom: -4px; width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center;
+                border: 2px solid var(--panel); background: var(--waiting); color: #0a0a0a; }
+  .hw-ava .st svg { width: 8px; height: 8px; }
+  .hw-ava .st.running { background: var(--running); animation: blink 1.2s ease-in-out infinite; }
+  .hw-ava .st.done { background: var(--done); } .hw-ava .st.failed { background: var(--failed); } .hw-ava .st.approval { background: var(--approval); }
+  .hw-txt { flex: 1; min-width: 0; display: grid; gap: 2px; padding-top: 1px; }
+  .hw-txt > b { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; line-height: 1.35; }
+  .hw-txt > b span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hw-txt > b em { flex: none; margin-left: auto; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: normal;
+                   font-size: 11.5px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .hw-txt > small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.45; color: var(--muted); }
+  .hw-txt > small.warn, .hw-node.approval em { color: var(--approval); }
+  .hw-txt > small.live { color: var(--ink); } .hw-txt > small.err { color: var(--failed); }
+  .hw-ags { display: grid; gap: 4px; margin-top: 5px; }
+  .hw-ags > small { font-size: 11px; color: var(--faint); }
+  .hw-ag { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  .hw-ag > i { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 9.5px; font-weight: 600;
+               color: color-mix(in srgb, var(--c) 75%, var(--ink)); background: color-mix(in srgb, var(--c) 12%, transparent);
+               box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent); font-variant-numeric: tabular-nums; }
+  .hw-ag > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hw-ag > small { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+  .hw-ag.running { color: var(--ink); }
+  .hw-ag.running > i { color: var(--bg); background: var(--running); box-shadow: 0 0 0 3px color-mix(in srgb, var(--running) 18%, transparent); }
+  .hw-ag.waiting { opacity: .6; }
+  .hw-ag.done > i { color: var(--done); background: color-mix(in srgb, var(--done) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 40%, transparent); }
+  .hw-ag.failed > i { color: var(--failed); background: color-mix(in srgb, var(--failed) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--failed) 40%, transparent); }
+  .hw-ag.failed > span { color: var(--failed); }
+  .hw-node.running .hw-ava { box-shadow: inset 0 0 0 1px var(--c), 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent); }
+  /* not reached yet: dim what's inside, so the rail never shows through the avatar */
+  .hw-node:is(.waiting, .skipped, .stopped) :is(.hw-txt, .hw-ava canvas) { opacity: .5; }
+  .hw-ghost .hw-ava { background: var(--panel); box-shadow: none; border: 1.5px dashed color-mix(in srgb, var(--ink) 28%, var(--line)); color: var(--muted); font-size: 16px; }
+  .hw-ghost:hover .hw-ava { border-color: var(--accent); color: var(--ink); }
+  .hw-loose { margin-top: 10px; display: grid; gap: 4px; }
+  .hw-loose > small { font-size: 11px; color: var(--approval); }
+  .hw-note { margin: 2px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--faint); }
+  .hw-h { margin: 6px 0 6px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
+  .hw-live { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+  .hw-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--done); animation: blink 1.4s infinite; }
+  .rrun i { width: 8px; height: 8px; border-radius: 50%; justify-self: center; background: var(--waiting); }
+  .rrun i.running { background: var(--running); } .rrun i.waiting { background: var(--approval); } .rrun i.done { background: var(--done); }
+  .rrun i.failed, .rrun i.stopped, .rrun i.interrupted { background: var(--failed); }
   .switch.mini { padding: 8px 12px; border-radius: 12px; }
   .isec { padding: 14px 16px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
   .isec:last-child { border-bottom: 0; }
-  .isec > h4 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .isec > h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink); }
   .isec .field { margin: 0; }
   .isec .sub, .isec .note { color: var(--muted); font-size: 11.5px; }
   .seg { display: flex; gap: 3px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 11px; }
   .seg button { flex: 1; min-width: 0; border: 0; background: transparent; padding: 6px 4px; border-radius: 8px; font-size: 12.5px; color: var(--muted); }
   .seg button:hover { color: var(--ink); background: transparent; }
-  .seg[data-seg="role"] { display: grid; grid-template-columns: 1fr 1fr; }   /* four role buttons: two rows, so long names never run together */
   .seg button.on { background: var(--pad); color: var(--ink); font-weight: 600; box-shadow: 0 1px 4px var(--shadow); outline: 1px solid var(--line); }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chips button { border-radius: 999px; padding: 5px 11px; font-size: 12px; color: var(--muted); background: var(--pad); }
@@ -508,7 +571,7 @@
   .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; background: var(--pad); }
   .stepper button { border: 0; border-radius: 0; width: 38px; padding: 7px 0; font-size: 16px; line-height: 1; background: transparent; }
   .stepper button:hover { background: var(--hover); }
-  .stepper output { min-width: 46px; text-align: center; font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .stepper output { min-width: 46px; text-align: center; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .inrow { display: flex; align-items: center; gap: 12px; }
   .stats { display: flex; flex-wrap: wrap; gap: 6px; }
   .switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; padding: 10px 12px;
@@ -525,7 +588,7 @@
   .switch.conn + .switch.conn { margin-top: 6px; }
   /* model slider and effort bar, like Claude Code's */
   .mslider { display: grid; gap: 6px; }
-  .mslider .ends { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .mslider .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
   .mslider input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; }
   .mslider input[type=range]:focus { outline: none; }
   .mslider input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px;
@@ -536,37 +599,35 @@
   .mslider .stops { display: grid; grid-template-columns: repeat(var(--n), 1fr); font-size: 11.5px; color: var(--muted); }
   .mslider .stops button { border: 0; background: none; padding: 0; color: inherit; font-size: inherit; text-align: center; }
   .mslider .stops button:first-child { text-align: left; } .mslider .stops button:last-child { text-align: right; }
-  .mslider .stops button.on { color: var(--ink); font-weight: 650; }
+  .mslider .stops button.on { color: var(--ink); font-weight: 600; }
   .effort { display: grid; gap: 6px; }
   .effort .bars { display: flex; align-items: flex-end; gap: 5px; height: 34px; }
   .effort .bars button { flex: 1; padding: 0; border-radius: 4px 4px 2px 2px; border: 1px solid var(--line); background: var(--pad); }
   .effort .bars button.lit { background: var(--accent); border-color: var(--accent); }
   .effort .bars button:hover { border-color: var(--accent); }
   .effort .lbl { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); }
-  .effort .lbl b { color: var(--ink); font-weight: 650; }
+  .effort .lbl b { color: var(--ink); font-weight: 600; }
   .effort.off { opacity: .45; pointer-events: none; }
-  /* get started: a checklist that follows the flow */
+  /* get started: a short checklist that follows the flow, gone once the flow has run */
   .gs-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .gs-top span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .gs-top h4 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-  .gs-bar { height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
-  .gs-bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); transition: width .3s ease; }
-  .gs-bar.all i { background: var(--done); }
-  .gs { display: grid; gap: 8px; margin-top: 4px; }
-  .gs-step { --c: var(--accent); display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px;
-             border: 1px solid var(--line); border-radius: 14px; background: var(--pad); transition: border-color .15s, opacity .15s; }
-  .gs-step .ic { position: relative; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
-                 background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); }
-  .gs-step .ic canvas { width: 32px; height: 24px; }
-  .gs-step .ic .tick { position: absolute; right: -5px; bottom: -5px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
-                       background: var(--done); color: #0a0a0a; font-size: 11px; font-weight: 800; border: 2px solid var(--pad); }
-  .gs-step b { display: block; font-size: 13.5px; margin-bottom: 2px; }
-  .gs-step p { margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
-  .gs-step button { margin-top: 9px; padding: 5px 12px; font-size: 12.5px; }
-  .gs-step.now { border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
-                 box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
-  .gs-step.did { opacity: .62; }
-  .gs-step.next { opacity: .8; }
+  .gs-top h4 { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+  .gs-bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .gs-bar i { display: block; height: 100%; border-radius: 2px; background: var(--accent); transition: width .3s ease; }
+  .gs { display: grid; gap: 2px; margin: 2px -8px 0; }
+  .gs-step { --c: var(--accent); display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: center; padding: 5px 8px;
+             border: 1px solid transparent; border-radius: 11px; }
+  .gs-step .ic { position: relative; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+                 background: color-mix(in srgb, var(--c) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 26%, transparent); }
+  .gs-step .ic canvas { width: 22px; height: 16.5px; image-rendering: pixelated; }
+  .gs-step .ic .tick { position: absolute; right: -4px; bottom: -4px; width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center;
+                       background: var(--done); color: #0a0a0a; font-size: 8.5px; font-weight: 800; border: 2px solid var(--panel); }
+  .gs-step b { display: block; font-size: 13px; font-weight: 600; }
+  .gs-step p { margin: 2px 0 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
+  .gs-step button { margin-top: 8px; padding: 5px 12px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 7px; }
+  .gs-step.now { align-items: start; padding: 10px 8px; background: var(--pad); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .gs-step.did b { color: var(--muted); font-weight: 500; }
+  .gs-step.next { opacity: .7; }
   .stats span { font-size: 11.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; background: var(--pad); }
   .isec details.more { margin: 0; }
 
@@ -574,7 +635,7 @@
   .field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
   .field .sub { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .big { font-size: 17px; font-weight: 650; margin: 0 0 2px; }
+  .big { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
   .range { display: flex; gap: 10px; align-items: center; } .range input { flex: 1; padding: 0; } .range b { min-width: 26px; text-align: right; }
   .agent { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; background: var(--pad); }
   .agent .top { display: flex; align-items: center; gap: 8px; }
@@ -582,9 +643,10 @@
   .agent .meta { color: var(--muted); font-size: 11.5px; }
   .agent details { margin-top: 6px; }
   .agent summary { cursor: pointer; color: var(--muted); font-size: 12px; }
-  .pill { font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: #fff; text-transform: uppercase; background: var(--waiting); }
-  .pill.running { background: var(--running); } .pill.done { background: var(--done); } .pill.failed { background: var(--failed); }
-  .pill.approval { background: var(--approval); }
+  .pill { --pc: var(--muted); font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; color: var(--pc);
+          background: color-mix(in srgb, var(--pc) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 28%, transparent); }
+  .pill.running { --pc: var(--running); } .pill.done { --pc: var(--done); } .pill.failed, .pill.stopped, .pill.interrupted { --pc: var(--failed); }
+  .pill.approval { --pc: var(--approval); }
   .out:not(.port) { white-space: pre-wrap; word-break: break-word; background: var(--pad); border: 1px solid var(--line); border-radius: 10px;
          padding: 10px 12px; font-size: 12.5px; max-height: 420px; overflow-y: auto; }
   .out h4 { margin: 8px 0 2px; font-size: 13px; }
@@ -598,15 +660,18 @@
   dialog h2 { margin: 0 0 12px; font-size: 18px; }
   .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
   dialog.rundlg { width: min(640px, 94vw); padding: 0; overflow: hidden; }
+  /* on a short window the middle scrolls, so the team and the Start button always show */
+  dialog.rundlg[open] { display: flex; flex-direction: column; }
+  dialog.rundlg .rbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   .rhead { padding: 18px 20px 16px; border-bottom: 1px solid var(--line);
            background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent); }
-  .rhead .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .rhead .eyebrow { font-size: 12px; font-weight: 600; color: var(--accent); }
   .rhead h2 { margin: 2px 0 12px; font-size: 20px; }
   .team { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
   .team .m { position: relative; width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center;
              background: color-mix(in srgb, var(--c) 16%, var(--pad)); border: 1px solid color-mix(in srgb, var(--c) 30%, var(--line)); }
   .team .m canvas { width: 30px; height: 22px; }
-  .team .m i { position: absolute; right: -6px; bottom: -6px; font: 700 10px/1 system-ui; font-style: normal; padding: 2px 5px; border-radius: 999px;
+  .team .m i { position: absolute; right: -6px; bottom: -6px; font: 700 10px/1 var(--sans); font-style: normal; padding: 2px 5px; border-radius: 999px;
                background: var(--ink); color: var(--bg); }
   .team .arrow { color: var(--muted); font-size: 12px; padding: 0 2px; }
   .team .sum { margin-left: 8px; color: var(--muted); font-size: 12px; }
@@ -628,7 +693,7 @@
   .usagedlg p b { color: var(--ink); font-weight: 600; }
   .usagedlg .acts { margin-top: 16px; }
   .go { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; }
-  .go kbd { font: 600 10.5px system-ui; padding: 1px 6px; border-radius: 5px; background: rgba(0, 0, 0, .18); }
+  .go kbd { font: 600 11px var(--sans); padding: 1px 6px; border-radius: 5px; background: rgba(0, 0, 0, .18); }
   .steps { display: grid; gap: 10px; margin: 12px 0 16px; }
   .steps div { display: flex; gap: 10px; align-items: flex-start; font-size: 12.5px; color: var(--muted); }
   .steps b { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px;
@@ -669,21 +734,21 @@
   .runrow:hover { border-color: var(--accent); }
   .runrow small { color: var(--muted); grid-column: 1 / -1; }
   .runrow:not(:has(.pill.items)) b { grid-column: span 2; }
-  .pill.items { background: var(--pad); border: 1px solid var(--line); font-weight: 700; }
-  #toast { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px;
+  .pill.items { background: var(--pad); }
+  #toast { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px;
            border-radius: 12px; display: none; z-index: 20; max-width: min(560px, 80vw); font-size: 13px; line-height: 1.45; text-align: center;
            box-shadow: 0 12px 32px -10px rgba(0, 0, 0, .45); }
   #toast.show { display: block; }
   /* ---- run view: status card, result card, activity ---- */
   .card { border: 1px solid var(--line); border-radius: 14px; background: var(--pad); padding: 14px; margin-bottom: 12px; }
-  .status-row { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .status-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
   .status-row i { width: 9px; height: 9px; border-radius: 50%; background: var(--running); }
   .status-row.live i { animation: blink 1s infinite; }
   .status-row.done { color: var(--done); } .status-row.done i { background: var(--done); }
   .status-row.failed, .status-row.stopped, .status-row.interrupted { color: var(--failed); }
   .status-row.failed i, .status-row.stopped i, .status-row.interrupted i { background: var(--failed); }
   .status-row.running { color: var(--running); } .status-row.waiting { color: var(--approval); } .status-row.waiting i { background: var(--approval); }
-  .card .title { font-size: 17px; font-weight: 650; margin: 6px 0 2px; }
+  .card .title { font-size: 17px; font-weight: 600; margin: 6px 0 2px; }
   .card .meta { color: var(--muted); font-size: 12px; }
   .result-card { border-color: color-mix(in srgb, var(--done) 45%, var(--line)); }
   .result-card h4 { margin: 0 0 8px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
@@ -691,10 +756,10 @@
   .result-card .peek::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 44px;
                               background: linear-gradient(transparent, var(--pad)); }
   .result-card .acts { margin-top: 10px; }
-  .result-card .acts button { flex: 1; }
+  .result-card .acts button { flex: 1; white-space: nowrap; }
   details.quiet { border-top: 1px solid var(--line); padding-top: 4px; margin-top: 6px; }
-  details.quiet > summary { cursor: pointer; list-style: none; padding: 8px 0; font-size: 12px; font-weight: 600; color: var(--muted);
-                            text-transform: uppercase; letter-spacing: .6px; display: flex; justify-content: space-between; }
+  details.quiet > summary { cursor: pointer; list-style: none; padding: 8px 0; font-size: 12.5px; font-weight: 600; color: var(--muted);
+                            display: flex; justify-content: space-between; }
   details.quiet > summary::after { content: "▸"; } details.quiet[open] > summary::after { content: "▾"; }
   .timeline { list-style: none; margin: 0; padding: 0 0 6px; }
   .timeline li { display: grid; grid-template-columns: 54px 14px 1fr; gap: 6px; align-items: start; font-size: 12px; padding: 4px 0; color: var(--ink); }
@@ -725,8 +790,8 @@
   .rp-main { flex: 1; overflow-y: auto; padding: 34px 32px 60px; }
   .rp-col { max-width: 720px; margin: 0 auto; }
   .rp-sec { background: var(--pad); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 18px; scroll-margin-top: 16px; }
-  .rp-sec > h3 { margin: 0; padding: 14px 24px; border-bottom: 1px solid var(--line); font-size: 13px; text-transform: uppercase;
-                 letter-spacing: .6px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .rp-sec > h3 { margin: 0; padding: 14px 24px; border-bottom: 1px solid var(--line); font-size: 13.5px; font-weight: 600;
+                 color: var(--ink); display: flex; align-items: center; gap: 8px; }
   .rp-sec > h3 .grow { flex: 1; }
   .rp-sec > .doc { padding: 6px 28px 24px; font-size: 15px; }
   .rp-sec .ask { margin: 16px 24px; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--panel); border-radius: 0 10px 10px 0;
@@ -742,15 +807,15 @@
   @media (max-width: 860px) { .rp-main { padding: 16px 16px 50px; }
     .rp-top { padding: 10px 16px; flex-wrap: wrap; } .rp-top .tools { width: 100%; } .rp-top .tools button { flex: 1; } .rp-sec > .doc { padding: 4px 16px 18px; } .rp-stage { padding: 4px 16px 8px; } }
   /* the result page reads like a document, not a terminal: plain type for sentences, mono stays for code */
-  html body .rp-main .doc, html body .rp-main .doc :where(p, li, h1, h2, h3, h4, b, i, td, th, a, strong, em) { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  html body .rp-main .doc, html body .rp-main .doc :where(p, li, h1, h2, h3, h4, b, i, td, th, a, strong, em) { font-family: var(--sans); }
   html body .rp-main .doc code, html body .rp-main .doc pre, html body .rp-main .doc pre * { font-family: var(--mono); }
   .rp-bottom { border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, var(--pad));
                border-radius: 16px; padding: 16px 22px; margin-bottom: 18px; }
-  .rp-bottom small { display: block; color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; margin-bottom: 5px; }
+  .rp-bottom small { display: block; color: var(--accent); font-size: 12px; font-weight: 600; margin-bottom: 5px; }
   .rp-bottom p { margin: 0; font-size: 17px; line-height: 1.5; font-weight: 600; }
-  html body .rp-bottom p { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  html body .rp-bottom p { font-family: var(--sans); }
   .rp-files { margin-bottom: 18px; }
-  .rp-files > small { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; margin: 0 4px 8px; }
+  .rp-files > small { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 600; margin: 0 4px 8px; }
   .rp-files > small button { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; padding: 3px 10px; }
   .rp-files .list { display: flex; flex-wrap: wrap; gap: 8px; }
   .rfile { display: inline-flex; align-items: baseline; gap: 8px; max-width: 100%; padding: 8px 12px; border-radius: 10px; text-align: left;
@@ -773,10 +838,10 @@
   .rp-details > summary:hover { color: var(--ink); }
   /* readable documents: used by the result page and report previews */
   .doc { font-size: 14px; line-height: 1.65; color: var(--ink); word-break: break-word; }
-  .doc h1, .doc h2, .doc h3, .doc h4 { line-height: 1.3; margin: 1.3em 0 .45em; text-transform: none; letter-spacing: normal; color: var(--ink); font-weight: 650; }
+  .doc h1, .doc h2, .doc h3, .doc h4 { line-height: 1.3; margin: 1.3em 0 .45em; text-transform: none; letter-spacing: normal; color: var(--ink); font-weight: 600; }
   .doc h1 { font-size: 21px; } .doc h2 { font-size: 18px; } .doc h3 { font-size: 15.5px; } .doc h4 { font-size: 14px; }
   .doc p { margin: .55em 0; } .doc ul, .doc ol { margin: .5em 0; padding-left: 1.4em; } .doc li { margin: .2em 0; }
-  .doc code { font-family: ui-monospace, Consolas, monospace; font-size: .9em; background: var(--panel); border: 1px solid var(--line);
+  .doc code { font-family: var(--mono); font-size: .9em; background: var(--panel); border: 1px solid var(--line);
               padding: 1px 5px; border-radius: 5px; }
   .doc pre { background: #111111; color: #e6e6ef; border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
   .doc pre code { background: none; border: 0; padding: 0; color: inherit; }
@@ -786,9 +851,7 @@
   .doc a { color: var(--accent); }
   .doc hr { border: 0; border-top: 1px solid var(--line); margin: 1.2em 0; }
   .doc > :first-child { margin-top: .6em; }
-  @media (max-width: 1000px) { main { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .palette { flex-direction: row; gap: 8px; overflow-x: auto; }
-    .palette h3, .palette .tip, .palette .find { display: none; } .tiles, #botPal { display: flex; gap: 8px; } .tile { min-width: 96px; }
-    .bot { min-width: 190px; border-color: var(--line); background: var(--pad); } .insp { max-height: 40vh; border-left: 0; border-top: 1px solid var(--line); } }
+  @media (max-width: 1040px) { main { --lw: 224px; --rw: 288px; } .bteam .bdots { display: none; } .bstep { padding-inline: 0; } .bstep b { font-size: 10.5px; letter-spacing: -.02em; } }
 
   /* ---- the look: the canvas is a patch of night sky (like lithnode.com), and every team wears its bot's color ---- */
   #canvas { background-color: var(--bg);
@@ -831,61 +894,69 @@
 <link rel="stylesheet" href="/static/theme.css">
 </head>
 <body>
-<div class="bar">
-  <button class="ib" id="paneL" title="Show or hide the building blocks" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>
-  <span class="sep"></span>
-  <input id="flowName" maxlength="60" aria-label="Flow name" title="Rename this flow" spellcheck="false">
-  <span class="fswitch" title="Switch flow"><select id="flowPick" aria-label="Switch flow"></select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></span>
-  <span class="chip" id="estChip" title="How many agents this flow will start."></span>
-  <span class="chip warn" id="probChip" hidden></span>
-  <span id="saved"></span>
-  <span class="grow"></span>
-  <button id="newBtn" title="A new blank flow">+ New</button>
-  <button id="runsBtn">Runs</button>
-  <button class="ib" id="delBtn" title="More actions">⋯</button>
-  <button id="runBtn" class="primary">▶ Run</button>
-  <span class="sep"></span>
-  <button class="ib" id="paneR" title="Show or hide the side panel" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></svg></button>
-</div>
 <div id="sheet" role="dialog" aria-label="Result"></div>
 <main>
-  <div class="palette" id="palette">
-    <div class="psec">
-      <h3>Building blocks</h3>
-      <div class="blocks">
-        <div class="pal blk bteam" draggable="true" tabindex="0" data-type="cluster" title="A team of agents with one job. Pick how many, what they do, their engine and what they can touch. The bots below are ready-made teams.">
-          <span class="bt"><canvas width="96" height="72" data-shape="byte" data-color="#5b8def"></canvas></span>
-          <span class="bx"><b>Team</b><small>Agents with one job</small></span>
-          <span class="bdots"><i></i><i></i><i></i></span></div>
-        <div class="pal blk bstep" draggable="true" tabindex="0" data-type="approval" title="Pauses the run until you say go">
-          <span class="bi" style="color:var(--approval)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12M11 11V4.5a1.5 1.5 0 0 1 3 0V12M14 11.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3.5 13a1.6 1.6 0 0 1 2.6-1.8L8 13"/></svg></span><b>Approval</b><small>you say go</small></div>
-        <div class="pal blk bstep" draggable="true" tabindex="0" data-type="checkpoint" title="Waits for everything before it, then passes the reports on or merges them into one">
-          <span class="bi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M6 8.2v7.6M8 6.6c5 .5 7.6 2.4 8 4M8 17.4c5-.5 7.6-2.4 8-4"/></svg></span><b>Checkpoint</b><small>merges</small></div>
-        <div class="pal blk bstep" draggable="true" tabindex="0" data-type="done" title="Where the final result lands">
-          <span class="bi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg></span><b>Done</b><small>the result</small></div>
+  <aside class="palette" id="palette">
+    <div class="phead">
+      <div class="ftitle">
+        <div class="fname"><input id="flowName" maxlength="60" aria-label="Flow name" title="Rename this flow" spellcheck="false"><button class="ib" id="flowMenu" title="Switch flow, duplicate or delete" aria-label="Flow menu" aria-haspopup="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button></div>
+        <div class="pmeta"><span id="estChip" title="How many agents this flow will start."></span><span id="saved"></span></div>
+      </div>
+      <button class="ib" id="newBtn" title="New blank flow" aria-label="New blank flow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="ib" id="paneL" title="Hide the building blocks" aria-label="Hide the building blocks" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>
+    </div>
+    <div class="plib">
+      <div class="psec">
+        <h3>Building blocks</h3>
+        <div class="blocks">
+          <div class="pal blk bteam" draggable="true" tabindex="0" data-type="cluster" title="A team of agents with one job. Pick how many, what they do, their engine and what they can touch. The bots below are ready-made teams.">
+            <span class="bt"><canvas width="96" height="72" data-shape="byte" data-color="#5b8def"></canvas></span>
+            <span class="bx"><b>Team</b><small>Agents with one job</small></span>
+            <span class="bdots"><i></i><i></i><i></i></span></div>
+          <div class="pal blk bstep" draggable="true" tabindex="0" data-type="approval" title="Pauses the run until you say go">
+            <span class="bi" style="color:var(--approval)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12M11 11V4.5a1.5 1.5 0 0 1 3 0V12M14 11.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3.5 13a1.6 1.6 0 0 1 2.6-1.8L8 13"/></svg></span><b>Approval</b><small>you say go</small></div>
+          <div class="pal blk bstep" draggable="true" tabindex="0" data-type="checkpoint" title="Waits for everything before it, then passes the reports on or merges them into one">
+            <span class="bi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M6 8.2v7.6M8 6.6c5 .5 7.6 2.4 8 4M8 17.4c5-.5 7.6-2.4 8-4"/></svg></span><b>Checkpoint</b><small>merges</small></div>
+          <div class="pal blk bstep" draggable="true" tabindex="0" data-type="done" title="Where the final result lands">
+            <span class="bi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg></span><b>Done</b><small>the result</small></div>
+        </div>
+      </div>
+      <div class="psec">
+        <h3>Bots <span class="count" id="botCount"></span><button type="button" class="newbot" id="newBot" title="Make your own bot">+ New</button></h3>
+        <label class="find" for="botFind"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="botFind" type="search" placeholder="Search bots" autocomplete="off" aria-label="Search bots"></label>
+        <div id="botPal"><p class="hint">Loading…</p></div>
       </div>
     </div>
-    <div class="psec">
-      <h3>Bots <span style="display:flex;gap:6px;align-items:center"><span class="count" id="botCount"></span><button type="button" class="newbot" id="newBot" title="Make your own bot">+ New</button></span></h3>
-      <label class="find" for="botFind"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <input id="botFind" type="search" placeholder="Find a bot" autocomplete="off" aria-label="Find a bot"></label>
-      <div id="botPal"><p class="hint">Loading…</p></div>
-    </div>
     <div class="tip"><span aria-hidden="true">↳</span><span><b>Click</b> to add, or <b>drag</b> onto the canvas. Then connect a node's right dot to the next one's left dot.</span></div>
-  </div>
+  </aside>
   <div id="canvas">
     <div id="world"><svg id="wires"></svg>
       <button id="ghost" class="ghost off" type="button"><span class="gorb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
-        <b>Add a team</b><small>Describe one above, or drag a bot here</small></button></div>
-    <form id="ask" autocomplete="off"><b>✦</b><input id="askIn" maxlength="4000"
-      placeholder="Describe a team, e.g. plan it, build it, then 3 reviewers check for bugs and security">
+        <b>Add a team</b><small>Describe one below, or drag a bot here</small></button></div>
+    <div class="float hud" id="floatL"><button class="ib" id="showL" title="Show the building blocks" aria-label="Show the building blocks"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button><button type="button" id="floatName" title="Switch flow"><span></span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button></div>
+    <div class="float hud" id="floatR"><button class="primary" id="floatRun"><svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>Run</button><button class="ib" id="showR" title="Show the side panel" aria-label="Show the side panel"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></svg></button></div>
+    <form id="ask" class="hud" autocomplete="off"><b aria-hidden="true">✦</b><input id="askIn" maxlength="4000" aria-label="Describe a team"
+      placeholder="Describe a team: plan it, build it, then 3 reviewers check it">
       <button class="primary" id="askBtn">Build flow</button></form>
-    <div id="tray" aria-label="Items from this run"></div>
-    <div id="banner"><i></i><span id="bannerText">Running</span><button id="stopBtn" class="danger">Stop</button><button id="editBtn">Back to editing</button></div>
-    <div id="emptyHint"><div><b>Empty flow</b><br>Describe a team in the box above, drag nodes in from the left, or start from a template in the ⋯ menu.</div></div>
-    <div class="zoom"><button id="zAuto" title="Auto-arrange: keep the flow neatly laid out as you edit it">Auto-arrange</button><button id="zDir">⇅</button><button id="zOut" title="Zoom out">−</button><button id="zFit" title="Fit to screen">Fit</button><button id="zIn" title="Zoom in">+</button></div>
+    <div id="tray" class="hud" aria-label="Items from this run"></div>
+    <div id="banner" class="hud"><i></i><span id="bannerText">Running</span><button id="stopBtn" class="danger">Stop</button><button id="editBtn">Back to editing</button></div>
+    <div id="emptyHint"><div><b>Empty flow</b>Describe a team in the box below, drag blocks in from the left, or start from a template in the flow menu.</div></div>
+    <div class="zoom hud" role="toolbar" aria-label="View">
+      <button id="zAuto" class="edit-only" title="Auto-arrange: keep the flow neatly laid out as you edit it" aria-label="Auto-arrange"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9.5" width="5" height="5" rx="1.2"/><rect x="16" y="4" width="5" height="5" rx="1.2"/><rect x="16" y="15" width="5" height="5" rx="1.2"/><path d="M8 12h4M12 6.5v11M12 6.5h4M12 17.5h4"/></svg></button>
+      <button id="zDir" class="edit-only" aria-label="Flow direction"></button>
+      <hr class="edit-only">
+      <button id="zIn" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button id="zPct" title="Zoom to 100%">100%</button>
+      <button id="zOut" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button id="zFit" title="Fit to screen" aria-label="Fit to screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
   </div>
-  <div class="insp" id="insp"></div>
+  <aside class="rside" id="rside">
+    <div class="rtop"><button id="runsBtn" title="Every run of your flows"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5v4h4"/><path d="M12 7.5V12l3 2"/></svg>Runs</button><span class="grow"></span><button id="runBtn" class="primary"><svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>Run</button><button class="ib" id="paneR" title="Hide the side panel" aria-label="Hide the side panel" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></svg></button></div>
+    <div class="probs" id="probChip" hidden></div>
+    <div class="insp" id="insp"></div>
+  </aside>
 </main>
 
 <dialog id="newDlg">
@@ -966,6 +1037,12 @@
 const $ = (id) => document.getElementById(id);
 function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML.replace(/"/g, "&quot;"); }   // quotes too: esc() also fills attributes
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const cap = (s) => String(s || "").replace(/^./, (c) => c.toUpperCase());
+const when = (t) => {   // "just now", "5m ago", "3h ago", then the date
+  const s = Date.now() / 1000 - t;
+  return s < 60 ? "just now" : s < 3600 ? `${Math.floor(s / 60)}m ago` : s < 86400 ? `${Math.floor(s / 3600)}h ago`
+    : new Date(t * 1000).toLocaleDateString([], { month: "short", day: "numeric" });
+};
 const theme = {};
 function readTheme() { for (const n of ["muted", "waiting", "running", "done", "failed", "approval"]) theme[n] = getComputedStyle(document.documentElement).getPropertyValue("--" + n).trim(); }
 readTheme(); matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTheme);
@@ -1020,6 +1097,7 @@ async function loadClis() {
   renderInspector();
 }
 let flows = [], flow = null, est = null, problems = [], bots = [];
+let allRuns = [];              // the latest runs of every flow (the overview lists this flow's)
 let sel = null;                 // { kind: "node" | "edge", id }
 const view = { x: 40, y: 20, k: 1 };
 let run = null, runTimer = null; // run snapshot while the run view is open
@@ -1054,15 +1132,12 @@ async function boot() {
   else await openFlow(flows.some((f) => f.id === want) ? want : flows[0].id);
   // jump straight into a run that is still going for this flow
   const runs = (await api("/api/runs")).runs;
-  runs.forEach((r) => ranFlows.add(r.flow_id));
+  allRuns = runs; runs.forEach((r) => ranFlows.add(r.flow_id));
   if (!sel) renderInspector();   // Get started can now tick off "Run it"
   const live = runs.find((r) => r.flow_id === flow.id && (r.status === "running" || r.status === "waiting"));
   if (live) openRun(live.id);
 }
 
-function renderFlowPick() {
-  $("flowPick").innerHTML = flows.map((f) => `<option value="${esc(f.id)}"${flow && f.id === flow.id ? " selected" : ""}>${esc(f.name)}</option>`).join("");
-}
 async function openFlow(id) {
   const d = await api("/api/flows/" + id);
   flow = d.flow; est = d.estimate; problems = d.problems; sel = null;
@@ -1072,8 +1147,8 @@ async function openFlow(id) {
     layoutFlow(flow.dir === "tb" ? "tb" : "lr");
     if (JSON.stringify(flow.nodes.map((n) => [n.x, n.y])) !== before) { dirty = true; setTimeout(save, 0); }
   }
-  $("flowName").value = flow.name;
-  renderFlowPick(); renderAll(); renderInspector(); autoFit = true; fit();
+  $("flowName").value = flow.name; $("flowName").title = flow.name;
+  renderAll(); renderInspector(); autoFit = true; fit();
   requestAnimationFrame(() => { if (autoFit) fit(); });   // again once the nodes have their real sizes
 }
 document.fonts.ready.then(() => { if (autoFit && flow) fit(); });   // the fonts change how wide the steps are
@@ -1082,7 +1157,7 @@ async function createFlow(template) {
   flows = (await api("/api/flows")).flows;
   await openFlow(d.flow.id);
 }
-async function refreshFlows() { flows = (await api("/api/flows")).flows; renderFlowPick(); }
+async function refreshFlows() { flows = (await api("/api/flows")).flows; }
 
 // ------------------------------------------------------------------ saving
 let saveTimer = null, saving = null, dirty = false;   // saving: the save in flight, so callers can wait for it
@@ -1106,7 +1181,7 @@ async function save() {   // resolves once your latest edits are on the server; 
       est = d.estimate; problems = d.problems; renderChips();
       $("saved").textContent = "Saved";
       const f = flows.find((x) => x.id === flow.id);
-      if (f && f.name !== flow.name) { f.name = flow.name; renderFlowPick(); }
+      if (f) f.name = flow.name;   // the flow menu lists it by this name
       return true;
     } catch (e) { $("saved").textContent = "Not saved"; toast(e.message); return false; }
   })();
@@ -1151,7 +1226,7 @@ function openBotEditor(bot) {
   $("botDlg").classList.toggle("locked", !!botDraft.builtin);
   $("bLocked").hidden = !botDraft.builtin; $("bDelete").hidden = isNew || !!botDraft.builtin; $("bErr").textContent = "";
   $("bName").value = botDraft.name; $("bTag").value = botDraft.tagline || ""; $("bJob").value = botDraft.instructions || "";
-  $("bModel").innerHTML = meta.models.map((m) => `<option value="${esc(m.id)}">${esc(m.label)} · ${esc(m.blurb.toLowerCase())}</option>`).join("");
+  $("bModel").innerHTML = meta.models.map((m) => `<option value="${esc(m.id)}" title="${esc(m.blurb)}">${esc(m.label)}</option>`).join("");
   $("bModel").value = botDraft.model || "claude-sonnet-5-5";
   $("bTools").innerHTML = Object.entries(TOOL_INFO).map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("");
   $("bTools").value = botDraft.tools || "read";
@@ -1303,7 +1378,10 @@ function followActive() {
   if (sx0 >= 40 && sx1 <= r.width - 40 && sy0 >= 60 && sy1 <= r.height - 60) return;   // already in view: leave the camera alone
   panTo((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2);
 }
-function applyView() { $("world").style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`; }
+function applyView() {
+  $("world").style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
+  $("zPct").textContent = Math.round(view.k * 100) + "%";
+}
 function zoomAt(cx, cy, k) {
   const r = $("canvas").getBoundingClientRect(), before = toWorld(cx, cy);
   view.k = Math.min(1.6, Math.max(0.3, k));
@@ -1322,14 +1400,17 @@ function fit() {
   const wraps = !vertical() && (rowGaps.get(f.id) || []).length;   // wires to the next row bulge out past both sides
   const maxX = Math.max(...box.map((b) => b.n.x + b.w)) + (wraps ? 90 : 40), maxY = Math.max(...box.map((b) => b.n.y + b.h)) + 40;
   const tray = $("tray"), trayH = tray.classList.contains("show") ? tray.offsetHeight + 12 : 0;
-  const top = 64, bottom = 44 + trayH;   // room for the describe box (or the run banner), the zoom buttons and the items tray
-  const h = r.height - top - bottom;
-  view.k = Math.min(1, Math.max(0.3, Math.min(r.width / (maxX - minX), h / (maxY - minY))));
+  // keep clear of what floats on the canvas: the run banner or a hidden panel's buttons up top, the describe box
+  // (or the items tray) at the bottom, the view controls on the right
+  const m = document.querySelector("main"), floats = (m.classList.contains("hideL") && !run) || m.classList.contains("hideR");
+  const top = run || floats ? 60 : 24, bottom = run ? 24 + trayH : 84;
+  const h = r.height - top - bottom, w = r.width - 72;
+  view.k = Math.min(1, Math.max(0.3, Math.min(w / (maxX - minX), h / (maxY - minY))));
   view.x = (r.width - (maxX - minX) * view.k) / 2 - minX * view.k;
   view.y = top + (h - (maxY - minY) * view.k) / 2 - minY * view.k;
   applyView();
 }
-// Until you pan or zoom yourself, keep the whole flow in view as the window resizes.
+// Until you pan or zoom yourself, keep the whole flow in view as the window resizes. Fit turns this back on.
 let autoFit = true;
 let refitting = 0;
 new ResizeObserver(() => {
@@ -1338,10 +1419,10 @@ new ResizeObserver(() => {
     refitting = 0; fit();
   });
 }).observe($("canvas"));
-$("canvas").addEventListener("mousedown", (e) => { if (!e.target.closest("#ghost")) autoFit = false; }, true);
-$("zIn").onclick = () => { const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k * 1.2); };
-$("zOut").onclick = () => { const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k / 1.2); };
-$("zFit").onclick = fit;
+$("zIn").onclick = () => { autoFit = false; const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k * 1.2); };
+$("zOut").onclick = () => { autoFit = false; const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, view.k / 1.2); };
+$("zFit").onclick = () => { autoFit = true; fit(); };
+$("zPct").onclick = () => { autoFit = false; const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1); };
 // Hide either side panel for more room to see the flow; the choice is remembered.
 function setPanes(l, r) {
   $("paneL").setAttribute("aria-pressed", String(l)); $("paneR").setAttribute("aria-pressed", String(r));
@@ -1352,6 +1433,9 @@ function setPanes(l, r) {
 (() => { let p = [true, true]; try { p = JSON.parse(localStorage.getItem("hq-panes")) || p; } catch (e) {} setPanes(!!p[0], !!p[1]); })();
 $("paneL").onclick = () => setPanes($("paneL").getAttribute("aria-pressed") !== "true", $("paneR").getAttribute("aria-pressed") === "true");
 $("paneR").onclick = () => setPanes($("paneL").getAttribute("aria-pressed") === "true", $("paneR").getAttribute("aria-pressed") !== "true");
+$("showL").onclick = () => setPanes(true, $("paneR").getAttribute("aria-pressed") === "true");
+$("showR").onclick = () => setPanes($("paneL").getAttribute("aria-pressed") === "true", true);
+$("floatRun").onclick = () => $("runBtn").click();
 // Tidy: line the flow up by stage, top to bottom or left to right (same rules as the server's layout)
 function tidy(direction) {   // arrange now and keep auto-arranging
   if (locked()) return;
@@ -1374,14 +1458,16 @@ function layoutFlow(direction, f = flow) {
   layoutAt(direction, f, Infinity);   // a short flow reads best as one straight line, even if it draws a bit smaller
   const wired = new Set(f.edges.flatMap((e) => [e.from, e.to]));
   if (new Set(f.nodes.filter((n) => wired.has(n.id) || n.type === "master").map((n) => n.x)).size <= 5) return;
-  let best = 2100, bestK = -1;
+  let best = 2100, bestS = -1, bestK = -1, bestRows = -1;
   for (let w = 2100; w >= 700; w -= 140) {   // widest first: when two fit as big, fewer rows wins
     layoutAt(direction, f, w);
     const bx = f.nodes.map((n) => ({ n, ...nodeSize(n) }));
     const W = Math.max(...bx.map((b) => b.n.x + b.w)) - Math.min(...bx.map((b) => b.n.x)) + 80;
     const H = Math.max(...bx.map((b) => b.n.y + b.h)) - Math.min(...bx.map((b) => b.n.y)) + 80;
-    const k = Math.min(1, r.width / W, ch / H) * Math.pow(.85, (rowGaps.get(f.id) || []).length);   // each extra row must earn its place
-    if (k > bestK + .02) { bestK = k; best = w; }
+    // Each extra row must earn its place. Past 85% the text reads fine, so a bigger zoom stops counting and fewer rows win;
+    // below it, a small window wraps more rather than shrink everything. With as many rows, the bigger zoom wins.
+    const k = Math.min(1, (r.width - 72) / W, ch / H), rows = (rowGaps.get(f.id) || []).length, s = Math.min(.85, k) * Math.pow(.93, rows);
+    if (s > bestS + .02 || (rows === bestRows && k > bestK)) { bestS = s; bestK = k; bestRows = rows; best = w; }
   }
   layoutAt(direction, f, best);
 }
@@ -1451,7 +1537,7 @@ $("zAuto").onclick = () => {
   else tidy(flow.dir === "tb" ? "tb" : "lr");
 };
 $("zDir").onclick = () => tidy(vertical() ? "lr" : "tb");
-$("canvas").addEventListener("wheel", (e) => { e.preventDefault(); autoFit = false; zoomAt(e.clientX, e.clientY, view.k * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive: false });
+$("canvas").addEventListener("wheel", (e) => { if (e.target.closest(".hud")) return; e.preventDefault(); autoFit = false; zoomAt(e.clientX, e.clientY, view.k * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive: false });
 
 // ------------------------------------------------------------------ rendering
 function renderAll() {
@@ -1464,11 +1550,12 @@ function renderAll() {
   doneTile.title = hasDone ? "This flow already has its Done step" : "Where the final result lands";
   doneTile.querySelector("small").textContent = hasDone ? "in this flow" : "the result";
   $("zAuto").classList.toggle("on", !locked() && flow.auto !== false);
-  $("zDir").textContent = vertical() ? "⇅" : "⇄";
+  $("zDir").innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${vertical() ? "M12 4v16M6 14l6 6 6-6" : "M4 12h16M14 6l6 6-6 6"}"/></svg>`;
   $("zDir").title = vertical() ? "Flow goes top to bottom. Click to tidy it left to right." : "Flow goes left to right. Click to tidy it top to bottom.";
   renderNodes(); renderWires(); renderChips();
   $("emptyHint").classList.toggle("show", !shown().nodes.length);
-  if (!locked()) $("flowName").value = flow.name;
+  if (!locked()) { $("flowName").value = flow.name; $("flowName").title = flow.name; }
+  $("floatName").querySelector("span").textContent = flow.name;
 }
 
 function nodeState(id) { return run ? (run.nodes[id] || { status: "waiting", agents: [] }) : null; }
@@ -1662,20 +1749,20 @@ function renderChips() {
   if (e) {
     const per = Object.entries(e.per_model).map(([m, c]) => `${c}× ${modelLabel(m)}`).join(", ");
     const steps = stepCount(flow);
-    $("estChip").textContent = `${plural(e.sessions, "agent")} · ${plural(steps, "step")}`;
+    $("estChip").textContent = e.sessions ? `${plural(e.sessions, "agent")} · ${plural(steps, "step")}` : "No agents yet";
     $("estChip").title = per ? per + "." : "";
   }
-  $("probChip").hidden = run || !problems.length;
-  $("probChip").textContent = problems.length ? "⚠ " + problems[0] : "";
+  $("probChip").hidden = run || !problems.length || !flow.nodes.some((x) => x.type === "cluster");
+  $("probChip").innerHTML = problems.length ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg><span>${esc(problems[0])}${problems.length > 1 ? ` <small>+${problems.length - 1} more</small>` : ""}</span>` : "";
   $("probChip").title = problems.join(" ");
   $("runBtn").disabled = locked();
-  for (const id of ["flowName", "delBtn", "newBtn", "flowPick"]) $(id).disabled = locked();
+  for (const id of ["flowName", "flowMenu", "newBtn", "floatRun"]) $(id).disabled = locked();
 }
 
 // ------------------------------------------------------------------ interaction
 let drag = null;
 $("canvas").addEventListener("mousedown", (e) => {
-  if (e.button !== 0 || e.target.closest("#ghost")) return;   // the empty team slot is a button, not somewhere to pan from
+  if (e.button !== 0 || e.target.closest("#ghost, .hud")) return;   // the empty team slot and the controls on the canvas are buttons, not somewhere to pan from
   const port = e.target.closest(".port"), nodeEl = e.target.closest(".node"), path = e.target.closest("[data-edge]");
   const cut = e.target.closest("[data-cut]");
   if (cut) { e.preventDefault(); disconnect(+cut.dataset.cut); return; }
@@ -1704,6 +1791,7 @@ $("canvas").addEventListener("mousedown", (e) => {
     e.preventDefault(); return;
   }
   if (path) { select({ kind: "edge", id: +path.dataset.edge }); return; }
+  autoFit = false;   // you moved the view: leave it where you put it
   drag = { kind: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
   $("canvas").classList.add("panning");
   if (sel) select(null);
@@ -1750,6 +1838,7 @@ function endDrag(e) {
 }
 // right-click menus: on a node, on a wire, or on empty canvas
 $("canvas").addEventListener("contextmenu", (e) => {
+  if (e.target.closest(".hud")) return;   // the describe box keeps its own menu (paste and so on)
   e.preventDefault();
   if (locked()) return;
   const w = e.target.closest("[data-edge]"), nodeEl = e.target.closest(".node"), x = e.clientX, y = e.clientY;
@@ -1771,7 +1860,7 @@ $("canvas").addEventListener("contextmenu", (e) => {
     { icon: "!", label: "Add approval", action: at("approval") },
     { icon: "✓", label: "Add done", action: at("done"), disabled: flow.nodes.some((x) => x.type === "done") },
     { sep: true },
-    { icon: "⤢", label: "Fit to screen", action: fit },
+    { icon: "⤢", label: "Fit to screen", action: () => { autoFit = true; fit(); } },
   ]);
 });
 function duplicateNode(id) {
@@ -1834,7 +1923,7 @@ const modelOpts = (v) => opt(meta.models.map((m) => [m.id, `${m.label} · ${m.bl
 const toolOpts = (v) => opt(meta.tools.map((t) => [t, TOOL_INFO[t] || t]), v);
 
 let moreOpen = false;   // remembered while you click between nodes
-function more(inner) { return `<details class="more"${moreOpen ? " open" : ""} data-more><summary>More settings</summary>${inner}</details>`; }
+function more(inner) { return `<details class="more"${moreOpen ? " open" : ""} data-more><summary>Advanced</summary>${inner}</details>`; }
 let recentFolders = [];
 function folderField(id, value) {
   return `<div class="folder"><input id="${id}" list="recentFolders" value="${esc(value || "")}" placeholder="Pick or paste a folder">
@@ -1865,25 +1954,24 @@ const GS_ACTIONS = {
   setup: () => { const n = unsetCluster() || flow.nodes.find((x) => x.type === "cluster"); if (n) select({ kind: "node", id: n.id }); },
   run: () => $("runBtn").click(),
 };
-function getStarted() {
+function getStarted() {   // "" once all three are done
   const clusters = flow.nodes.filter((n) => n.type === "cluster");
   const done = [clusters.length > 0 && problems.length === 0, clusters.length > 0 && !unsetCluster(), ranFlows.has(flow.id)];
   const now = done.findIndex((d) => !d);
+  if (now < 0) return "";
   const steps = [
     { shape: "owl", color: "#7aa2f7", title: "Make a team", text: "Describe it in one line, or drag bots in.", act: "describe", label: "Describe a team" },
     { shape: "golem", color: "#e0823d", title: "Set them up", text: "Pick a job, agents and access for each team.", act: "setup", label: unsetCluster() ? "Pick a team" : "Open a team" },
-    { shape: "rocket", color: "#bb9af7", title: "Run it", text: "Say what you want done, then watch.", act: "run", label: "▶ Run" },
+    { shape: "rocket", color: "#bb9af7", title: "Run it", text: "Say what you want done, then watch.", act: "run", label: `<svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>Run` },
   ];
   const count = done.filter(Boolean).length;
-  return `<div class="gs-top"><h4>${count === 3 ? "You're all set" : "Get started"}</h4><span>${count} of 3</span></div>
-    <div class="gs-bar${count === 3 ? " all" : ""}"><i style="width:${Math.max(4, count / 3 * 100)}%"></i></div>
+  return `<div class="gs-top"><h4>Get started</h4><span>${count} of 3</span></div>
+    <div class="gs-bar"><i style="width:${Math.max(4, count / 3 * 100)}%"></i></div>
     <div class="gs">${steps.map((st, i) => {
       const cls = done[i] ? "did" : i === now ? "now" : "next";
       return `<div class="gs-step ${cls}" style="--c:${st.color}">
         <span class="ic"><canvas width="96" height="72" data-shape="${st.shape}" data-color="${st.color}"></canvas>${done[i] ? '<span class="tick" aria-label="done">✓</span>' : ""}</span>
-        <div><b>${st.title}</b>${i === now ? `<p>${st.text}</p>` : ""}
-          ${i === now ? `<button type="button" class="primary" data-gs="${st.act}">${st.label}</button>` : ""}
-          ${count === 3 && i === 2 ? `<button type="button" data-gs="run">Run again</button>` : ""}</div></div>`;
+        <div><b>${st.title}</b>${i === now ? `<p>${st.text}</p><button type="button" class="primary" data-gs="${st.act}">${st.label}</button>` : ""}</div></div>`;
     }).join("")}</div>`;
 }
 // a team's connectors: only the ones switched on here load, and only when an agent searches for a tool
@@ -1957,6 +2045,24 @@ function cliRows(n) {
     <div class="sub">Only commands that start with these can run. Everything else is blocked.</div>`;
 }
 
+// how a node looks in lists: a team as its bot, Start as the owl, the other steps as their icons
+const lookOf = (n) => n.type === "cluster" ? { shape: n.shape, color: n.color } : n.type === "master" ? { shape: "owl", color: "#7aa2f7" }
+  : { icon: n.type, color: { checkpoint: "#7aa2f7", approval: "#e0a23c", done: "#e6b450" }[n.type] };
+function drawLooks(root) {
+  root.querySelectorAll("canvas[data-shape], canvas[data-icon]").forEach((cv) => {
+    const g = cv.getContext("2d"); g.clearRect(0, 0, cv.width, cv.height);
+    if (cv.dataset.icon) drawIcon(g, cv.dataset.icon, 6, 8, 7, { t: 0 });
+    else drawBot(g, { shape: cv.dataset.shape, color: cv.dataset.color }, 6, 8, 7, { state: "idle", t: 0 });
+  });
+}
+// the bots a team can start from, grouped as in the palette
+function botOptions(n) {
+  const list = teamBots(), one = (b) => `<option value="${esc(b.id)}"${b.id === n.bot ? " selected" : ""} title="${esc(b.tagline || "")}">${esc(b.name)}</option>`;
+  const groups = BOT_GROUPS.map(([name, ids]) => [name, list.filter((b) => ids.includes(b.id))])
+    .concat([["Your bots", list.filter((b) => !BOT_GROUPS.some(([, ids]) => ids.includes(b.id)))]]).filter(([, items]) => items.length);
+  return `<option value=""${list.some((b) => b.id === n.bot) ? "" : " selected"}>Custom (no bot)</option>`
+    + groups.map(([name, items]) => `<optgroup label="${esc(name)}">${items.map(one).join("")}</optgroup>`).join("");
+}
 function renderInspector() {
   if (!flow) return;   // checks that finish before the first flow loads have nothing to draw yet
   if (run) return renderRunPanel();
@@ -1965,20 +2071,23 @@ function renderInspector() {
   box.classList.remove("padded");
   const n = sel && sel.kind === "node" ? nodeById(sel.id) : null;
   if (!n) {
-    const steps = stepCount(flow);
-    box.innerHTML = `<div class="isec" style="padding-top:18px">
-        <div class="big">${esc(flow.name)}</div>
-        <div class="stats"><span>${est ? est.sessions : 0} agent${est && est.sessions === 1 ? "" : "s"}</span><span>${steps} step${steps === 1 ? "" : "s"}</span>
-          ${est ? Object.entries(est.per_model).map(([m, c]) => `<span>${c}× ${esc(modelLabel(m))}</span>`).join("") : ""}</div>
-      </div>
-      <div class="isec">${getStarted()}</div>
+    const mine = allRuns.filter((r) => r.flow_id === flow.id).sort((a, b) => b.started - a.started).slice(0, 3);
+    const gs = getStarted();
+    box.innerHTML = (gs ? `<div class="isec">${gs}</div>` : "") + `
+      <div class="isec"><h4>How it works <span class="aside">${plural(est ? est.sessions : 0, "agent")} · ${plural(stepCount(flow), "step")}</span></h4>
+        ${howItWorks(flow, null)}
+        <p class="hw-note">Each stage waits for everything wired into it. Only each agent's short report moves on, which keeps usage down.</p></div>
       <div class="isec" title="Where agents work. You can change it each time you run."><h4>Project folder</h4>${folderField("fFolder", flow.folder)}</div>
-      <div class="isec"><details class="more"><summary>How it works</summary>
-        <p class="hint">Your task goes in at <b>Start</b>, which can write a short plan every agent sees. Each node waits for everything wired into it, so stages run in order and branches run side by side. Only each agent's short report moves on to the next stage, which keeps usage down.</p>
-        <p class="hint">Agents that can <b>edit files</b> take turns in the folder so they never overwrite each other. Read-only agents all work at once.</p></details></div>`;
+      <div class="isec"><h4>Recent runs${mine.length ? `<a href="#" class="aside" id="allRuns">All runs</a>` : ""}</h4>
+        ${mine.length ? `<div class="rruns">${mine.map((r) => `<button type="button" class="rrun" data-run="${esc(r.id)}"><i class="${esc(r.status)}"></i>
+          <span class="ot"><b>${esc(r.task || "No task")}</b><small>${esc(STATUS_WORD[r.status] || cap(r.status))} · ${esc(when(r.started))}${r.ended ? " · " + dur(r.ended - r.started) : ""}</small></span></button>`).join("")}</div>`
+          : `<p class="hint" style="margin:0">No runs yet. Press Run and say what you want done.</p>`}</div>`;
     wireFolder("fFolder", (v) => { flow.folder = v; changed(false); });
-    box.querySelectorAll(".gs-step canvas").forEach((cv) => drawBot(cv.getContext("2d"), { shape: cv.dataset.shape, color: cv.dataset.color }, 6, 8, 7, { state: "idle", t: 0 }));
+    drawLooks(box);
     box.querySelectorAll("[data-gs]").forEach((b) => b.addEventListener("click", () => GS_ACTIONS[b.dataset.gs]()));
+    box.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => { select({ kind: "node", id: b.dataset.pick }); followNode(b.dataset.pick); }));
+    box.querySelectorAll("[data-run]").forEach((b) => b.addEventListener("click", () => openRun(b.dataset.run)));
+    if ($("allRuns")) $("allRuns").onclick = (e) => { e.preventDefault(); $("runsBtn").click(); };
     return;
   }
   if (sel.kind === "edge") {
@@ -1993,8 +2102,7 @@ function renderInspector() {
     return;
   }
 
-  const look = n.type === "cluster" ? { shape: n.shape, color: n.color } : n.type === "master" ? { shape: "owl", color: "#7aa2f7" }
-    : { icon: n.type, color: { checkpoint: "#7aa2f7", approval: "#e0a23c", done: "#e6b450" }[n.type] };
+  const look = lookOf(n);
   const kind = n.type === "cluster" ? `Team · ${n.count} × ${teamModel(n)}` : n.type === "master" ? (n.mode === "pass" ? "Start · passes your task on" : `Start · writes a plan first · ${modelLabel(n.model)}`)
     : { checkpoint: "Checkpoint · waits for everything before it", approval: "Approval · pauses until you say go", done: "Done · the final result lands here" }[n.type];
   const seg = (key, options, value) => `<div class="seg" data-seg="${key}">${options.map(([v, l, tip]) => `<button type="button" data-v="${esc(v)}" class="${v === value ? "on" : ""}"${tip ? ` title="${esc(tip)}"` : ""}>${esc(l)}</button>`).join("")}</div>`;
@@ -2017,9 +2125,10 @@ function renderInspector() {
   const ROLE_TIPS = { think: "Planning, design, writing, judgment", build: "Making and changing things", run: "Checks, tests, merges, deploys" };
   const modelPick = (node) => {   // a role (the Run menu says which model fills it) or a model picked by hand
     const role = node.role || "";
-    return seg("role", [["think", ROLE_NAME.think, ROLE_TIPS.think], ["build", ROLE_NAME.build, ROLE_TIPS.build], ["run", ROLE_NAME.run, ROLE_TIPS.run], ["", "Pick a model"]], role)
-      + (role ? `<div class="usespill" title="${esc(ROLE_TIPS[role])}. Change which model fills ${ROLE_NAME[role]} in the Run menu.">Uses <b>${esc(modelLabel(roleModel(role)))}</b></div>`
-              : models(node.model));
+    const cards = ["think", "build", "run"].map((r) => `<button type="button" data-v="${r}" class="${r === role ? "on" : ""}" title="${esc(ROLE_TIPS[r])}"><b>${ROLE_NAME[r]}</b><small>${esc(modelLabel(roleModel(r)))}</small></button>`).join("")
+      + `<button type="button" data-v="" class="${role ? "" : "on"}" title="Choose the model for this step yourself"><b>Pick a model</b><small>${role ? "Choose it yourself" : esc(modelLabel(node.model))}</small></button>`;
+    return `<div class="rolecards" data-seg="role">${cards}</div>`
+      + (role ? `<div class="sub">${esc(ROLE_TIPS[role])}. The Run menu sets which model each role uses.</div>` : models(node.model));
   };
   const modelNote = () => "";   // the model's blurb was one line too many; the slider says enough
   const ACCESS = [["none", "Think only"], ["read", "Read files"], ["web", "Web"], ["research", "Read + web"], ["edit", "Edit files"], ["full", "Edit + run code"]];
@@ -2039,13 +2148,10 @@ function renderInspector() {
       <div class="sl-top"><span>${esc(name)}</span><b id="${id}Val">${val}</b></div>
       <input type="range" id="${id}" min="${min}" max="${max}" step="1" value="${v}" style="--fill:${max > min ? ((v - min) / (max - min)) * 100 : 0}%" aria-label="${esc(name)}">
       ${lo ? `<div class="sl-ends"><span>${esc(lo)}</span><span>${esc(hi)}</span></div>` : ""}</div>`;
-  const team = n.type === "cluster";
-  let html = `<div class="ihead hero${team ? " team" : ""}" style="--c:${esc(look.color)}">
+  let html = `<div class="ihead" style="--c:${esc(look.color)}">
       <span class="ava"><canvas id="iAva" width="96" height="72"></canvas></span>
-      <input class="title" id="iName" data-k="name" maxlength="40" value="${esc(n.name)}" aria-label="Name">
-      ${team ? "" : `<div class="kind">${esc(kind)}</div>`}
+      <div class="who"><input class="title" id="iName" data-k="name" maxlength="40" value="${esc(n.name)}" aria-label="Name"><div class="kind" title="${esc(kind)}">${esc(kind)}</div></div>
       ${n.type !== "master" ? `<button class="iconbtn" id="iDel" title="Delete this node (or press Delete)" aria-label="Delete node"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>` : ""}
-      ${team ? `<div class="botstrip" role="group" aria-label="Start from a bot">${teamBots().map((b) => `<button type="button" data-bot="${esc(b.id)}" class="${b.id === n.bot ? "on" : ""}" style="--bc:${esc(b.color)}" title="${esc(b.name + (b.tagline ? " · " + b.tagline : ""))}"><canvas width="96" height="72" data-shape="${esc(b.shape)}" data-color="${esc(b.color)}"></canvas></button>`).join("")}</div>` : ""}
     </div>`;
 
   if (n.type === "master") {
@@ -2057,19 +2163,21 @@ function renderInspector() {
   }
   if (n.type === "cluster") {
     const claude = engineOf(n) === "claude";
-    const ai = Math.max(0, ACCESS.findIndex(([v]) => v === n.tools)), how = n.count === 1 ? "Works alone" : n.split ? "Split the job" : n.tools === "edit" || n.tools === "full" ? "Take turns" : "Side by side";
+    const ai = Math.max(0, ACCESS.findIndex(([v]) => v === n.tools));
+    const how = n.count === 1 ? ["Works alone", "One agent does the whole job."] : n.split ? ["Split the job", `The job is cut into ${n.count} parts, one each.`]
+      : n.tools === "edit" || n.tools === "full" ? ["Take turns", "They edit the folder one at a time."] : ["Side by side", "Each one does the whole job, all at once."];
     html += `<div class="isec"><h4>Job</h4>
+        <label class="bpick">Bot<select id="iBot" title="Start from a ready-made bot">${botOptions(n)}</select></label>
         <textarea data-k="instructions" rows="3" placeholder="${esc(builtinOf(n) ? `${builtinOf(n).name}'s built-in job. Write your own here.` : "Review the changes for bugs.")}">${esc(n.instructions || "")}</textarea></div>
-      <div class="isec">
-        ${slider("agRange", 1, meta.max_agents, n.count, { name: "Agents", val: n.count, c: n.color })}
-        <div class="agviz" style="--c:${esc(n.color)}" title="${esc(how)}">${Array.from({ length: meta.max_agents }, (_, i) => `<button type="button" data-count="${i + 1}" class="${i < n.count ? "on" : ""}" aria-label="${i + 1} agent${i ? "s" : ""}"></button>`).join("")}</div>
+      <div class="isec"><h4>Agents</h4>
+        <div class="agents"><div class="stepper"><button type="button" data-step="-1" aria-label="One agent fewer"${n.count <= 1 ? " disabled" : ""}>−</button><output>${n.count}</output><button type="button" data-step="1" aria-label="One agent more"${n.count >= meta.max_agents ? " disabled" : ""}>+</button></div>
+          <div class="how"><b>${how[0]}</b>${esc(how[1])}</div></div>
         ${n.count > 1 ? `<label class="switch mini"><span><b>Split the job</b></span><input type="checkbox" id="splitSw"${n.split ? " checked" : ""} title="${esc(n.split ? `One job, cut into ${n.count} parts` : "Every agent does the whole job")}"></label>` : ""}</div>
-      <div class="isec"><h4>Brain</h4>${engineCards(n)}
-        ${claude ? `${modelPick(n)}${effortBar(n)}`
-          : `<div class="field"><label>Model</label>${engineModels(n)}</div>`}</div>
+      <div class="isec"><h4>Model</h4>${engineCards(n)}
+        ${claude ? `${modelPick(n)}${effortBar(n)}` : engineModels(n)}</div>
       <div class="isec"><h4>Access</h4>
-        <div class="acviz" style="--c:${ACCESS_COLOR[ACCESS[ai][0]]}">${ACCESS.map(([v, l], j) => `<button type="button" data-acc="${j}" class="${j <= ai ? "on" : ""}" title="${esc(l)}">${ACCESS_ICON[v]}</button>`).join("")}</div>
-        ${slider("acRange", 0, ACCESS.length - 1, ai, { name: "Can", val: esc(ACCESS[ai][1]), lo: "Safe", hi: "Powerful", c: ACCESS_COLOR[ACCESS[ai][0]], tip: ACCESS_NOTE[n.tools] || "" })}
+        <div class="access">${ACCESS.map(([v, l], j) => `<button type="button" data-acc="${j}" class="${j === ai ? "on" : ""}" style="--c:${ACCESS_COLOR[v]}" title="${esc(ACCESS_NOTE[v])}">${ACCESS_ICON[v]}<span>${esc(l)}</span></button>`).join("")}</div>
+        <div class="sub">${esc(ACCESS_NOTE[n.tools] || "")}</div>
         ${claude ? `<div class="slabel">Commands</div>${cliRows(n)}
         <div class="slabel">Apps <a href="#" id="connRefresh">Refresh</a></div>${connectorRows(n)}` : ""}</div>
       <div class="isec">${more(`<div class="field"><label>On the card</label><input data-k="summary" maxlength="80" value="${esc(n.summary || "")}" placeholder="${esc(summaryOf({ ...n, summary: "" }) || "What this team does, in a few words")}"></div>
@@ -2171,23 +2279,8 @@ function renderInspector() {
     });
     r.addEventListener("change", () => renderInspector());
   };
-  live("agRange", (v) => { n.count = v; box.querySelectorAll("[data-count]").forEach((d) => d.classList.toggle("on", Number(d.dataset.count) <= v)); return v; });
   live("efRange", (v) => { n.effort = EFFORTS[v][0]; return EFFORTS[v][1]; });
-  live("acRange", (v) => {
-    n.tools = ACCESS[v][0]; const c = ACCESS_COLOR[n.tools];
-    $("acRange").closest(".sl").style.setProperty("--c", c); box.querySelector(".acviz").style.setProperty("--c", c);
-    box.querySelectorAll("[data-acc]").forEach((d) => d.classList.toggle("on", Number(d.dataset.acc) <= v));
-    return esc(ACCESS[v][1]);
-  });
-  box.querySelectorAll("[data-count]").forEach((d) => d.addEventListener("click", () => { n.count = Number(d.dataset.count); changed(false); renderInspector(); }));
   box.querySelectorAll("[data-acc]").forEach((d) => d.addEventListener("click", () => { n.tools = ACCESS[Number(d.dataset.acc)][0]; changed(false); renderInspector(); }));
-  box.querySelectorAll(".botstrip canvas").forEach((cv) => drawBot(cv.getContext("2d"), { shape: cv.dataset.shape, color: cv.dataset.color }, 6, 8, 7, { state: "idle", t: 0 }));
-  box.querySelectorAll("[data-bot]").forEach((b) => b.addEventListener("click", () => {
-    const bot = bots.find((x) => x.id === b.dataset.bot); if (!bot) return;
-    applyBot(n, bot); changed(false); renderInspector();
-  }));
-  const picked = box.querySelector(".botstrip .on");   // keep the team's bot in view
-  if (picked) picked.parentElement.scrollLeft = picked.offsetLeft - picked.parentElement.clientWidth / 2 + picked.offsetWidth / 2;
 }
 
 // ------------------------------------------------------------------ runs
@@ -2254,10 +2347,89 @@ $("taskIdeas").addEventListener("click", (e) => { const b = e.target.closest("[d
 $("recentChips").addEventListener("click", (e) => { const b = e.target.closest("[data-folder]"); if (b) $("folderIn").value = b.dataset.folder; });
 // Nodes in the order a run reaches them: by how many steps from the start, then top to bottom. (Not by where they sit:
 // a long flow wraps onto rows, so a later step can sit further left.)
-function flowOrder(f) {
+function flowDepth(f) {   // node id -> how many steps from the start
   const depth = Object.fromEntries(f.nodes.map((n) => [n.id, 0]));
   for (let k = 0; k < f.nodes.length; k++) for (const e of f.edges) if (e.from in depth && e.to in depth) depth[e.to] = Math.max(depth[e.to], depth[e.from] + 1);
+  return depth;
+}
+function flowOrder(f) {
+  const depth = flowDepth(f);
   return [...f.nodes].sort((a, b) => depth[a.id] - depth[b.id] || a.y - b.y || a.x - b.x);
+}
+// ---- How it works: every stage in running order, each team with its agents and what each one is told to work on.
+// With a run it shows what each agent is doing right now instead.
+function agentFocus(n, i) {   // as flows.py's _cluster tells agent i
+  const c = n.count || 1, fs = (n.focuses || "").split("\n").map((s) => s.trim()).filter(Boolean);
+  if (n.split && c > 1) return `Part ${i} of ${c}` + (fs.length ? ` · ${fs[(i - 1) % fs.length]}` : "");
+  return fs.length ? fs[(i - 1) % fs.length] : "";
+}
+const WRITES = ["edit", "full"];   // agents.py WRITES: these take turns in the folder unless the team splits the job
+function teamHow(n) {
+  const c = n.count || 1, fs = (n.focuses || "").trim();
+  if (c < 2) return "";
+  if (n.split) return fs ? `${c} agents split the job` : `${c} agents split the job into parts`;
+  const how = WRITES.includes(n.tools) ? `${c} agents take turns, since they edit files` : `${c} agents work at once`;
+  return fs ? how : `${how}, each looking for what the others miss`;
+}
+const STEP_DOES = {
+  master: (n) => n.mode === "pass" ? "Your task goes in and is passed on" : "Reads your task and writes a short plan every agent sees",
+  checkpoint: (n) => n.mode === "summarize" ? "Waits for every report, then merges them into one" : "Waits for every report, then passes them on",
+  approval: (n) => n.message || "Pauses until you say go",
+  done: () => "The final result lands here",
+};
+const STEP_DID = { master: (n) => n.mode === "pass" ? "Passed your task on" : "Plan written", checkpoint: (n) => n.mode === "summarize" ? "Reports merged" : "Reports passed on",
+                   approval: () => "Approved", done: () => "The result is ready" };
+function howItWorks(f, r) {
+  const now = Date.now() / 1000, depth = flowDepth(f), wired = new Set(f.edges.flatMap((e) => [e.from, e.to]));
+  const end = f.nodes.find((n) => n.type === "done" && !wired.has(n.id));   // still ends the line, as on the canvas
+  const loose = f.nodes.filter((n) => n.type !== "master" && n !== end && !wired.has(n.id));
+  const stages = [];
+  for (const n of flowOrder(f)) if (!loose.includes(n) && n !== end) (stages[depth[n.id]] = stages[depth[n.id]] || []).push(n);
+  if (end) stages.push([end]);
+  const row = (n) => {
+    const lk = lookOf(n), team = n.type === "cluster", st = r ? r.nodes[n.id] || { status: "waiting", agents: [] } : null, status = st ? st.status : "";
+    const ags = st ? st.agents || [] : [], live = ags.find((a) => a.status === "running");
+    const secs = st && st.started ? (st.ended || now) - st.started : 0, took = secs >= 1 || (st && !st.ended && st.started) ? dur(secs) : "";
+    const meta = r ? (status === "waiting" ? "" : status === "approval" ? "Needs you" : took)
+      : team ? `${teamModel(n)} · ${(CAN[n.tools] || CAN.read)[0]}` : (n.type === "master" && n.mode !== "pass") || (n.type === "checkpoint" && n.mode === "summarize") ? modelLabel(n.model) : "";
+    // the line under the name: the job, or (in a run, for a step with one agent) what it's doing now
+    let line = team ? summaryOf(n) : STEP_DOES[n.type](n), cls = team && !line ? "warn" : "";
+    if (team && !line) line = "No job yet";
+    if (r && !(team && n.count > 1)) {
+      if (status === "running") { line = esc((live && live.step) || (n.type === "checkpoint" ? "Merging reports" : n.type === "master" ? "Writing the plan" : "Starting up")); cls = "live"; }
+      else if (status === "approval") { line = esc(n.message || "Waiting for you to say go"); cls = "warn"; }
+      else if (status === "failed") { line = esc(st.error || "Didn't finish"); cls = "err"; }
+      else if (status === "done") line = esc(team ? `Done · ${plural(ags.reduce((t, a) => t + (a.turns || 0), 0), "turn")}` : STEP_DID[n.type](n));
+      else if (status !== "waiting") line = esc(STATUS_WORD[status] || cap(status));
+      else line = esc(line);
+    } else line = esc(line);
+    // a team of several: who does what, and in a run what each one is on
+    let agents = "";
+    if (team && n.count > 1) {
+      const how = teamHow(n), focused = n.split || (n.focuses || "").trim();
+      const items = r || focused ? Array.from({ length: n.count }, (_, k) => k + 1) : [];
+      const shown = items.slice(0, 6).map((i) => {
+        const a = r && ags.find((x) => x.name === `${n.name} ${i}`), focus = agentFocus(n, i);
+        if (!r) return `<span class="hw-ag"><i>${i}</i><span>${esc(focus)}</span></span>`;
+        if (!a) return `<span class="hw-ag waiting"><i>${i}</i><span>${esc(focus || (WRITES.includes(n.tools) && !n.split && status === "running" ? "Waiting its turn" : "Waiting"))}</span></span>`;
+        const text = a.status === "running" ? a.step || "Thinking…" : a.status === "failed" ? a.error || "Didn't finish" : a.status === "done" ? focus || "Done" : cap(a.status);
+        return `<span class="hw-ag ${esc(a.status)}"><i>${a.status === "done" ? "✓" : i}</i><span>${esc(text)}</span>${a.turns ? `<small>${plural(a.turns, "turn")}</small>` : ""}</span>`;
+      });
+      agents = `<span class="hw-ags">${how && (!r || !focused) ? `<small>${esc(how)}</small>` : ""}${shown.join("")}${items.length > 6 ? `<small>+${items.length - 6} more</small>` : ""}</span>`;
+    }
+    const badge = !st || status === "waiting" ? "" : `<span class="st ${esc(status)}">${status === "done" ? ICON.check : ""}</span>`;
+    return `<button type="button" class="hw-node ${esc(status)}" ${r ? "data-step-node" : "data-pick"}="${esc(n.id)}" style="--c:${esc(lk.color)}">
+      <span class="hw-ava"><canvas width="96" height="72" ${lk.icon ? `data-icon="${esc(lk.icon)}"` : `data-shape="${esc(lk.shape)}" data-color="${esc(lk.color)}"`}></canvas>${badge}</span>
+      <span class="hw-txt"><b><span>${esc(n.name || TYPE_LABEL[n.type])}</span>${meta ? `<em>${esc(meta)}</em>` : ""}</b>
+        <small class="${cls}">${line}</small>${agents}</span></button>`;
+  };
+  const ghost = `<button type="button" class="hw-node hw-ghost" data-gs="describe"><span class="hw-ava">+</span>
+    <span class="hw-txt"><b><span>A team goes here</span></b><small>Describe one below, or drag a bot in</small></span></button>`;
+  const noTeam = !r && !f.nodes.some((n) => n.type === "cluster");
+  const body = stages.filter(Boolean).map((g, i) => (g.length > 1 ? `<div class="hw-par"><small>Side by side</small>${g.map(row).join("")}</div>` : row(g[0]))
+    + (noTeam && i === 0 ? ghost : "")).join("");
+  return `<div class="hw">${body || ghost}</div>`
+    + (loose.length ? `<div class="hw-loose"><small>Not wired in yet, so these won't run</small><div class="hw">${loose.map(row).join("")}</div></div>` : "");
 }
 function renderRunTeam() {   // the team in running order, as little avatars
   const order = flowOrder(flow);
@@ -2363,7 +2535,7 @@ async function openRun(id) {
   ranFlows.add(run.flow_id);
   sel = null; for (const k of Object.keys(els)) { els[k].el.remove(); delete els[k]; }
   traySrc = null; lastTray = "";
-  renderAll(); fit(); renderInspector(); renderBanner(); renderTray();
+  renderAll(); autoFit = true; fit(); renderInspector(); renderBanner(); renderTray();
   runTimer = setInterval(pollRun, 1000);
   maybeShowResult(run);
 }
@@ -2384,7 +2556,13 @@ async function pollRun() {
 function closeRun() {
   clearInterval(runTimer); run = null; sel = null; closeSheet(); renderTray();
   for (const k of Object.keys(els)) { els[k].el.remove(); delete els[k]; }
-  renderAll(); renderInspector(); renderBanner(); fit();
+  renderAll(); renderInspector(); renderBanner(); autoFit = true; fit();
+  refreshRuns();
+}
+async function refreshRuns() {   // the overview lists this flow's latest runs
+  try { allRuns = (await api("/api/runs")).runs; } catch (e) { return; }
+  allRuns.forEach((r) => ranFlows.add(r.flow_id));
+  if (!run && !sel) renderInspector();
 }
 function renderBanner() {
   const b = $("banner");
@@ -2469,20 +2647,6 @@ function runMeta(r) {
 }
 function logClass(text) { return /finished|approved/i.test(text) ? "ok" : /fail|reject|stopped|interrupted/i.test(text) ? "bad" : /waiting/i.test(text) ? "wait" : ""; }
 
-// every step of the run, in flow order, with what it's doing right now; click one to see its agents
-function stepList(r) {
-  const order = flowOrder(r.flow);
-  return `<div class="runsteps">${order.map((n) => {
-    const st = r.nodes[n.id] || { status: "waiting", agents: [] }, running = (st.agents || []).find((a) => a.status === "running");
-    const took = st.started ? dur(((st.ended || Date.now() / 1000)) - st.started) : "";
-    const what = st.status === "running" ? (running && running.step) || (n.type === "checkpoint" ? "Merging reports" : "Starting up")
-      : st.status === "approval" ? "Needs you" : st.status === "failed" ? st.error || "Didn't finish"
-      : st.status === "done" ? (n.type === "cluster" ? `${(st.agents || []).length} agent${(st.agents || []).length === 1 ? "" : "s"} · done` : "Done")
-      : st.status === "waiting" ? "Waiting" : STATUS_WORD[st.status] || st.status;
-    return `<button type="button" data-step-node="${esc(n.id)}" class="${esc(st.status)}"><i class="rs-dot ${esc(st.status)}"></i>
-      <span class="rs-name"><b>${esc(n.name)}</b><small class="${st.status === "running" ? "live" : ""}">${esc(what)}</small></span><span class="rs-time">${st.status === "waiting" ? "" : took}</span></button>`;
-  }).join("")}</div>`;
-}
 function renderRunPanel() {
   $("insp").classList.add("padded");
   const box = $("insp"), r = run, m = runMeta(r), live = r.status === "running" || r.status === "waiting";
@@ -2501,7 +2665,7 @@ function renderRunPanel() {
       <div class="acts" style="margin-top:8px"><button class="danger" data-decide="${esc(nid)}" data-ok="0">Reject</button><button class="primary" data-decide="${esc(nid)}" data-ok="1">Approve</button></div></div>`;
   }
   if (r.final) html += `<div class="card result-card"><h4>✓ Result</h4><div class="peek doc">${md(r.final)}</div>
-      <div class="acts"><button id="copyFinal">Copy</button><button class="primary" id="openFinal">Open full result</button></div></div>`;
+      <div class="acts"><button id="copyFinal">Copy</button><button class="primary" id="openFinal">Open result</button></div></div>`;
   else if (!live && r.status !== "done") html += `<div class="card"><h4 style="margin:0 0 6px;font-size:13px">No result</h4>
       <p class="hint" style="margin:0">${esc((r.status === "stopped" && (r.log || []).map((l) => l.text).reverse().find((t) => /^Stopped/.test(t)))
         || Object.values(r.nodes).map((x) => x.error).find(Boolean) || "The run ended before the last step.")}</p></div>`;
@@ -2509,13 +2673,13 @@ function renderRunPanel() {
   const n = sel && sel.kind === "node" ? r.flow.nodes.find((x) => x.id === sel.id) : null;
   if (n) {
     const st = r.nodes[n.id];
-    html += `<div class="card"><div class="status-row ${esc(st.status === "approval" ? "waiting" : st.status)}"><i></i>${esc(st.status === "approval" ? "Needs you" : st.status)}</div>
+    html += `<div class="card"><div class="status-row ${esc(st.status === "approval" ? "waiting" : st.status)}"><i></i>${esc(st.status === "approval" ? "Needs you" : st.status === "waiting" ? "Not started" : STATUS_WORD[st.status] || cap(st.status))}</div>
       <div class="title" style="font-size:15px">${esc(n.name)}</div>`;
     if (st.note) html += `<p class="hint" style="margin:4px 0">${esc(st.note)}</p>`;
     if (st.error) html += `<p class="hint" style="margin:4px 0;color:var(--failed)">${esc(st.error)}</p>`;
     if (n.type === "master" && r.brief) html += `<details><summary class="hint">The plan everyone got</summary><div class="doc">${md(r.brief)}</div></details>`;
     for (const a of st.agents) {
-      html += `<div class="agent-row"><div class="top"><b>${esc(a.name)}</b><span class="pill ${esc(a.status)}">${esc(a.status)}</span></div>
+      html += `<div class="agent-row"><div class="top"><b>${esc(a.name)}</b><span class="pill ${esc(a.status)}">${esc(cap(a.status))}</span></div>
         <div class="meta">${esc(modelLabel(a.model))} · ${a.turns || 0} turns</div>
         ${a.status === "running" ? `<div class="meta" style="color:var(--ink)">${esc(a.step || "Thinking…")}</div>` : ""}
         ${a.error ? `<div class="meta" style="color:var(--failed)">${esc(a.error)}</div>` : ""}
@@ -2525,7 +2689,7 @@ function renderRunPanel() {
     }
     if (!st.agents.length && st.output && n.type !== "done") html += `<details><summary class="hint">What it passed on</summary><div class="doc">${md(st.output)}</div></details>`;
     html += `</div>`;
-  } else html += stepList(r);
+  } else html += `<div class="hw-h">How it works${live ? `<span class="hw-live"><i></i>Live</span>` : ""}</div>${howItWorks(r.flow, r)}`;
 
   html += `<details class="quiet"${live ? " open" : ""}><summary>Task</summary><div class="task-text">${esc(r.task)}</div></details>
     <details class="quiet"><summary>Activity · ${r.log.length}</summary><ul class="timeline">${r.log.slice().reverse().map((l) =>
@@ -2538,6 +2702,7 @@ function renderRunPanel() {
   if (html === lastPanel) { $("runClock").textContent = clock; return; }
   const same = lastPanel && lastPanel.split("<details").length === html.split("<details").length;
   box.innerHTML = html; lastPanel = html;
+  drawLooks(box);
   if (same) box.querySelectorAll("details").forEach((d, i) => { if (openNow[i] !== undefined) d.open = openNow[i]; });
   $("runClock").textContent = clock;
   if ($("openFinal")) $("openFinal").onclick = () => openSheet(r);
@@ -2671,10 +2836,10 @@ function maybeShowResult(r) {
 }
 
 $("runsBtn").onclick = async () => {
-  const runs = (await api("/api/runs")).runs;
+  const runs = allRuns = (await api("/api/runs")).runs;
   $("runList").innerHTML = runs.length ? runs.map((r) => `<div class="runrow" data-run="${esc(r.id)}"><b>${esc(r.flow_name)}</b>
-    <span class="pill ${esc(r.status)}">${esc(r.status)}</span>${r.items ? `<span class="pill items">${r.items.pass || r.items.cut ? `<span style="color:var(--done)">${r.items.pass} ✓</span>${r.items.cut ? ` · <span style="color:var(--failed)">${r.items.cut} ✕</span>` : ""}` : `${r.items.total} items`}</span>` : ""}<small>${esc((r.task || "").slice(0, 120))} · ${new Date(r.started * 1000).toLocaleString()}${r.ended ? " · took " + dur(r.ended - r.started) : ""}</small></div>`).join("")
-    : '<p class="hint">No runs yet. Press ▶ Run.</p>';
+    <span class="pill ${esc(r.status === "waiting" ? "approval" : r.status)}">${esc(r.status === "waiting" ? "Needs you" : cap(r.status))}</span>${r.items ? `<span class="pill items">${r.items.pass || r.items.cut ? `<span style="color:var(--done)">${r.items.pass} ✓</span>${r.items.cut ? ` · <span style="color:var(--failed)">${r.items.cut} ✕</span>` : ""}` : `${r.items.total} items`}</span>` : ""}<small>${esc((r.task || "").slice(0, 120))} · <span title="${esc(new Date(r.started * 1000).toLocaleString())}">${when(r.started)}</span>${r.ended ? " · " + dur(r.ended - r.started) : ""}</small></div>`).join("")
+    : '<p class="hint">No runs yet. Press Run to start one.</p>';
   $("runsDlg").showModal();
 };
 $("runList").onclick = (e) => { const row = e.target.closest("[data-run]"); if (row) { $("runsDlg").close(); openRun(row.dataset.run); } };
@@ -2703,29 +2868,36 @@ async function leaveFlow() {
   if (await save()) return true;
   return ui.confirm({ title: "Your last edits aren't saved", text: "Lithnode couldn't save this flow. Leave anyway and lose those edits?", ok: "Leave without saving", danger: true });
 }
-$("flowPick").onchange = async (e) => {
-  const to = e.target.value;
-  if (!(await leaveFlow())) { e.target.value = flow.id; return; }
-  dirty = false; openFlow(to);
-};
-$("flowName").oninput = (e) => { flow.name = e.target.value || "Untitled flow"; changed(false); };
-$("newBtn").onclick = async () => { if (!(await leaveFlow())) return; dirty = false; await createFlow(null); toast("New blank flow. Describe a team above, or drag a bot in from the left."); };
+async function switchFlow(id) {
+  if (!flow || id === flow.id) return;
+  if (!(await leaveFlow())) return;
+  dirty = false; openFlow(id);
+}
+$("flowName").oninput = (e) => { flow.name = e.target.value || "Untitled flow"; $("floatName").querySelector("span").textContent = flow.name; changed(false); };
+$("newBtn").onclick = async () => { if (!(await leaveFlow())) return; dirty = false; await createFlow(null); toast("New blank flow. Describe a team below, or drag a bot in from the left."); };
 $("newDlg").addEventListener("click", async (e) => {
   const t = e.target.closest("[data-tpl]"); if (!t) return;
   $("newDlg").close(); if (!(await leaveFlow())) return; dirty = false; await createFlow(t.dataset.tpl || null);
 });
-$("delBtn").onclick = (e) => {
-  const r = e.currentTarget.getBoundingClientRect();
+// The flow menu, from the arrow by the flow's name: switch to another flow, make one, tidy this one up or delete it.
+function flowMenu(r) {
   ui.menu(r.left, r.bottom + 6, [
-    { icon: "＋", label: "New from template…", action: () => $("newDlg").showModal() },
+    { head: "Your flows" },
+    ...flows.map((f) => ({ icon: f.id === flow.id ? "✓" : "", label: f.name, on: f.id === flow.id, action: () => switchFlow(f.id) })),
+    { sep: true },
+    { icon: "＋", label: "New blank flow", action: () => $("newBtn").click() },
+    { icon: "▦", label: "New from a template…", action: () => $("newDlg").showModal() },
     { icon: "⧉", label: "Duplicate flow", action: duplicateFlow },
-    { icon: "⇅", label: "Tidy up, top to bottom", action: () => tidy("tb") },
-    { icon: "⇄", label: "Tidy up, left to right (wraps long flows)", action: () => tidy("lr") },
-    { icon: "⤢", label: "Fit to screen", action: fit },
+    { sep: true },
+    { icon: "⇅", label: "Tidy up top to bottom", action: () => tidy("tb") },
+    { icon: "⇄", label: "Tidy up left to right", hint: "wraps long flows", action: () => tidy("lr") },
+    { icon: "⤢", label: "Fit to screen", action: () => { autoFit = true; fit(); } },
     { sep: true },
     { icon: "✕", label: "Delete flow", danger: true, action: deleteFlow },
   ]);
-};
+}
+$("flowMenu").onclick = (e) => flowMenu(e.currentTarget.closest(".fname").getBoundingClientRect());
+$("floatName").onclick = (e) => flowMenu(e.currentTarget.getBoundingClientRect());
 async function duplicateFlow() {
   if (!(await leaveFlow())) return;
   const d = await api("/api/flows", { method: "POST", body: {} });

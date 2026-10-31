@@ -121,7 +121,8 @@ def report_of(text, limit):
     text = TOOL_TEXT_RE.sub("", text or "").strip()
     marker = text.upper().rfind("REPORT:")
     if marker >= 0:
-        text = text[marker + len("REPORT:"):].lstrip("*_ 	").strip()   # "**REPORT:**" leaves its closing ** behind
+        # "**REPORT:**" leaves its closing ** behind; "REPORT: **Found** ..." keeps its bold
+        text = re.sub(r"^[*_]{1,3}(?=\s|$)", "", text[marker + len("REPORT:"):]).strip()
     return text if len(text) <= limit else text[:limit].rstrip() + "\n[...cut to save credits]"
 
 

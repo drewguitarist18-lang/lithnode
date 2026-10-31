@@ -35,36 +35,38 @@
   html, body { height: 100%; margin: 0; }
   body {
     background: var(--bg); color: var(--ink);
-    font: 14px/1.4 system-ui, "Segoe UI", sans-serif;
-    display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+    font: 13.5px/1.45 system-ui, "Segoe UI", sans-serif;
+    display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden;
   }
-  header {
-    display: flex; align-items: center; gap: 16px; padding: 12px 20px;
-    border-bottom: 1px solid var(--line); background: var(--panel);
-  }
-  header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: .2px; }
-  .logo { width: 36px; height: 28px; }
-  .chips { display: flex; gap: 8px; margin-left: 8px; flex-wrap: wrap; }
-  .chip {
-    display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
-    background: var(--pad); border: 1px solid var(--line); font-size: 12.5px;
-  }
-  .chip i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
-  .live { margin-left: auto; color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
-  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--done); }
-  .live.off i { background: var(--waiting); }
-  main { display: grid; grid-template-columns: 280px 1fr 300px; min-height: 0; }
-  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; }
-  aside h2, #detail h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 4px 4px 10px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  main { display: grid; grid-template-columns: 264px minmax(0, 1fr) 300px; min-height: 0; }
+  /* nobody at work: the side panels have nothing to say, so the empty office gets the whole window */
+  main.empty { grid-template-columns: 0 minmax(0, 1fr) 0; }
+  main.empty :is(aside, #detail) { visibility: hidden; padding: 0; border: 0; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 14px 12px; min-width: 0;
+          display: flex; flex-direction: column; gap: 12px; }
+  .shead { display: flex; align-items: center; gap: 8px; padding: 0 4px; min-height: 22px; }
+  aside h2 { margin: 0; font-size: 13px; font-weight: 600; }
+  .live { margin-left: auto; color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--done); box-shadow: 0 0 0 3px color-mix(in srgb, var(--done) 22%, transparent); }
+  .live.off i { background: var(--waiting); box-shadow: 0 0 0 3px color-mix(in srgb, var(--waiting) 22%, transparent); }
+  /* who's working, who needs you, who's idle: one small tile each */
+  .chips { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 6px; }
+  .chip { display: grid; align-content: start; gap: 3px; padding: 8px 8px 7px; border-radius: 10px; background: var(--pad); border: 1px solid var(--line); min-width: 0; }
+  /* the dot sits with the number, so the label gets the whole width (and wraps on a narrow window rather than being cut) */
+  .chip b { display: flex; align-items: center; gap: 6px; font-size: 18px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .chip span { font-size: 11px; line-height: 1.3; color: var(--muted); }
+  .chip i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .chip.hot { border-color: color-mix(in srgb, var(--waiting) 55%, var(--line)); }
   .row {
-    display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center;
-    padding: 8px; border-radius: 12px; cursor: pointer; border: 1px solid transparent;
+    display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; align-items: center;
+    padding: 7px 8px; border-radius: 10px; cursor: pointer; border: 1px solid transparent;
   }
-  .row:hover { background: var(--pad); }
-  .row.child { margin-left: 18px; padding-top: 4px; padding-bottom: 4px; border-left: 2px dashed var(--line); border-radius: 0 12px 12px 0; }
-  .row.sel { background: var(--pad); border-color: var(--accent); }
-  .glabel { margin: 12px 6px 4px; font-size: 11.5px; font-weight: 650; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .glabel:first-child { margin-top: 2px; }
+  .row:hover { background: var(--hover); }
+  .row.child { margin-left: 18px; padding-top: 4px; padding-bottom: 4px; border-left: 2px dashed var(--line); border-radius: 0 10px 10px 0; }
+  .row.sel { background: var(--pad); border-color: var(--line); box-shadow: inset 3px 0 0 var(--accent); }
+  .glabel { margin: 10px 6px 4px; font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .glabel:first-child { margin-top: 0; }
   .row canvas { width: 40px; height: 30px; }
   .row .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .sub { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -73,22 +75,37 @@
   #stagewrap { overflow: auto; background: var(--floor); position: relative; min-width: 0; }
   #stage { display: block; }
   #empty {
-    position: absolute; inset: 0; display: none; place-items: center; text-align: center;
+    position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 24px;
     color: var(--muted); pointer-events: none;
   }
   #empty.show { display: grid; }
-  #empty canvas { width: 180px; height: 120px; display: block; margin: 0 auto 10px; }
-  #detail { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 16px; }
-  #detail dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: 13px; }
-  #detail dt { color: var(--muted); }
+  #empty canvas { width: 180px; height: 120px; display: block; margin: 0 auto 6px; }
+  #empty h3 { margin: 0 0 6px; color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  #empty p { margin: 0 auto; max-width: 400px; font-size: 13.5px; line-height: 1.55; text-wrap: balance; }
+  #empty .go { pointer-events: auto; margin-top: 16px; padding: 7px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--pad); font-weight: 550; }
+  #empty .go:hover { background: var(--hover); }
+  #detail { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 16px; min-width: 0; }
+  #detail h2 { margin: 0 0 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+  #detail h3 { margin: 18px 0 6px; font-size: 13px; font-weight: 600; }
+  #detail .big { font-size: 17px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 2px; word-break: break-word; }
+  #detail .state { margin: 0 0 14px; font-size: 13px; }
+  #detail dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); font-size: 13px; border-top: 1px solid var(--line); }
+  #detail dt, #detail dd { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  #detail dt { color: var(--muted); padding-right: 16px; white-space: nowrap; }
   #detail dd { margin: 0; word-break: break-word; }
-  #detail .big { font-size: 18px; font-weight: 650; margin: 2px 0 2px; }
-  #detail .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
-  #detail ul { margin: 8px 0 0; padding-left: 18px; }
-  .hint { color: var(--muted); font-size: 13px; }
-  @media (max-width: 980px) {
+  #detail .mono { font-size: 12px; }
+  #detail ul { margin: 0; padding-left: 18px; }
+  #detail .pick { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 7px 10px; margin-bottom: 4px;
+                  border-radius: 10px; border: 1px solid var(--line); background: var(--pad); }
+  #detail .pick:hover { background: var(--hover); }
+  #detail .pick i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  #detail .pick span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+  #detail .pick small { color: var(--muted); font-size: 12px; }
+  .hint { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0; }
+  @media (max-width: 1180px) { main { grid-template-columns: 236px minmax(0, 1fr) 272px; } }
+  @media (max-width: 760px) {
     main { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
-    aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 28vh; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 32vh; }
     #detail { border-left: 0; border-top: 1px solid var(--line); max-height: 30vh; }
     body { overflow: auto; }
   }
@@ -96,23 +113,22 @@
 <link rel="stylesheet" href="/static/theme.css">
 </head>
 <body>
-<header>
-  <canvas class="logo" id="logo" width="108" height="84"></canvas>
-  <h1>Office</h1>
-  <div class="chips" id="chips"></div>
-  <div class="live" id="live"><i></i><span>live</span></div>
-</header>
-<main>
-  <aside><h2>Sessions</h2><div id="list"></div></aside>
+<main id="main">
+  <aside>
+    <div class="shead"><h2>Sessions</h2><div class="live" id="live" title=""><i></i><span>Live</span></div></div>
+    <div class="chips" id="chips"></div>
+    <div id="list"></div>
+  </aside>
   <div id="stagewrap">
     <canvas id="stage"></canvas>
     <div id="empty"><div>
       <canvas id="emptyClawd" width="360" height="240"></canvas>
-      <div><b>The office is empty</b></div>
-      <div>Start a Claude Code session or run a flow on Claude Code, Codex or Cursor, and a bot will clock in.</div>
+      <h3>The office is empty</h3>
+      <p>Agents clock in here while they work. Start Claude Code in any folder, or run a flow on Claude Code, Codex or Cursor, and each agent gets a desk.</p>
+      <button class="go" id="toFlows" type="button">Open Flows</button>
     </div></div>
   </div>
-  <div id="detail"><p class="hint">Click a bot to see details.</p></div>
+  <div id="detail"></div>
 </main>
 
 <script src="/static/sprites.js"></script>
@@ -234,20 +250,22 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
   }
 
   // name tag: the bot's name, and for a Codex or Cursor agent, that engine's icon and name
-  ctx.font = "600 12px 'Geist Mono', ui-monospace, monospace";
+  ctx.font = "600 12px Inter, 'Segoe UI', sans-serif";
   const eng = !isSub && s.engine && s.engine !== "claude" ? s.engine : null, img = eng && ENGINE_IMG[eng];
   const label = clip(ctx, s.project, eng ? 110 : 150), lw0 = ctx.measureText(label).width;
-  ctx.font = "500 11px 'Geist Mono', ui-monospace, monospace";
+  ctx.font = "500 11px Inter, 'Segoe UI', sans-serif";
   const suffix = eng ? ` · ${ENGINE_NAME[eng] || eng}` : "", sufW = suffix ? ctx.measureText(suffix).width : 0;
   const lw = lw0 + sufW + 30, tagX = ox + 70 - lw / 2, tagY = oy + 22;
   ctx.fillStyle = "#1f1f1f"; roundRect(ctx, tagX, tagY, lw, 22, 11); ctx.fill();
   if (img && img.complete && img.naturalWidth) {
     ctx.fillStyle = "#2b2b2b"; roundRect(ctx, tagX + 5, tagY + 4, 14, 14, 3.5); ctx.fill();
     const k = eng === "codex" ? 10 : 14; ctx.drawImage(img, tagX + 5 + (14 - k) / 2, tagY + 4 + (14 - k) / 2, k, k);
-  } else { ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(tagX + 12, tagY + 11, 4, 0, 7); ctx.fill(); }
+  } else {   // the tag is always dark, so a working dot stays light even where the light theme's working color is black
+    ctx.fillStyle = st === "working" && !isSub ? "#ecebe6" : accent; ctx.beginPath(); ctx.arc(tagX + 12, tagY + 11, 4, 0, 7); ctx.fill();
+  }
   ctx.textBaseline = "middle";
-  ctx.font = "600 12px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = "#fff"; ctx.fillText(label, tagX + 22, tagY + 11.5);
-  if (suffix) { ctx.font = "500 11px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = "#a8a8a8"; ctx.fillText(suffix, tagX + 22 + lw0, tagY + 11.5); }
+  ctx.font = "600 12px Inter, 'Segoe UI', sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(label, tagX + 22, tagY + 11.5);
+  if (suffix) { ctx.font = "500 11px Inter, 'Segoe UI', sans-serif"; ctx.fillStyle = "#a8a8a8"; ctx.fillText(suffix, tagX + 22 + lw0, tagY + 11.5); }
 
   // sprite behind desk
   if (!isSub && s.bot) drawBot(ctx, s.bot, ox + 28, oy + 74, 7, { state: st, t });
@@ -268,13 +286,13 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
   ctx.restore();
   ctx.strokeStyle = accent; ctx.globalAlpha = 0.8; ctx.lineWidth = 1.5; roundRect(ctx, sx, sy, sw, sh, 9); ctx.stroke(); ctx.globalAlpha = 1;
   ["#f7768e", "#e0af68", "#9ece6a"].forEach((col, i) => { ctx.fillStyle = col; ctx.fillRect(sx + 9 + i * 9, sy + 8, 6, 6); });
-  ctx.font = "10px ui-monospace, Consolas, monospace"; ctx.fillStyle = "#8d8d8d";
+  ctx.font = "10px 'Geist Mono', ui-monospace, Consolas, monospace"; ctx.fillStyle = "#8d8d8d";
   ctx.fillText(clip(ctx, s.project, 80), sx + 44, sy + 12);
   ctx.fillStyle = "#2a2a2a"; ctx.fillRect(sx + 8, sy + 20, sw - 16, 1);
 
   ctx.textBaseline = "alphabetic";
   if (st === "working") {
-    ctx.font = "bold 11px ui-monospace, Consolas, monospace"; ctx.fillStyle = "#ededed";
+    ctx.font = "bold 11px 'Geist Mono', ui-monospace, Consolas, monospace"; ctx.fillStyle = "#ededed";
     ctx.fillText(clip(ctx, s.detail || "Working…", sw - 24) + (Math.floor(t * 2) % 2 ? "▌" : ""), sx + 10, sy + 38);
     const shades = ["#9ece6a", "#7dcfff", "#e0af68"];
     for (let i = 0; i < 4; i++) {
@@ -297,7 +315,7 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
 
   // screen stand + energy bar
   ctx.fillStyle = theme["desk-front"]; ctx.fillRect(ox + 206, oy + 150, 16, 10); ctx.fillRect(ox + 190, oy + 158, 48, 5);
-  ctx.font = "10.5px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = theme.muted;
+  ctx.font = "11px Inter, 'Segoe UI', sans-serif"; ctx.fillStyle = theme.muted;
   if (isSub) {
     ctx.fillText(clip(ctx, "helping " + station.s.project, sw), sx, oy + 176);
     ctx.fillText(`running ${dur(nowS() - station.a.started)} · ${station.a.tools} tools`, sx, oy + 192);
@@ -345,9 +363,9 @@ function stationAt(mx, my) {
 function drawHead(ctx, h, W) {
   const [title, sub] = groupTitle(h.key);
   ctx.textBaseline = "alphabetic";
-  ctx.font = "650 13px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = theme.ink || "#ededed";
+  ctx.font = "600 13.5px Inter, 'Segoe UI', sans-serif"; ctx.fillStyle = theme.ink || "#ededed";
   const tw = Math.min(ctx.measureText(title).width, 420); ctx.fillText(clip(ctx, title, 420), h.x, h.y);
-  ctx.font = "12px 'Geist Mono', ui-monospace, monospace"; ctx.fillStyle = theme.muted; ctx.fillText(sub, h.x + tw + 10, h.y);
+  ctx.font = "12.5px Inter, 'Segoe UI', sans-serif"; ctx.fillStyle = theme.muted; ctx.fillText(sub, h.x + tw + 10, h.y);
   if (h.key !== "you") { ctx.fillStyle = theme.working; ctx.beginPath(); ctx.arc(h.x - 10, h.y - 4.5, 3.5, 0, 7); ctx.fill(); }
 }
 stage.addEventListener("click", (e) => {
@@ -392,7 +410,7 @@ function esc(str) { const d = document.createElement("div"); d.textContent = str
 let lastSideHtml = "";
 function renderSide() {
   const list = $("list");
-  const html = !stations.length ? '<p class="hint">No sessions open.</p>' : stations.map((x, i) => {
+  const html = !stations.length ? '<p class="hint">No sessions open right now.</p>' : stations.map((x, i) => {
     const id = stationId(x), cls = "row" + (id === selected ? " sel" : "") + (x.kind === "sub" ? " child" : "");
     const label = i === 0 || stations[i - 1].group !== x.group ? `<div class="glabel">${esc(groupTitle(x.group)[0])}</div>` : "";
     if (x.kind === "sub") {
@@ -412,15 +430,29 @@ function renderSide() {
 $("list").addEventListener("click", (e) => {
   const row = e.target.closest(".row"); if (row) select(row.dataset.id);
 });
+$("detail").addEventListener("click", (e) => { const b = e.target.closest(".pick"); if (b) select(b.dataset.id); });
+$("toFlows").onclick = () => { try { top.location.hash = "flows"; } catch (e) {} };
 function select(id) { selected = selected === id ? null : id; renderSide(); renderDetail(); }
 
 function renderDetail() {
   const box = $("detail"), x = stations.find((z) => stationId(z) === selected);
-  if (!x) { box.innerHTML = '<p class="hint">Click a bot to see details.</p>'; return; }
+  if (x) delete box.dataset.sig;
+  if (!x) {   // nothing picked: who needs you first, then how to read a desk
+    const waiting = stations.filter((z) => z.kind === "main" && effState(z.s) === "waiting");
+    const working = stations.filter((z) => z.kind === "main" && effState(z.s) === "working");
+    const pick = (z, label, col) => `<button class="pick" data-id="${esc(stationId(z))}"><i style="background:${col}"></i><span>${esc(z.s.project)}</span><small>${esc(label)}</small></button>`;
+    const html = `<h2>Details</h2><p class="hint">Click a desk, or a name on the left, to see what that agent is doing.</p>
+      ${waiting.length ? `<h3>Needs you</h3>${waiting.map((z) => pick(z, "waiting", theme.waiting)).join("")}` : ""}
+      ${working.length ? `<h3>Working now</h3>${working.map((z) => pick(z, "working", theme.working)).join("")}` : ""}
+      <h3>Reading a desk</h3>
+      <p class="hint">The screen shows what the agent is doing. The bar under it is how much of its context is left: when it runs low, the session gets tired and forgets older work.</p>`;
+    if (box.dataset.sig !== html) { box.innerHTML = html; box.dataset.sig = html; }   // rebuilt only when it changes, so a click lands
+    return;
+  }
   if (x.kind === "sub") {
     const a = x.a;
     box.innerHTML = `<h2>Subagent</h2><div class="big">${esc(a.type)}</div>
-      <p class="hint" style="margin:0 0 14px;color:${subColor(a)}">${esc(a.detail || "Thinking…")}</p>
+      <p class="state" style="color:${subColor(a)}">${esc(a.detail || "Thinking…")}</p>
       <dl>
         <dt>Helping</dt><dd>${esc(x.s.project)}</dd>
         <dt>Running for</dt><dd>${dur(nowS() - a.started)}</dd>
@@ -433,7 +465,7 @@ function renderDetail() {
   const subs = s.subagents.length
     ? "<ul>" + s.subagents.map((a) => `<li>${esc(a.type)}</li>`).join("") + "</ul>" : "<span class='hint'>none</span>";
   box.innerHTML = `<h2>${s.engine && s.engine !== "claude" ? esc(ENGINE_NAME[s.engine] || s.engine) + " agent" : "Session"}</h2><div class="big">${esc(s.project)}</div>
-    <p class="hint" style="margin:0 0 14px;color:${stColor(st)}">${esc(statusText(s, st))}</p>
+    <p class="state" style="color:${stColor(st)}">${esc(statusText(s, st))}</p>
     <dl>
       <dt>Runs on</dt><dd>${esc(ENGINE_NAME[s.engine || "claude"] || s.engine)}</dd>
       ${s.flow ? `<dt>Flow</dt><dd>${esc(s.flow.name)} · ${esc(s.flow.stage)}</dd>` : ""}
@@ -454,9 +486,11 @@ function renderChips() {
     if (st === "working") n.working++; else if (st === "waiting") n.waiting++; else n.idle++;
   }
   const helpers = stations.filter((x) => x.kind === "sub").length;
-  $("chips").innerHTML = [["working", "Working", n.working], ["waiting", "Needs you", n.waiting], ["idle", "Idle", n.idle]]
-    .map(([k, label, v]) => `<span class="chip"><i style="background:${theme[k]}"></i>${label} <b>${v}</b></span>`).join("")
-    + (helpers ? `<span class="chip"><i style="background:#7aa2f7"></i>Subagents <b>${helpers}</b></span>` : "");
+  const tiles = [["working", "Working", n.working], ["waiting", "Needs you", n.waiting], ["idle", "Idle", n.idle]];
+  if (helpers) tiles.push(["sub", "Subagents", helpers]);
+  $("chips").style.setProperty("--n", tiles.length > 3 ? 2 : tiles.length);   // four go two by two, so every label fits
+  $("chips").innerHTML = tiles.map(([k, label, v]) => `<div class="chip${k === "waiting" && v ? " hot" : ""}">`
+    + `<b><i style="background:${k === "sub" ? "#7aa2f7" : theme[k]}"></i>${v}</b><span>${label}</span></div>`).join("");
   document.title = (n.waiting ? "(!) " : "") + "Office" + (n.working ? ` · ${n.working} working` : "");
 }
 
@@ -470,14 +504,18 @@ async function poll() {
     renderSide(); renderDetail(); renderChips();
   } catch (e) { online = false; }
   $("live").className = "live" + (online ? "" : " off");
-  $("live").lastChild.textContent = online ? "live" : "offline — is Lithnode running?";
-  $("empty").classList.toggle("show", online && data.sessions.length === 0);
+  $("live").lastChild.textContent = online ? "Live" : "Offline";
+  $("live").title = online ? "Updates every second" : "Lithnode isn't answering. Is it still running?";
+  const empty = online && data.sessions.length === 0;
+  $("empty").classList.toggle("show", empty);
+  $("main").classList.toggle("empty", empty);
 }
 
 let lastFrame = 0;
 function frame(ms) {
   requestAnimationFrame(frame);
-  if (document.hidden || ms - lastFrame < 32) return;   // idle when hidden, ~30 fps otherwise
+  // idle when hidden (also as a hidden tab of the app, where the stage measures 0), ~30 fps otherwise
+  if (document.hidden || !stageBox.w || !stageBox.h || ms - lastFrame < 32) return;
   lastFrame = ms;
   const t = ms / 1000, dpr = window.devicePixelRatio || 1, L = layout();
   if (stage.width !== Math.round(L.W * dpr) || stage.height !== Math.round(L.H * dpr)) {
@@ -497,8 +535,6 @@ function frame(ms) {
     else if (x.s.bot) drawBot(c2, x.s.bot, 6, 12, 9, { state: effState(x.s), t });
     else drawClawd(c2, 6, 12, 9, { state: effState(x.s), t, tired: tiredLevel(fill(x.s)), seed: hash(x.s.id) % 50 });
   });
-  const lg = $("logo").getContext("2d"); lg.clearRect(0, 0, 108, 84);
-  drawLogo(lg, 18, 13, 4.5);
   const ec = $("emptyClawd"); if ($("empty").classList.contains("show")) {
     const e2 = ec.getContext("2d"); e2.clearRect(0, 0, ec.width, ec.height);
     drawClawd(e2, 100, 70, 13, { state: "sleeping", t });

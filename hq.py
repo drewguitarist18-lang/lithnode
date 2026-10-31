@@ -359,7 +359,7 @@ class Handler(BaseHTTPRequestHandler):
         waiting = sum(1 for r in active for st in r.nodes.values() if st["status"] == "approval")
         working = sum(1 for r in active for st in r.nodes.values() for a in st["agents"] if a["status"] == "running")
         self.send_json({"runs": len(active), "approvals": waiting, "agents": working,
-                        "claude_code": claude_code.auth_status()})
+                        "claude_code": claude_code.auth_status(force="fresh=1" in self.path)})
 
     # -- flows -------------------------------------------------------------------
     def flow_payload(self, flow):

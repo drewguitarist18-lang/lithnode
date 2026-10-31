@@ -1,48 +1,57 @@
-/* Lithnode's look, shared by every page of the app (and matching lithnode.com): black and white, Geist Mono for the
-   app's own words (buttons, names, chips, labels), Geist for titles and sentences, pixel type for the brand and the
-   small section labels. Loaded after each page's own styles, so these tokens win.
+/* Lithnode's look, shared by every page of the app (and matching lithnode.com): black and white, Inter for the
+   app's words, Geist Mono only for data (folders, commands, live tool lines, logs), and pixel type only for the
+   wordmark. Loaded after each page's own styles, so these tokens win.
    Status colors keep their meaning: green done, red failed, amber waiting for you. */
-@font-face { font-family: "Geist"; src: url("/static/fonts/geist.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+/* Inter in two parts, so the accented letters only load when a name uses them. Served from this computer, so it
+   waits for the font (block) rather than flashing a fallback first. */
+@font-face { font-family: "Inter"; src: url("/static/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block;
+             unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
+                            U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Inter"; src: url("/static/fonts/inter-ext.woff2") format("woff2"); font-weight: 100 900; font-display: block;
+             unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF,
+                            U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 @font-face { font-family: "Geist Mono"; src: url("/static/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "Silkscreen"; src: url("/static/fonts/silkscreen-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Silkscreen"; src: url("/static/fonts/silkscreen-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
 
 :root {
   --mono: "Geist Mono", ui-monospace, Consolas, monospace;
-  --sans: "Geist", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --sans: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
   --pixel: "Silkscreen", "Geist Mono", ui-monospace, monospace;
+  --r-sm: 8px; --r: 10px; --r-lg: 14px;   /* chips and small buttons, controls, cards and dialogs */
   /* light: the same idea, inverted */
   --bg: #f3f3f0; --bar: #f3f3f0; --panel: #fafaf8; --pad: #ffffff; --line: #e1e0db; --hover: #ecebe7;
-  --ink: #121214; --muted: #66655f; --accent: #121214; --on-accent: #fafaf8;
+  --ink: #121214; --muted: #66655f; --faint: #8f8e88; --accent: #121214; --on-accent: #fafaf8;
   --grid: #e4e3de; --wire: #a9a8a2; --running: #121214; --working: #121214;
+  --lift: 0 1px 2px rgba(20, 20, 18, .08), 0 8px 24px rgba(20, 20, 18, .08);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #08080a; --bar: #08080a; --panel: #0d0d10; --pad: #141417; --line: #24242a; --hover: #1b1b1f;
-    --ink: #ecebe6; --muted: #a3a29c; --accent: #ecebe6; --on-accent: #08080a;
+    --ink: #ecebe6; --muted: #a3a29c; --faint: #6f6e69; --accent: #ecebe6; --on-accent: #08080a;
     --grid: #17171b; --wire: #4c4c52; --running: #ecebe6; --working: #ecebe6; color-scheme: dark;
+    --lift: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .45);
   }
 }
 :root[data-theme="dark"] {
   --bg: #08080a; --bar: #08080a; --panel: #0d0d10; --pad: #141417; --line: #24242a; --hover: #1b1b1f;
-  --ink: #ecebe6; --muted: #a3a29c; --accent: #ecebe6; --on-accent: #08080a;
+  --ink: #ecebe6; --muted: #a3a29c; --faint: #6f6e69; --accent: #ecebe6; --on-accent: #08080a;
   --grid: #17171b; --wire: #4c4c52; --running: #ecebe6; --working: #ecebe6; color-scheme: dark;
+  --lift: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .45);
 }
 
-/* Geist Mono for the app's own words (pages set families in shorthands, so this has to reach every element) */
-html body, html body * { font-family: var(--mono); }
+/* Inter for everything the app says (pages set families in shorthands, so this has to reach every element) */
+html body, html body * { font-family: var(--sans); }
+html body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 html body svg, html body svg * { font-family: inherit; }
-/* Geist for sentences: descriptions, help and notes read as prose, like the lines under lithnode.com's headings */
-html body :is(.blk small, .bot small, .tile small, .makebot small, .tip, .tip *, .hint, .hint *, .sub, .note, .switch small,
-               .gs-step p, .usagedlg p, .usagedlg p *, .steps div, .steps strong, .enote, .risk span, .node .jb:not(.live),
-               .tpl small, .ui-pop p, #emptyHint, #emptyHint *, .ghost small, #toast, textarea, #empty > div > div:last-child) { font-family: var(--sans); }
-/* pixel type for the brand, page names and the small section labels */
-html body :is(h1, h2, .brand > span, .psec > h3, .isec > h4, .gs-top h4, .rp-sec > h3) { font-family: var(--pixel); letter-spacing: .01em; }
-/* titles: Geist, bold and tight, so a long flow name reads at a glance and never breaks into blocky lines */
-html body :is(dialog h2, .rp-top h2, .ihead input.title, .bar #flowName, .insp .big, .card .title, .ui-pop h3) {
-  font-family: var(--sans); font-weight: 650; letter-spacing: -.02em; }
-html body .brand small, html body .psec > h3 * { font-family: var(--mono); }
+/* Geist Mono only for data a person might copy or compare: folders, commands, live tool lines, logs, code */
+html body :is(code, pre, kbd, samp, .mono, .log, .log *, .cliadd input, .folder input, #folderIn, #fFolder) { font-family: var(--mono); }
+html body :is(.cliadd input, .folder input, #folderIn, #fFolder)::placeholder { font-family: var(--sans); }
+/* pixel type only for the wordmark */
+html body .brand .word { font-family: var(--pixel); font-weight: 700; letter-spacing: .02em; }
+/* titles: semibold and a little tight, so a long flow name reads at a glance */
+html body :is(dialog h2, .rp-top h2, .ihead input.title, #flowName, .card .title, .ui-pop h3) { font-weight: 600; letter-spacing: -.012em; }
 
 /* white (or black, in light mode) is the action color: its text sits on it in the opposite tone */
 html body :is(button.primary, .signin, .ui-btn.go, .badge) { color: var(--on-accent); }
-html body button.primary:hover { filter: none; background: color-mix(in srgb, var(--accent) 88%, var(--bg)); }
+html body button.primary:hover:not(:disabled) { filter: none; background: color-mix(in srgb, var(--accent) 86%, var(--bg)); }

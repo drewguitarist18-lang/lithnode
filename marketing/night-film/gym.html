@@ -1,0 +1,716 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Lithnode Gym Shots</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=TikTok+Sans:wght@600&display=swap">
+<style>html,body{margin:0;background:#000}canvas{display:block;width:100vw;height:auto}</style></head>
+<body><canvas id="cv" width="1080" height="1920"></canvas>
+<script src="phonecam.js"></script>
+<script>
+// Phone photos in a gym at night, for the start of the gym carousel: the gym from the end of the dumbbell rack, the phone on the
+// floor when its timer went off, and the rack with the set put back. The gym is path traced in WebGL (rubber hex dumbbells on a rack in
+// front of the mirrors, a bench, a power rack, a cable crossover, treadmills, the rubber floor, the strip lights and the signs gyms
+// tape up), then developed by the same phone as the desk.
+// render.js --gym calls renderPhoto(i) for each of SHOTS. Open gym.html?shot=1&passes=8 through any local server for a quick look.
+const Q = new URLSearchParams(location.search);
+const RAD = Math.PI / 180;
+
+// ============================================================================ the gym, in cm: floor at y 0, the mirror wall at z -290
+// Boxes: centre, the box's own x and y axes, half sizes and material (the ids are listed in the shader). They're kept in groups, each
+// with a bounding box the tracer tries first, so a ray only tests the boxes of the things it passes near.
+const BOXES = [], GROUPS = [];
+function group() { GROUPS.push(BOXES.length); }
+function box(c, hx, hy, hz, mat, X = [1, 0, 0], Y = [0, 1, 0]) { BOXES.push({ c, X: norm(X), Y: norm(Y), h: [hx, hy, hz], mat }); }
+// round things (the bar and plates, pulleys, the duct): centre, axis, radius, half length, material
+const CYLS = [];
+function cyl(c, a, r, hl, mat) { CYLS.push({ c, a: norm(a), r, hl, mat }); }
+const lean = (deg) => [0, Math.cos(deg * RAD), Math.sin(deg * RAD)];   // an up axis tipped toward +z
+
+// A two-tier rack along the mirrors, its trays tipped 12 degrees toward you; the dumbbells slide down them to the lip.
+group();
+const TILT = 12 * RAD, TN = [0, Math.cos(TILT), Math.sin(TILT)], TZ = [0, -Math.sin(TILT), Math.cos(TILT)];
+const TRAYS = [{ front: [0, 34, -195] }, { front: [0, 76, -238] }].map((t) => ({ ...t, c: add(t.front, mul(TZ, -20)) }));
+for (const t of TRAYS) {
+  box(t.c, 178, .3, 20, 1, [1, 0, 0], TN);                            // the tray
+  box(add(t.front, mul(TN, 1.5)), 178, 1.8, .3, 1, [1, 0, 0], TN);   // its lip
+  box(add(t.front, [0, -3.5, -1]), 178, 2.5, 2.5, 1);                // the rail under its front
+  for (const x of [-176, 0, 176]) box(add(add(t.c, mul(TN, -2.8)), [x, 0, 0]), 2.5, 2.5, 20, 1, [1, 0, 0], TN);   // its arms
+}
+for (const x of [-176, 0, 176]) {
+  box([x, 43, -277], 2.5, 43, 5, 1);    // back post
+  box([x, 17, -198], 2.5, 17, 3.5, 1);  // front post
+  box([x, 2.5, -238], 3, 2.5, 44, 1);   // foot
+}
+// a flat bench in front of the rack
+group();
+const BENCH = [0, 0, -92];
+box(add(BENCH, [0, 40.5, 0]), 60, 3.5, 14, 8);
+box(add(BENCH, [0, 32, 0]), 46, 4, 4, 1);
+for (const s of [-1, 1]) {
+  box(add(BENCH, [42 * s, 16, 0]), 3.5, 15, 3.5, 1);
+  box(add(BENCH, [42 * s, 2.5, 0]), 4, 2.5, 25, 1);
+  for (const e of [-1, 1]) box(add(BENCH, [42 * s, 2.7, 26.5 * e]), 4.3, 2.8, 1.6, 12);
+}
+// a power rack past the end of the mirrors, a bar racked on its hooks with two 45s a side
+group();
+const PR = [640, 0, -200];
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(add(PR, [62 * sx, 114, 58 * sz]), 3.8, 114, 3.8, 18);   // the uprights, holed
+for (const sz of [-1, 1]) box(add(PR, [0, 224.2, 58 * sz]), 58.2, 3.8, 3.8, 1);
+for (const sx of [-1, 1]) {
+  box(add(PR, [62 * sx, 224.2, 0]), 3.8, 3.8, 54.2, 1);
+  box(add(PR, [62 * sx, 3, 0]), 5, 3, 75, 1);           // the feet
+  box(add(PR, [62 * sx, 72, 0]), 2.6, 2.6, 66, 1);      // the safety arms
+  box(add(PR, [62 * sx, 131, 64]), 2.8, 3.5, 4.5, 1);   // the J-hooks
+}
+const BAR = add(PR, [0, 136, 67]);
+cyl(BAR, [1, 0, 0], 1.4, 66, 23);
+for (const s of [-1, 1]) {
+  cyl(add(BAR, [87.5 * s, 0, 0]), [1, 0, 0], 2.5, 22, 23);    // the sleeves
+  cyl(add(BAR, [67 * s, 0, 0]), [1, 0, 0], 3.8, 1.2, 23);     // the collars
+  for (const x of [71.5, 77.5]) cyl(add(BAR, [x * s, 0, 0]), [1, 0, 0], 22.5, 2.9, 21);
+}
+// plates leaning on the wall: three by the power rack, two past the far end of the mirrors
+for (const [x, plates] of [[752, [22.5, 22.5, 16.5]], [-505, [22.5, 12.7]]]) {
+  const th = 11 * RAD; let dz = 0;
+  for (const r of plates) { cyl([x, r * Math.cos(th) + .2, -287 + r * Math.sin(th) + 2.9 + dz], [0, Math.sin(th), Math.cos(th)], r, 2.9, 21); dz += 6; }
+}
+// a cable crossover against the red end wall: two weight stacks, a pulley and handle on each, a beam with a pull-up bar
+group();
+for (const z of [-140, 200]) {
+  const T = [868, 0, z];
+  for (const s of [-1, 1]) box(add(T, [0, 116, 22 * s]), 3.6, 116, 3.6, 1);   // the uprights
+  box(add(T, [-6, 3, 0]), 34, 3, 30, 1);                                      // the base
+  box(add(T, [0, 52, 0]), 6, 42, 15.5, 13);                                   // the stack
+  box(add(T, [-12, 116, 10]), 4, 112, 4, 1);                                  // the track the pulley runs on
+  box(add(T, [-18, 150, 10]), 5, 10, 6, 1);                                   // the carriage
+  box(add(T, [-23.5, 124, 10]), .3, 18, .3, 12);                              // the cable
+  box(add(T, [-23.5, 105, 10]), 1.4, 1.4, 7, 12);                             // its handle
+  cyl(add(T, [-19, 142, 10]), [0, 0, 1], 4.5, 1.2, 1);                        // the pulley
+}
+box([868, 236, 30], 4.5, 4.5, 196, 1);
+cyl([852, 224, 30], [0, 0, 1], 1.6, 150, 1);
+// a row of three treadmills facing the mirrors, their consoles lit toward the runner
+group();
+for (const x of [300, 420, 540]) {
+  const z = 100;                                // the deck's centre; the runner faces -z
+  box([x, 12, z], 41, 12, 94, 16);              // the deck
+  box([x, 24.3, z + 12], 26.5, .4, 76, 12);     // the belt
+  box([x, 20, z - 84], 41, 20, 12, 16);         // the motor hood
+  for (const s of [-1, 1]) {
+    box([x + 37 * s, 80, z - 82], 2.8, 48, 3.5, 16, [1, 0, 0], lean(15));   // the uprights, leaning back toward the runner
+    box([x + 37 * s, 104, z - 40], 2, 2, 30, 24);                          // the handrails
+  }
+  box([x, 134, z - 68], 39, 15, 6.5, 17, [1, 0, 0], lean(-35));             // the console, tipped toward the runner
+}
+cyl([0, 372, 60], [1, 0, 0], 30, 900, 25);   // a duct across the ceiling
+
+// rubber hex dumbbells, 5 to 90 lb: a hexagon a = 3.82 cm x the cube root of the pounds across its flats, 0.7 a thick, on a 13 cm grip
+const DBS = [];
+function dumbbell(lb, c, Z, X, seed) {
+  const a = 3.82 * Math.cbrt(lb), L = .7 * a;
+  DBS.push({ lb, c, Z: norm(Z), X: norm(X), a, L, hl: 6.6, r: lb > 50 ? 1.85 : 1.65, seed });
+  return DBS.at(-1);
+}
+const dims = (lb) => { const a = 3.82 * Math.cbrt(lb); return { a, L: .7 * a }; };
+const OUT = 35;   // the pair in use: on the floor by the bench mid-workout, back on the rack after
+let GAPX = 0;     // where they go on the rack
+{
+  const r = mulberry(5);
+  [[5, 10, 15, 20, 25, 30, 35, 40, 45, 50], [55, 60, 65, 70, 75, 80, 85, 90]].forEach((row, k) => {
+    const t = TRAYS[1 - k], w = row.reduce((s, lb) => s + 2 * dims(lb).a + 2, 0), gap = (346 - w) / (row.length - 1);
+    let x = -173;
+    for (const lb of row) {
+      const { a, L } = dims(lb), x0 = x;
+      for (let j = 0; j < 2; j++) {
+        const cx = x + a / 2 + (r() - .5) * 1.2, rot = (r() - .5) * 5 * RAD, X = add(mul([1, 0, 0], Math.cos(rot)), mul(TZ, Math.sin(rot))), Z = sub(mul(TZ, Math.cos(rot)), mul([1, 0, 0], Math.sin(rot)));
+        const dz = 19.4 - (6.6 + L) - r() * 1.2 * (lb % 15 === 0 ? 3 : 1);
+        dumbbell(lb, add(add(t.c, [cx, 0, 0]), add(mul(TZ, dz), mul(TN, .3 + a / 2))), Z, X, r() * 100);
+        x += a + 2;
+      }
+      if (lb === OUT) GAPX = (x0 + x - 2) / 2;
+      x += gap;
+    }
+  });
+}
+const RACKED = DBS.length;
+{
+  const flat = (lb, x, z, yaw, seed) => { const { a } = dims(lb), Z = [Math.cos(yaw * RAD), 0, Math.sin(yaw * RAD)]; dumbbell(lb, [x, a / 2, z], Z, cross([0, 1, 0], Z), seed); };
+  flat(OUT, -22, -46, 84, 3); flat(OUT, 24, -38, 18, 7);
+}
+function dumbbells(sh) {   // the ones in a shot, the rack's first: the 35s by the bench, or back in their spot once the set's done
+  const rack = DBS.slice(0, RACKED).filter((d) => sh.racked || d.lb !== OUT);
+  return { list: sh.racked ? rack : [...rack, ...DBS.slice(RACKED)], racked: rack.length };
+}
+// the signs: laminated on the mirror right over the 35s' spot, handwritten on the crossover's left stack
+group();
+{ const a = -2.5 * RAD; box([GAPX, 146, -289.8], 25, 19.34, .06, 14, [Math.cos(a), Math.sin(a), 0], [-Math.sin(a), Math.cos(a), 0]); }
+group();
+{ const a = 6 * RAD; box([861.88, 56, -146], 9.5, 12.3, .05, 15, [0, Math.sin(a), Math.cos(a)], [0, Math.cos(a), -Math.sin(a)]); }
+if (BOXES.length > 128 || GROUPS.length > 16 || CYLS.length > 24) throw new Error("the gym has outgrown NB, NG or NC in the shader");
+
+// the phone face up on the floor in its case, top away from the bench, the earbuds' case beside it; a steel bottle by the bench's foot.
+// h is the half sizes, rc the corners' radius, bev how round the top's edges look.
+const PHONE = { c: [50, .45, -14], yaw: -14, h: [3.72, .45, 7.58], rc: 1, bev: .25 };
+const PODS = { c: [61, 1.09, -4], yaw: 30, h: [3.03, 1.09, 2.25], rc: 1.35, bev: .75 };
+const BOTTLE = [-64, -44, 3.8, 22];   // x, z, radius, height to the cap
+// strip lights hung from the black ceiling in rows across the room: centre and half length
+const LIGHTS = [];
+for (const z of [-165, -20, 135, 290, 445]) for (const x of [-170, 170]) LIGHTS.push([x, 300, z, 115]);
+for (const z of [-165, 0, 165]) for (const x of [-560, 560]) LIGHTS.push([x, 300, z, 115]);
+const LE = [1, .91, .8].map((c) => c * 160);
+
+// ============================================================================ the shots
+// cam and at are where the phone is and what it points at, focus what it focused on; lens is the main camera or the 2x.
+// phone puts the phone and earbuds on the floor (they leave with you); racked puts the 35s back on the rack.
+const SHOTS = [
+  { cam: [-430, 152, -70], at: [480, 120, -180], focus: [250, 100, -200], lens: WIDE, roll: -.7, expo: 1.0, phone: true,
+    size: 72, say: ["i don't wait for my claude limit to reset. i train"] },
+  { cam: [60, 33, 16], at: [50, .9, -16], focus: [50, .9, -14], lens: FOCAL, roll: 1.1, expo: .8, phone: true,
+    say: ["timer set for the minute it resets"] },
+  { cam: [-103, 130, 375], at: [-7, 81.2, -10], focus: [GAPX, 85, -240], lens: FOCAL, roll: .8, expo: .85, racked: true,
+    say: ["rack the weights. back to work"] },
+];
+window.PHOTO_COUNT = SHOTS.length;
+
+// ============================================================================ textures: the numbers on the dumbbells, the phone's screen, the signs
+function numbers() {   // 8 x 4 cells of 128 px, the weight's cell is lb / 5 - 1
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 512;
+  const g = c.getContext("2d"); g.fillStyle = "#000"; g.fillRect(0, 0, 1024, 512);
+  g.fillStyle = "#fff"; g.textAlign = "center"; g.textBaseline = "alphabetic";
+  for (let lb = 5; lb <= 90; lb += 5) {
+    const k = lb / 5 - 1, x = (k % 8) * 128 + 64, y = Math.floor(k / 8) * 128;
+    g.font = `700 ${lb < 10 ? 62 : 58}px Bahnschrift`; g.fillText(String(lb), x, y + 74);
+    g.font = "600 20px Bahnschrift"; g.fillText("LB", x, y + 98);
+  }
+  return c;
+}
+function screen() {   // the lock screen when the timer went off: wallpaper, clock, the timer's alert, flashlight and camera
+  const c = document.createElement("canvas"); c.width = 600; c.height = 1300;
+  const g = c.getContext("2d");
+  const rr = (x, y, w, h, r, fill) => { g.fillStyle = fill; g.beginPath(); g.roundRect(x, y, w, h, r); g.fill(); };
+  const text = (s, x, y, font, fill, align = "left") => { g.font = font; g.fillStyle = fill; g.textAlign = align; g.fillText(s, x, y); };
+  // the wallpaper, a dusk off the camera roll, dimmed behind the alert
+  const sky = g.createLinearGradient(0, 0, 0, 1300);
+  [[0, "#0a1230"], [.42, "#28305f"], [.66, "#7c4762"], [.8, "#d9845a"], [.9, "#f0ad69"]].forEach(([k, col]) => sky.addColorStop(k, col));
+  g.fillStyle = sky; g.fillRect(0, 0, 600, 1300);
+  g.fillStyle = "#150e1b"; g.beginPath(); g.moveTo(0, 1300);
+  for (let x = 0; x <= 600; x += 6) g.lineTo(x, 1100 - 48 * Math.sin(x * .011 + .4) - 18 * Math.sin(x * .037 + 2) - 6 * Math.sin(x * .13));
+  g.lineTo(600, 1300); g.fill();
+  g.fillStyle = "rgba(0,0,0,.3)"; g.fillRect(0, 0, 600, 1300);
+  // the camera's island, then the status bar: signal, 5G, the battery nearly flat
+  rr(212, 20, 176, 54, 27, "#000");
+  for (let i = 0; i < 4; i++) rr(446 + i * 9, 57 - (i + 1) * 5.5, 6.5, (i + 1) * 5.5, 1.5, i < 3 ? "#fff" : "rgba(255,255,255,.35)");
+  text("5G", 487, 57, "600 24px Inter", "#fff");
+  g.strokeStyle = "rgba(255,255,255,.5)"; g.lineWidth = 2.2; g.beginPath(); g.roundRect(527, 37, 44, 22, 7); g.stroke();
+  rr(573, 44, 3.5, 8, 1.5, "rgba(255,255,255,.5)"); rr(530.5, 40.5, 7, 15, 3.5, "#ff453a");
+  g.strokeStyle = "#fff"; g.lineWidth = 3.4; g.beginPath(); g.arc(300, 111, 8.5, Math.PI, 0); g.stroke(); rr(287, 110, 26, 20, 4, "#fff");
+  text("Wednesday, October 28", 300, 183, "600 27px Inter", "rgba(255,255,255,.9)", "center");
+  g.letterSpacing = "-5px"; text("9:27", 300, 342, "700 176px Inter", "rgba(255,255,255,.94)", "center"); g.letterSpacing = "0px";
+  // the timer's alert
+  rr(22, 560, 556, 352, 46, "rgba(30,30,34,.76)");
+  g.fillStyle = "#ff9f0a"; g.beginPath(); g.arc(70, 612, 21, 0, 2 * Math.PI); g.fill();
+  g.strokeStyle = "#fff"; g.lineWidth = 3; g.beginPath(); g.arc(70, 615, 10, 0, 2 * Math.PI); g.stroke();
+  g.beginPath(); g.moveTo(70, 615); g.lineTo(70, 608); g.stroke(); rr(66, 599, 8, 4, 1.5, "#fff");
+  text("Timer", 103, 622, "600 27px Inter", "rgba(235,235,245,.62)");
+  text("now", 554, 622, "500 25px Inter", "rgba(235,235,245,.5)", "right");
+  g.letterSpacing = "-1.5px"; text("claude reset", 44, 718, "700 80px Inter", "#fff"); g.letterSpacing = "0px";
+  rr(44, 768, 248, 114, 57, "rgba(120,120,128,.38)"); text("Repeat", 168, 838, "600 36px Inter", "#fff", "center");
+  rr(308, 768, 248, 114, 57, "#ff9f0a"); text("Stop", 432, 838, "600 38px Inter", "#141414", "center");
+  // the flashlight and the camera, and the bar to swipe up
+  for (const x of [98, 502]) { g.fillStyle = "rgba(40,40,46,.6)"; g.beginPath(); g.arc(x, 1192, 46, 0, 2 * Math.PI); g.fill(); }
+  g.fillStyle = "#fff"; g.beginPath(); g.moveTo(86, 1170); g.lineTo(110, 1170); g.lineTo(105, 1182); g.lineTo(91, 1182); g.fill(); rr(91, 1184, 14, 30, 3, "#fff");
+  rr(479, 1179, 46, 32, 8, "#fff"); rr(491, 1173, 22, 9, 3, "#fff"); g.fillStyle = "#28282e"; g.beginPath(); g.arc(502, 1195, 9, 0, 2 * Math.PI); g.fill();
+  rr(205, 1264, 190, 8, 4, "#fff");
+  return c;
+}
+function signs() {   // one sheet: the laminated sign for the mirror, the handwritten one for the crossover, the slogan for the red wall
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 1024;
+  const g = c.getContext("2d"); g.fillStyle = "#000"; g.fillRect(0, 0, 1024, 1024);
+  g.textAlign = "center";
+  // 640 x 495 at the top left: printed and laminated
+  g.fillStyle = "#f4f2ec"; g.fillRect(0, 0, 640, 495);
+  g.fillStyle = "#c8191f"; g.fillRect(0, 0, 640, 120);
+  g.fillStyle = "#fff"; g.font = "900 86px 'Arial Black'"; g.fillText("PLEASE", 320, 94, 600);
+  g.fillStyle = "#151515"; g.font = "900 64px 'Arial Black'"; g.fillText("RE-RACK YOUR", 320, 210, 600); g.fillText("WEIGHTS", 320, 284, 600);
+  g.fillStyle = "#c8191f"; g.fillRect(170, 322, 300, 6);
+  g.fillStyle = "#151515"; g.font = "italic 700 58px Arial"; g.fillText("THANK YOU", 320, 414, 600);
+  // 384 x 497 at the top right: printer paper, a marker, blue tape
+  g.save(); g.beginPath(); g.rect(640, 0, 384, 497); g.clip();
+  g.fillStyle = "#f7f7f3"; g.fillRect(640, 0, 384, 497);
+  g.save(); g.translate(832, 300); g.rotate(-.04); g.fillStyle = "#161616";
+  g.font = "700 104px 'Ink Free'"; g.fillText("OUT", -6, -112); g.fillText("OF", 8, -16); g.fillText("ORDER", 0, 84, 350);
+  g.restore();
+  g.fillStyle = "#3d7fd1"; for (const [x, a] of [[662, -.6], [1002, .55]]) { g.save(); g.translate(x, 16); g.rotate(a); g.fillRect(-36, -12, 72, 24); g.restore(); }
+  g.restore();
+  // 1024 x 256 under them: the slogan, white
+  g.fillStyle = "#fff"; g.font = "italic 700 220px 'Bahnschrift Condensed', Bahnschrift"; g.fillText("NO EXCUSES", 512, 712, 990);
+  return c;
+}
+
+// ============================================================================ the path tracer
+const SCENE = `#version 300 es
+precision highp float;
+precision highp int;
+out vec4 fragColor;
+uniform vec2 uRes;
+uniform vec3 uP, uR, uU, uFw;
+uniform float uF, uFocus, uAp, uSeed, uScale;
+uniform sampler2D uNum, uScr, uSign;
+const int NB = 128, NG = 16, NC = 24, ND = 40, NL = 20;
+uniform vec4 uBoxC[NB], uBoxX[NB], uBoxY[NB], uBoxZ[NB];
+uniform vec4 uGrpLo[NG], uGrpHi[NG];
+uniform vec4 uCylC[NC], uCylA[NC], uCylH[NC];
+uniform vec4 uDbC[ND], uDbX[ND], uDbZ[ND], uDbH[ND];
+uniform vec4 uLight[NL];
+uniform vec4 uRsC[2], uRsX[2], uRsZ[2], uRsS[2];
+uniform int uNG, uNC, uND, uNL, uRacked;
+uniform vec3 uRackLo, uRackHi, uLe;
+uniform vec4 uBottle;
+const float PI = 3.14159265, LW = 3.5, BACK = -290.0, FRONT = 800.0, SIDE = 900.0, CEIL = 420.0;
+const int SPP = 2, BOUNCES = 3;
+// Keep float literals in vector constructors: on Windows (ANGLE to D3D11) vec3(-sign(x), 0, 0) beside vec3(0, 0, x) fails to compile at draw time.
+
+uint hashu(uint x) { x ^= x >> 16; x *= 0x7feb352dU; x ^= x >> 15; x *= 0x846ca68bU; x ^= x >> 16; return x; }
+float rnd(inout uint s) { s = hashu(s); return float(s) / 4294967296.0; }
+float hash2(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
+float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p *= 2.03; a *= 0.5; } return s; }
+float lum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+float sdRR(vec2 p, vec2 b, float r) { vec2 d = abs(p) - b + r; return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r; }   // a rounded rectangle, negative inside
+float seg(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0)); }
+
+struct Hit { float t; vec3 n; int id; vec4 aux; };
+// ids: 1 steel, 2 rubber head, 3 chrome, 4 floor, 5 wall, 7 ceiling, 8 vinyl, 9 phone, 10 light housing, 11 bottle, 12 rubber,
+// 13 weight stack, 14 laminated sign, 15 paper sign, 16 treadmill, 17 treadmill console, 18 holed upright, 19 earbuds' case, 20 light,
+// 21 rubber plate, 23 bare steel, 24 aluminium, 25 duct
+
+bool slab(vec3 lo, vec3 ld, vec3 h, out float tn, out vec3 ln) {   // a box at the origin, half sizes h
+  vec3 inv = 1.0 / ld, t0 = (-h - lo) * inv, t1 = (h - lo) * inv, mn = min(t0, t1), mx = max(t0, t1);
+  tn = max(max(mn.x, mn.y), mn.z); float tf = min(min(mx.x, mx.y), mx.z);
+  ln = tn == mn.x ? vec3(-sign(ld.x), 0.0, 0.0) : tn == mn.y ? vec3(0.0, -sign(ld.y), 0.0) : vec3(0.0, 0.0, -sign(ld.z));
+  return tn <= tf && tn > 1e-3;
+}
+vec3 bevel(vec3 p, vec3 h, vec3 ln, float b) {   // rounds the edges in the shading: near one, the normal leans over it
+  vec3 w = (1.0 - smoothstep(0.0, b, h - abs(p))) * sign(p) * (1.0 - abs(ln));
+  return normalize(ln + w * 0.8);
+}
+bool aabb(vec3 ro, vec3 rd, vec3 lo, vec3 hi, float tt) {
+  vec3 inv = 1.0 / rd, t0 = (lo - ro) * inv, t1 = (hi - ro) * inv, mn = min(t0, t1), mx = max(t0, t1);
+  float tn = max(max(mn.x, mn.y), mn.z), tf = min(min(mx.x, mx.y), mx.z);
+  return tn <= tf && tf > 0.0 && tn < tt;
+}
+bool hexHead(vec3 o, vec3 d, float a, float hz, out float t, out vec3 n) {   // a hexagonal prism along z, flats at top and bottom
+  float tn = -1e9, tf = 1e9; vec3 nn = vec3(0.0);
+  for (int k = 0; k < 4; k++) {
+    vec3 ax = k == 0 ? vec3(0.0, 1.0, 0.0) : k == 1 ? vec3(0.8660254, 0.5, 0.0) : k == 2 ? vec3(0.8660254, -0.5, 0.0) : vec3(0.0, 0.0, 1.0);
+    float h = k == 3 ? hz : a, dn = dot(d, ax), on = dot(o, ax);
+    if (abs(dn) < 1e-7) { if (abs(on) > h) return false; continue; }
+    float t0 = (-h - on) / dn, t1 = (h - on) / dn;
+    if (min(t0, t1) > tn) { tn = min(t0, t1); nn = -sign(dn) * ax; }
+    tf = min(tf, max(t0, t1));
+  }
+  if (tn > tf || tn <= 1e-3) return false;
+  t = tn; vec3 p = o + d * t, s = nn;
+  for (int k = 0; k < 4; k++) {
+    vec3 ax = k == 0 ? vec3(0.0, 1.0, 0.0) : k == 1 ? vec3(0.8660254, 0.5, 0.0) : k == 2 ? vec3(0.8660254, -0.5, 0.0) : vec3(0.0, 0.0, 1.0);
+    float h = k == 3 ? hz : a, on = dot(p, ax);
+    if (abs(dot(nn, ax)) < 0.99) s += ax * sign(on) * (1.0 - smoothstep(0.0, 0.7, h - abs(on))) * 0.8;
+  }
+  n = normalize(s);
+  return true;
+}
+bool cylZ(vec3 o, vec3 d, float r, float z0, float z1, out float t, out vec3 n) {
+  float A = dot(d.xy, d.xy), B = dot(o.xy, d.xy), C = dot(o.xy, o.xy) - r * r, D = B * B - A * C;
+  if (D < 0.0 || A < 1e-9) return false;
+  t = (-B - sqrt(D)) / A; float z = o.z + d.z * t;
+  if (t <= 1e-3 || z < z0 || z > z1) return false;
+  n = vec3((o.xy + d.xy * t) / r, 0.0);
+  return true;
+}
+bool cylY(vec3 o, vec3 d, float r, float y0, float y1, bool cap, out float t, out vec3 n) {
+  float A = dot(d.xz, d.xz), B = dot(o.xz, d.xz), C = dot(o.xz, o.xz) - r * r, D = B * B - A * C;
+  if (D < 0.0) return false;
+  t = (-B - sqrt(D)) / max(A, 1e-9); float y = o.y + d.y * t;
+  if (t > 1e-3 && y > y0 && y < y1) { n = vec3((o.x + d.x * t) / r, 0.0, (o.z + d.z * t) / r); return true; }
+  if (cap && d.y < 0.0) { t = (y1 - o.y) / d.y; vec2 q = o.xz + d.xz * t; if (t > 1e-3 && dot(q, q) < r * r) { n = vec3(0.0, 1.0, 0.0); return true; } }
+  return false;
+}
+bool cylA(vec3 ro, vec3 rd, vec3 c, vec3 a, float r, float hl, out float t, out vec3 n) {   // a capped cylinder along a, centre c
+  vec3 o = ro - c; float da = dot(rd, a), oa = dot(o, a);
+  vec3 dp = rd - a * da, op = o - a * oa;
+  float A = dot(dp, dp), B = dot(op, dp), C = dot(op, op) - r * r, D = B * B - A * C;
+  t = 1e9; n = a;
+  if (D < 0.0) return false;
+  bool hit = false;
+  if (A > 1e-9) {
+    float tc = (-B - sqrt(D)) / A;
+    if (tc > 1e-3 && abs(oa + da * tc) < hl) { t = tc; n = (op + dp * tc) / r; hit = true; }
+  }
+  if (abs(da) > 1e-6) {
+    float s = da > 0.0 ? -1.0 : 1.0, tp = (s * hl - oa) / da; vec3 q = op + dp * tp;
+    if (tp > 1e-3 && tp < t && dot(q, q) < r * r) { t = tp; n = a * s; hit = true; }
+  }
+  return hit;
+}
+
+void dumbbell(int i, vec3 ro, vec3 rd, inout Hit h) {
+  vec3 c = uDbC[i].xyz, X = uDbX[i].xyz, Z = uDbZ[i].xyz, Y = cross(Z, X);
+  float a = uDbX[i].w * 0.5, L = uDbZ[i].w, hl = uDbH[i].x, r = uDbH[i].y;
+  vec3 o = ro - c, lo = vec3(dot(o, X), dot(o, Y), dot(o, Z)), ld = vec3(dot(rd, X), dot(rd, Y), dot(rd, Z));
+  float R = length(vec2(hl + L, a * 1.155)), b = dot(lo, ld), cc = dot(lo, lo) - R * R;
+  if (cc > 0.0 && (b > 0.0 || b * b - cc < 0.0)) return;
+  float t; vec3 ln; bool hit = false;
+  for (int s = -1; s <= 1; s += 2) {
+    vec3 zc = vec3(0.0, 0.0, float(s) * (hl + L * 0.5));
+    if (hexHead(lo - zc, ld, a, L * 0.5, t, ln) && t < h.t) { h.t = t; h.n = X * ln.x + Y * ln.y + Z * ln.z; h.id = 2; h.aux = vec4(lo + ld * t - zc, float(s) * float(i + 1)); }
+  }
+  if (cylZ(lo, ld, r, -hl, hl, t, ln) && t < h.t) { h.t = t; h.n = X * ln.x + Y * ln.y + Z * ln.z; h.id = 3; h.aux = vec4(lo + ld * t, hl - 1.3); }
+  for (int s = -1; s <= 1; s += 2) {
+    if (cylZ(lo - vec3(0.0, 0.0, float(s) * (hl - 0.6)), ld, r * 1.32, -0.6, 0.6, t, ln) && t < h.t) { h.t = t; h.n = X * ln.x + Y * ln.y + Z * ln.z; h.id = 3; h.aux = vec4(0.0, 0.0, 99.0, 0.0); }
+  }
+}
+void rslab(int i, vec3 ro, vec3 rd, inout Hit h) {   // a slab with rounded corners: the phone, the earbuds' case
+  if (uRsS[i].w < 0.5) return;
+  vec3 X = uRsX[i].xyz, Z = uRsZ[i].xyz, Y = cross(Z, X), S = uRsS[i].xyz, o = ro - uRsC[i].xyz;
+  vec3 lo = vec3(dot(o, X), dot(o, Y), dot(o, Z)), ld = vec3(dot(rd, X), dot(rd, Y), dot(rd, Z));
+  float RC = uRsX[i].w, t; vec3 ln; int id = int(uRsC[i].w); bool hit = false;
+  if (slab(lo, ld, S, t, ln) && t < h.t) {
+    vec3 p = lo + ld * t; vec2 q = abs(p.xz) - (S.xz - RC);
+    if (!(q.x > 0.0 && q.y > 0.0 && length(q) > RC)) { h.t = t; h.n = bevel(p, S, ln, uRsZ[i].w); h.id = id; h.aux = vec4(p, ln.y); hit = true; }
+  }
+  for (int k = 0; k < 4; k++) {
+    vec2 cc = vec2(k % 2 == 0 ? 1.0 : -1.0, k < 2 ? 1.0 : -1.0) * (S.xz - RC);
+    if (cylY(lo - vec3(cc.x, 0.0, cc.y), ld, RC, -S.y, S.y, false, t, ln) && t < h.t) {
+      vec3 p = lo + ld * t;
+      if (abs(p.x) > S.x - RC && abs(p.z) > S.z - RC) { h.t = t; h.n = ln; h.id = id; h.aux = vec4(p, 0.0); hit = true; }
+    }
+  }
+  if (hit) h.n = X * h.n.x + Y * h.n.y + Z * h.n.z;
+}
+
+Hit trace(vec3 ro, vec3 rd) {
+  Hit h; h.t = 1e9; h.id = 0; h.n = vec3(0.0, 1.0, 0.0); h.aux = vec4(0.0);
+  float t; vec3 n;
+  if (rd.y < 0.0) { t = -ro.y / rd.y; if (t < h.t) { h.t = t; h.id = 4; h.n = vec3(0.0, 1.0, 0.0); } }
+  if (rd.y > 0.0) { t = (CEIL - ro.y) / rd.y; if (t < h.t) { h.t = t; h.id = 7; h.n = vec3(0.0, -1.0, 0.0); } }
+  if (rd.z < 0.0) { t = (BACK - ro.z) / rd.z; if (t < h.t) { h.t = t; h.id = 5; h.n = vec3(0.0, 0.0, 1.0); } }
+  if (rd.z > 0.0) { t = (FRONT - ro.z) / rd.z; if (t < h.t) { h.t = t; h.id = 5; h.n = vec3(0.0, 0.0, -1.0); } }
+  t = (sign(rd.x) * SIDE - ro.x) / rd.x; if (t < h.t) { h.t = t; h.id = 5; h.n = vec3(-sign(rd.x), 0.0, 0.0); }
+  for (int g = 0; g < NG; g++) {
+    if (g >= uNG) break;
+    if (!aabb(ro, rd, uGrpLo[g].xyz, uGrpHi[g].xyz, h.t)) continue;
+    int s = int(uGrpLo[g].w), e = int(uGrpHi[g].w);
+    for (int k = 0; k < NB; k++) {
+      int i = s + k;
+      if (i >= e) break;
+      vec3 c = uBoxC[i].xyz, X = uBoxX[i].xyz, Y = uBoxY[i].xyz, Z = uBoxZ[i].xyz, hs = vec3(uBoxX[i].w, uBoxY[i].w, uBoxZ[i].w);
+      vec3 o = ro - c, lo = vec3(dot(o, X), dot(o, Y), dot(o, Z)), ld = vec3(dot(rd, X), dot(rd, Y), dot(rd, Z)), ln;
+      if (slab(lo, ld, hs, t, ln) && t < h.t) {
+        vec3 p = lo + ld * t; ln = bevel(p, hs, ln, min(1.5, 0.4 * min(hs.x, min(hs.y, hs.z))));
+        h.t = t; h.n = X * ln.x + Y * ln.y + Z * ln.z; h.id = int(uBoxC[i].w); h.aux = vec4(p, float(i));
+      }
+    }
+  }
+  for (int i = 0; i < NC; i++) {
+    if (i >= uNC) break;
+    if (cylA(ro, rd, uCylC[i].xyz, uCylA[i].xyz, uCylA[i].w, uCylH[i].x, t, n) && t < h.t) { h.t = t; h.n = n; h.id = int(uCylC[i].w); h.aux = vec4(ro + rd * t - uCylC[i].xyz, float(i)); }
+  }
+  for (int i = 0; i < NL; i++) {
+    if (i >= uNL) break;
+    vec3 c = uLight[i].xyz, hs = vec3(uLight[i].w, 3.0, 5.0), ln;
+    if (slab(ro - c, rd, hs, t, ln) && t < h.t) {
+      vec3 p = ro - c + rd * t;
+      h.t = t; h.n = ln; h.id = ln.y < -0.5 && abs(p.z) < LW && abs(p.x) < hs.x - 1.0 ? 20 : 10;
+    }
+  }
+  bool rack = aabb(ro, rd, uRackLo, uRackHi, h.t);
+  for (int i = 0; i < ND; i++) {
+    if (i >= uND) break;
+    if (i < uRacked && !rack) continue;
+    dumbbell(i, ro, rd, h);
+  }
+  rslab(0, ro, rd, h); rslab(1, ro, rd, h);
+  if (cylY(ro - vec3(uBottle.x, 0.0, uBottle.y), rd, uBottle.z, 0.0, uBottle.w, false, t, n) && t < h.t) { h.t = t; h.n = n; h.id = 11; h.aux = vec4(ro + rd * t - vec3(uBottle.x, 0.0, uBottle.y), 0.0); }
+  if (cylY(ro - vec3(uBottle.x, 0.0, uBottle.y), rd, uBottle.z * 0.8, uBottle.w - 0.5, uBottle.w + 4.0, true, t, n) && t < h.t) { h.t = t; h.n = n; h.id = 11; h.aux = vec4(0.0, 99.0, 0.0, 0.0); }
+  return h;
+}
+
+struct Mat { vec3 alb, f0, e; float r; };
+float crack(vec2 p) {   // the phone's screen protector, cracked from a corner the time it hit the floor
+  p += 0.05 * vec2(vnoise(p * 11.0), vnoise(p * 11.0 + 7.7)) + 0.02 * vec2(vnoise(p * 37.0), vnoise(p * 37.0 + 2.1));   // ragged, not ruled
+  vec2 o = vec2(-3.05, 6.9), b = vec2(-1.75, 5.55), c = vec2(-2.15, 4.15), e = vec2(-0.25, 5.2);
+  float d = min(seg(p, o, b), seg(p, b, e));
+  d = min(d, min(seg(p, b, c), seg(p, c, vec2(-3.3, 3.35))));
+  d = min(d, min(seg(p, o, vec2(-0.95, 7.1)), seg(p, e, vec2(1.35, 5.6))));
+  return min(d, seg(p, o, vec2(-3.4, 5.6)));
+}
+Mat material(Hit h, vec3 p) {
+  Mat m; m.alb = vec3(0.03); m.f0 = vec3(0.04); m.e = vec3(0.0); m.r = 0.6;
+  if (h.id == 1 || h.id == 13 || h.id == 18) {   // black powder coat, worn to the steel in streaks where the dumbbells slide
+    float wear = smoothstep(0.62, 0.8, fbm(vec2(p.x * 1.7, p.z * 0.12 + p.y * 0.12) + 4.0)) * step(0.6, h.n.y);
+    m.alb = vec3(h.id == 13 ? 0.05 : 0.022) * (0.8 + 0.4 * fbm(p.xz * 0.3 + p.y * 0.2)); m.r = 0.42;
+    m.f0 = mix(vec3(0.04), vec3(0.35), wear); m.alb *= 1.0 - wear; m.r = mix(m.r, 0.33, wear);
+    vec3 q = h.aux.xyz; int i = int(h.aux.w);
+    if (h.id == 13) m.alb *= 1.0 - 0.8 * smoothstep(0.42, 0.48, abs(fract(q.y / 2.55) - 0.5));   // the plates in the stack
+    if (h.id == 18) {   // a hole every two inches up each face of the rack's uprights
+      vec3 ln = vec3(dot(h.n, uBoxX[i].xyz), dot(h.n, uBoxY[i].xyz), dot(h.n, uBoxZ[i].xyz));
+      vec2 hp = vec2(abs(ln.x) > 0.5 ? q.z : q.x, mod(q.y, 5.08) - 2.54);
+      if (abs(ln.y) < 0.5 && length(hp) < 1.05) { m.alb = vec3(0.002); m.f0 = vec3(0.01); m.r = 1.0; }
+    }
+  } else if (h.id == 2) {   // the rubber head; its number painted on both outer faces
+    vec3 q = h.aux.xyz; int i = int(abs(h.aux.w)) - 1; float s = sign(h.aux.w);
+    float a = uDbX[i].w, seed = uDbH[i].z;
+    m.alb = vec3(0.027, 0.027, 0.029) * (0.85 + 0.3 * fbm(q.xy * 0.9 + q.z + seed));
+    m.alb += 0.025 * smoothstep(0.66, 0.82, fbm(q.xy * 2.5 + q.zx * 1.5 + seed * 3.0));   // scuffs and chalk
+    m.r = 0.42 + 0.12 * fbm(q.xy * 1.3 + seed);
+    vec3 ln = vec3(dot(h.n, uDbX[i].xyz), dot(h.n, cross(uDbZ[i].xyz, uDbX[i].xyz)), dot(h.n, uDbZ[i].xyz));
+    if (ln.z * s > 0.9) {
+      vec2 uv = vec2(q.x * s / a + 0.5, 0.5 - q.y / a);
+      float cell = uDbC[i].w;
+      vec2 tc = (vec2(mod(cell, 8.0), floor(cell / 8.0)) + clamp(uv, 0.0, 1.0)) / vec2(8.0, 4.0);
+      float paint = texture(uNum, tc).r * smoothstep(0.25, 0.45, fbm(q.xy * 3.0 + seed * 7.0));
+      m.alb = mix(m.alb, vec3(0.62, 0.6, 0.56), paint); m.r = mix(m.r, 0.55, paint);
+    }
+  } else if (h.id == 3) {   // chrome, knurled on the grip
+    m.alb = vec3(0.0); m.f0 = vec3(0.6, 0.6, 0.62); m.r = 0.09;
+    vec3 q = h.aux.xyz;
+    if (abs(q.z) < h.aux.w) {
+      float ang = atan(q.y, q.x) * 1.7;
+      float k = abs(sin((ang + q.z) * 9.0) * sin((ang - q.z) * 9.0));
+      m.r = 0.2 + 0.18 * k; m.f0 *= 0.85 - 0.2 * k;
+    }
+  } else if (h.id == 4) {   // rubber tiles, flecked, seamed, chalky round the bench
+    vec2 q = p.xz, f = abs(fract(q / 100.0 + 0.5) - 0.5) * 100.0, cb = q - vec2(0.0, -70.0);
+    m.alb = vec3(0.02, 0.02, 0.022) * (0.8 + 0.4 * fbm(q * 0.04));
+    vec2 w = q / 0.2 + 0.7 * vec2(vnoise(q * 7.0), vnoise(q * 7.0 + 5.3)), cl = floor(w);   // the crumb: 2 mm chips, ragged
+    float fl = hash2(cl);
+    if (fl > 0.88) { float k = hash2(cl + 7.1); m.alb = (0.75 + 0.5 * hash2(cl + 3.3)) * (k < 0.5 ? vec3(0.036) : k < 0.8 ? vec3(0.06, 0.06, 0.058) : vec3(0.026, 0.033, 0.058)); }
+    m.alb += vec3(0.04) * smoothstep(0.6, 0.85, fbm(q * 0.025 + 3.0)) * fbm(q * 0.4);
+    m.alb += vec3(0.05) * smoothstep(0.62, 0.85, fbm(q * 0.08 + 11.0)) * exp(-dot(cb, cb) / 9000.0);
+    m.alb *= mix(0.25, 1.0, smoothstep(0.1, 0.25, min(f.x, f.y)));
+    m.r = 0.62 + 0.12 * fbm(q * 0.05 + 9.0);
+  } else if (h.id == 5) {   // painted walls: smudged mirrors in panels along the back, the red end wall and its slogan, a TV across the room
+    m.alb = vec3(0.13, 0.128, 0.126); m.r = 0.9;
+    if (h.n.x < -0.5) {
+      m.alb = vec3(0.21, 0.024, 0.022);
+      vec2 uv = vec2((p.z - 30.0) / 380.0 + 0.5, 0.5 - (p.y - 318.0) / 95.0);
+      if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) m.alb = mix(m.alb, vec3(0.62, 0.6, 0.57), texture(uSign, vec2(uv.x, 0.5 + uv.y * 0.25)).r);
+    }
+    if (h.n.z < -0.5 && abs(p.x + 60.0) < 79.0 && abs(p.y - 245.0) < 46.0) m.alb = vec3(0.01);
+    if (h.n.z > 0.5 && p.y > 26.0 && p.y < 218.0 && abs(p.x) < 420.0) {
+      float seam = abs(fract((p.x + 420.0) / 120.0 + 0.5) - 0.5) * 120.0;
+      m.alb = vec3(0.012);
+      if (seam > 0.2) { m.alb = vec3(0.003); m.f0 = vec3(0.84, 0.88, 0.86); m.r = 0.03 * smoothstep(0.55, 0.85, fbm(p.xy * 0.06 + 2.0)); }
+    }
+    if (h.n.z < -0.5 && abs(p.x + 60.0) < 75.0 && abs(p.y - 245.0) < 42.0) {   // the TV's on: a game, its score in the corner
+      vec2 tv = vec2(p.x + 60.0, p.y - 245.0) / vec2(75.0, 42.0);
+      vec3 pic = tv.y < 0.25 ? vec3(0.1, 0.36, 0.13) * (0.8 + 0.4 * fbm(tv * 4.0)) : vec3(0.16, 0.17, 0.24) * (0.5 + fbm(tv * 9.0));
+      if (tv.y < -0.7 && tv.y > -0.86 && tv.x > -0.9 && tv.x < -0.2) pic = vec3(0.8);
+      m.e = uLe * 0.012 * pic;
+    }
+  } else if (h.id == 7 || h.id == 10) { m.alb = vec3(0.015); m.r = 0.7; }
+  else if (h.id == 8) { m.alb = vec3(0.02, 0.02, 0.022); m.r = 0.3 + 0.15 * fbm(p.xz * 0.2 + p.y); }
+  else if (h.id == 9) {   // the phone in a green case: the glass on top with the screen under it, smudged, its protector cracked
+    vec3 q = h.aux.xyz, S = uRsS[0].xyz;
+    m.alb = vec3(0.04, 0.055, 0.045); m.r = 0.62;
+    if (h.aux.w > 0.9 && sdRR(q.xz, S.xz - 0.17, 0.83) < 0.0) {
+      m.alb = vec3(0.0); m.f0 = vec3(0.045);
+      float smudge = smoothstep(0.45, 0.8, fbm(q.xz * 1.7 + 3.0)), tp = length((q.xz - vec2(1.3, 4.7)) * vec2(1.0, 0.8));
+      m.r = 0.03 + 0.2 * smudge + 0.22 * smoothstep(1.0, 0.6, tp) * (0.5 + 0.5 * sin(tp * 150.0));   // and a thumbprint
+      vec2 in2 = S.xz - 0.38;
+      if (sdRR(q.xz, in2, 0.7) < 0.0) m.e = texture(uScr, vec2(q.x / in2.x, q.z / in2.y) * 0.5 + 0.5).rgb * uLe * 0.014;
+      if (abs(sdRR(q.xz, S.xz - 0.25, 0.76)) < 0.012) { m.alb = vec3(0.05); m.r = 0.3; }   // the protector's edge
+      float cr = crack(q.xz);
+      if (cr < 0.012) { m.alb = vec3(0.3); m.r = 0.45; m.e *= 0.4; }
+      else if (cr < 0.05) m.r = max(m.r, 0.15);
+    }
+  } else if (h.id == 11) {
+    if (h.aux.y > 90.0) { m.alb = vec3(0.02); m.r = 0.4; }
+    else { m.alb = vec3(0.0); m.f0 = vec3(0.58, 0.57, 0.55); m.r = 0.24 + 0.05 * fbm(h.aux.xy * 2.0); }
+  } else if (h.id == 12) { m.alb = vec3(0.025); m.r = 0.7; }
+  else if (h.id == 14 || h.id == 15) {   // the signs, laminated on the mirror, printer paper on the crossover
+    int i = int(h.aux.w); vec3 q = h.aux.xyz;
+    vec2 uv = clamp(vec2(q.x / uBoxX[i].w, -q.y / uBoxY[i].w) * 0.5 + 0.5, 0.0, 1.0);
+    vec4 rc = h.id == 14 ? vec4(0.0, 0.0, 0.625, 0.4834) : vec4(0.625, 0.0, 0.375, 0.4854);
+    vec3 ink = texture(uSign, rc.xy + uv * rc.zw).rgb * 0.82;
+    m.alb = dot(h.n, uBoxZ[i].xyz) > 0.5 ? ink : mix(vec3(0.75), ink, 0.1);   // from behind, the print shows through faintly
+    m.r = h.id == 14 ? 0.2 : 0.8; m.f0 = vec3(h.id == 14 ? 0.05 : 0.03);
+  } else if (h.id == 16 || h.id == 17) {   // treadmill plastic; the console's screen glows toward the runner
+    m.alb = vec3(0.03, 0.031, 0.034); m.r = 0.42;
+    int i = int(h.aux.w); vec3 q = h.aux.xyz;
+    if (h.id == 17 && dot(h.n, uBoxZ[i].xyz) > 0.5 && abs(q.x) < 24.0 && abs(q.y) < 9.0) {
+      m.alb = vec3(0.0); m.f0 = vec3(0.04); m.r = 0.05;
+      float row = step(0.65, fract(q.y / 3.0)) * step(abs(q.x), 15.0);   // the idle screen's lines of text
+      m.e = uLe * 0.003 * mix(vec3(0.08, 0.2, 0.5), vec3(0.6, 0.85, 1.0), row);
+    }
+  } else if (h.id == 19) {   // the earbuds' case: white plastic, the lid's seam
+    m.alb = vec3(0.66, 0.66, 0.64); m.r = 0.22;
+    if (abs(h.aux.x - 1.55) < 0.025) m.alb = vec3(0.1);
+  } else if (h.id == 21) {   // rubber-coated plates, a steel ring round the bar's hole
+    int i = int(h.aux.w); vec3 a = uCylA[i].xyz, q = h.aux.xyz; float rr = length(q - a * dot(q, a));
+    m.alb = vec3(0.026) * (0.85 + 0.3 * fbm(q.xy * 0.4 + q.z * 0.3)); m.r = 0.5;
+    if (abs(dot(h.n, a)) > 0.9) { if (rr < 3.2) { m.alb = vec3(0.0); m.f0 = vec3(0.55); m.r = 0.2; } else if (abs(rr - 19.0) < 0.6) m.alb *= 0.5; }
+  } else if (h.id == 23) { m.alb = vec3(0.0); m.f0 = vec3(0.55, 0.55, 0.57); m.r = 0.22; }   // bare steel: the bar, its sleeves
+  else if (h.id == 24) { m.alb = vec3(0.0); m.f0 = vec3(0.6, 0.61, 0.63); m.r = 0.32; }      // brushed aluminium
+  else if (h.id == 25) {   // the duct, black like the ceiling, a seam every metre and a half
+    m.alb = vec3(0.03); m.f0 = vec3(0.06); m.r = 0.4;
+    if (abs(fract(h.aux.x / 150.0) - 0.5) > 0.48) m.alb *= 0.4;
+  }
+  else if (h.id == 20) m.e = uLe;
+  return m;
+}
+
+vec3 brdf(vec3 n, vec3 wo, vec3 wi, Mat m, bool spec) {
+  vec3 hv = normalize(wo + wi);
+  float nl = max(dot(n, wi), 0.0), nv = max(dot(n, wo), 1e-4), nh = max(dot(n, hv), 0.0), vh = max(dot(wo, hv), 0.0);
+  vec3 F = m.f0 + (1.0 - m.f0) * pow(1.0 - vh, 5.0), f = m.alb / PI * (1.0 - F);
+  if (spec) {
+    float a = m.r * m.r, a2 = a * a, dd = nh * nh * (a2 - 1.0) + 1.0, D = a2 / (PI * dd * dd), k = a * 0.5;
+    f += D * (nl / (nl * (1.0 - k) + k)) * (nv / (nv * (1.0 - k) + k)) * F / (4.0 * nl * nv + 1e-4);
+  }
+  return f;
+}
+float pick(int j, vec3 p) { vec3 d = uLight[j].xyz - p; return uLight[j].w / (dot(d, d) + 2e4); }   // how much a light is likely to give here
+vec3 direct(vec3 p, vec3 n, vec3 wo, Mat m, inout uint seed) {   // one strip light, picked by how near it is, then sampled
+  float tot = 0.0;
+  for (int j = 0; j < NL; j++) { if (j >= uNL) break; tot += pick(j, p); }
+  float u = rnd(seed) * tot, pk = 1.0; int k = 0;
+  for (int j = 0; j < NL; j++) { if (j >= uNL) break; k = j; pk = pick(j, p); u -= pk; if (u <= 0.0) break; }
+  vec4 L = uLight[k];
+  vec3 q = L.xyz + vec3((rnd(seed) * 2.0 - 1.0) * (L.w - 1.0), -3.02, (rnd(seed) * 2.0 - 1.0) * LW), wi = q - p;
+  float d2 = dot(wi, wi), d = sqrt(d2); wi /= d;
+  float cl = wi.y, cn = dot(n, wi);
+  if (cl <= 0.0 || cn <= 0.0) return vec3(0.0);
+  if (trace(p + n * 0.02, wi).t < d - 0.5) return vec3(0.0);
+  return brdf(n, wo, wi, m, m.r >= 0.15) * uLe * cn * cl / d2 * (4.0 * (L.w - 1.0) * LW) * tot / pk;
+}
+
+void main() {
+  uint seed = hashu(uint(gl_FragCoord.x) * 1973u + uint(gl_FragCoord.y) * 9277u + uint(uSeed) * 26699u);
+  vec3 acc = vec3(0.0);
+  for (int sp = 0; sp < SPP; sp++) {
+    vec2 c = gl_FragCoord.xy - 0.5 + vec2(rnd(seed), rnd(seed)) - 0.5 * uRes;
+    c *= 1.0 - 0.012 * dot(c, c) / dot(0.5 * uRes, 0.5 * uRes);
+    vec3 dir = normalize(uR * c.x + uU * c.y + uFw * uF);
+    float ang = rnd(seed) * 6.2831853, rr = sqrt(rnd(seed)) * uAp;
+    vec3 o = uP + (uR * cos(ang) + uU * sin(ang)) * rr, d = normalize(uP + dir * (uFocus / dot(dir, uFw)) - o);
+    vec3 thr = vec3(1.0), L = vec3(0.0); bool sharp = true;
+    for (int b = 0; b < BOUNCES; b++) {
+      Hit h = trace(o, d);
+      if (h.id == 0) break;
+      vec3 p = o + d * h.t, n = h.n;
+      if (dot(n, d) > 0.0) n = -n;
+      Mat m = material(h, p);
+      if (dot(m.e, m.e) > 0.0) { if (sharp) L += thr * m.e; if (h.id == 20) break; }
+      vec3 wo = -d, add = thr * direct(p, n, wo, m, seed);
+      L += min(add, vec3(b == 0 ? 6.0 : b == 1 ? 3.0 : 1.0));   // the odd sample that finds a light in a glossy surface would be a speck
+      float nv = max(dot(n, wo), 1e-4);
+      vec3 Fv = m.f0 + (1.0 - m.f0) * pow(1.0 - nv, 5.0);
+      float ps = clamp(lum(Fv) / (lum(Fv) + lum(m.alb) + 1e-4), 0.1, 0.95);
+      vec3 t1 = normalize(abs(n.y) < 0.9 ? cross(n, vec3(0.0, 1.0, 0.0)) : cross(n, vec3(1.0, 0.0, 0.0))), t2 = cross(n, t1);
+      float u1 = rnd(seed), u2 = rnd(seed), ph = 6.2831853 * u1;
+      if (rnd(seed) < ps) {
+        float a = max(m.r * m.r, 1e-4), ct = sqrt((1.0 - u2) / (1.0 + (a * a - 1.0) * u2));
+        if (m.r < 0.15) ct = inversesqrt(1.0 - a * a * log(1.0 - u2));   // a smudged mirror blurs like Beckmann: GGX's long tail finds the strip lights in specks
+        float st = sqrt(1.0 - ct * ct);
+        vec3 hv = t1 * cos(ph) * st + t2 * sin(ph) * st + n * ct, wi = reflect(d, hv);
+        float nl = dot(n, wi), nh = max(dot(n, hv), 1e-4), vh = max(dot(wo, hv), 0.0);
+        if (nl <= 0.0) break;
+        float k = a * 0.5, G = (nl / (nl * (1.0 - k) + k)) * (nv / (nv * (1.0 - k) + k));
+        thr = min(thr * (m.f0 + (1.0 - m.f0) * pow(1.0 - vh, 5.0)) * G * vh / (nh * nv) / ps, vec3(2.0));   // a grazing glossy bounce can weigh far too much
+        sharp = sharp && m.r < 0.15; d = wi;   // a light seen in the mirror from a matte bounce: too rare to sample, so left out
+      } else {
+        float r2 = sqrt(u2);
+        d = t1 * cos(ph) * r2 + t2 * sin(ph) * r2 + n * sqrt(1.0 - u2);
+        thr *= m.alb / (1.0 - ps); sharp = false;
+      }
+      o = p + n * 0.02;
+      if (max(thr.r, max(thr.g, thr.b)) < 1e-3) break;
+    }
+    acc += L;
+  }
+  acc /= float(SPP);
+  if (any(isnan(acc)) || any(isinf(acc))) acc = vec3(0.0);
+  fragColor = vec4(acc * uScale, 1.0);
+}`;
+
+// ============================================================================ WebGL
+const cv = document.getElementById("cv");
+const gl = cv.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false, alpha: false });
+gl.getExtension("EXT_color_buffer_float");
+const scene = compile(gl, SCENE), post = compile(gl, POST);
+gl.bindVertexArray(gl.createVertexArray());
+const accTex = texture(gl, gl.RGBA16F, W, H), numTex = texture(gl, gl.SRGB8_ALPHA8, 1024, 512), scrTex = texture(gl, gl.SRGB8_ALPHA8, 600, 1300);
+const signTex = texture(gl, gl.SRGB8_ALPHA8, 1024, 1024);
+const fbo = gl.createFramebuffer();
+gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, accTex, 0);
+function upload(tex, unit, canvas) {
+  gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, canvas); gl.generateMipmap(gl.TEXTURE_2D);
+}
+function bounds() {   // each group of boxes: its bounding box, its first box and one past its last
+  return GROUPS.map((s, k) => {
+    const e = GROUPS[k + 1] ?? BOXES.length, lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (const b of BOXES.slice(s, e)) {
+      const Z = cross(b.X, b.Y);
+      for (let j = 0; j < 3; j++) {
+        const r = Math.abs(b.X[j]) * b.h[0] + Math.abs(b.Y[j]) * b.h[1] + Math.abs(Z[j]) * b.h[2] + .5;
+        lo[j] = Math.min(lo[j], b.c[j] - r); hi[j] = Math.max(hi[j], b.c[j] + r);
+      }
+    }
+    return { lo, hi, s, e };
+  });
+}
+function sceneUniforms(sh) {
+  const { u } = scene, G = bounds();
+  gl.uniform4fv(u.uBoxC, BOXES.flatMap((b) => [...b.c, b.mat]));
+  gl.uniform4fv(u.uBoxX, BOXES.flatMap((b) => [...b.X, b.h[0]]));
+  gl.uniform4fv(u.uBoxY, BOXES.flatMap((b) => [...b.Y, b.h[1]]));
+  gl.uniform4fv(u.uBoxZ, BOXES.flatMap((b) => [...cross(b.X, b.Y), b.h[2]]));
+  gl.uniform4fv(u.uGrpLo, G.flatMap((g) => [...g.lo, g.s])); gl.uniform4fv(u.uGrpHi, G.flatMap((g) => [...g.hi, g.e]));
+  gl.uniform4fv(u.uCylC, CYLS.flatMap((c) => [...c.c, c.mat])); gl.uniform4fv(u.uCylA, CYLS.flatMap((c) => [...c.a, c.r]));
+  gl.uniform4fv(u.uCylH, CYLS.flatMap((c) => [c.hl, 0, 0, 0]));
+  const db = dumbbells(sh);
+  gl.uniform4fv(u.uDbC, db.list.flatMap((d) => [...d.c, d.lb / 5 - 1]));
+  gl.uniform4fv(u.uDbX, db.list.flatMap((d) => [...d.X, d.a]));
+  gl.uniform4fv(u.uDbZ, db.list.flatMap((d) => [...d.Z, d.L]));
+  gl.uniform4fv(u.uDbH, db.list.flatMap((d) => [d.hl, d.r, d.seed, 0]));
+  gl.uniform4fv(u.uLight, LIGHTS.flat());
+  gl.uniform1i(u.uNG, G.length); gl.uniform1i(u.uNC, CYLS.length); gl.uniform1i(u.uND, db.list.length); gl.uniform1i(u.uNL, LIGHTS.length);
+  gl.uniform1i(u.uRacked, db.racked);
+  const racked = db.list.slice(0, db.racked);
+  gl.uniform3fv(u.uRackLo, [0, 1, 2].map((k) => Math.min(...racked.map((d) => d.c[k])) - 25));
+  gl.uniform3fv(u.uRackHi, [0, 1, 2].map((k) => Math.max(...racked.map((d) => d.c[k])) + 25));
+  gl.uniform3fv(u.uLe, LE);
+  const rs = [[PHONE, 9], [PODS, 19]].map(([o, id]) => { const Z = [Math.sin(o.yaw * RAD), 0, Math.cos(o.yaw * RAD)]; return { o, id, Z, X: cross([0, 1, 0], Z) }; });
+  gl.uniform4fv(u.uRsC, rs.flatMap((r) => [...r.o.c, r.id])); gl.uniform4fv(u.uRsX, rs.flatMap((r) => [...r.X, r.o.rc]));
+  gl.uniform4fv(u.uRsZ, rs.flatMap((r) => [...r.Z, r.o.bev])); gl.uniform4fv(u.uRsS, rs.flatMap((r) => [...r.o.h, sh.phone ? 1 : 0]));
+  gl.uniform4fv(u.uBottle, BOTTLE);
+  gl.uniform1i(u.uNum, 2); gl.uniform1i(u.uScr, 3); gl.uniform1i(u.uSign, 4);
+}
+async function shoot(sh, passes) {   // path traces the shot into the canvas, through the phone
+  const f = norm(sub(sh.at, sh.cam)), r0 = norm(cross(f, [0, 1, 0])), u0 = cross(r0, f), ro = sh.roll * RAD;
+  const r = add(mul(r0, Math.cos(ro)), mul(u0, Math.sin(ro))), up = sub(mul(u0, Math.cos(ro)), mul(r0, Math.sin(ro)));
+  const { p, u } = scene;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, W, H);
+  gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(p); sceneUniforms(sh);
+  gl.uniform2f(u.uRes, W, H); gl.uniform3fv(u.uP, sh.cam); gl.uniform3fv(u.uR, r); gl.uniform3fv(u.uU, up); gl.uniform3fv(u.uFw, f);
+  gl.uniform1f(u.uF, sh.lens); gl.uniform1f(u.uFocus, dot(sub(sh.focus, sh.cam), f)); gl.uniform1f(u.uAp, .19); gl.uniform1f(u.uScale, 1 / passes);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+  for (let k = 0; k < passes; k++) {
+    gl.uniform1f(u.uSeed, k + 1); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (k % 4 === 3) { gl.finish(); await new Promise((res) => setTimeout(res, 0)); }
+  }
+  gl.disable(gl.BLEND);
+  develop(gl, post, accTex, { expo: sh.expo, seed: 7, grain: .4 });
+}
+window.renderPhoto = async (i, passes = 96) => { await shoot(SHOTS[i], passes); return slide(cv, SHOTS[i].say, SHOTS[i].size); };
+window.ready = (async () => {
+  for (const f of ["700 58px Bahnschrift", "500 28px Inter", "600 28px Inter", "700 80px Inter"]) await document.fonts.load(f);
+  upload(numTex, 2, numbers()); upload(scrTex, 3, screen()); upload(signTex, 4, signs());
+  const q = Q.get("shot");
+  if (q !== null) await shoot(SHOTS[+q], +(Q.get("passes") || 16));
+  return true;
+})();
+</script></body></html>

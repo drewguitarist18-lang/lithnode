@@ -12,7 +12,7 @@ const MAC = process.platform === "darwin";
 const SERVER = process.platform === "win32" ? path.join(path.dirname(process.execPath), "server", "lithnode-server.exe")
   : MAC ? path.join(process.resourcesPath, "server", "lithnode-server")
   : path.join(path.dirname(process.execPath), "server", "lithnode-server");
-const BAR = { color: "#111111", symbolColor: "#8d8d8d", height: 48 };   // matches the app's top bar
+const BAR = { color: "#08080a", symbolColor: "#a3a29c", height: 44 };   // matches the app's top bar
 let win = null;
 let server = null;
 
@@ -45,7 +45,7 @@ async function startEngine() {
 function createWindow() {
   win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 960, minHeight: 600, show: false,
-    title: "Lithnode", backgroundColor: "#0a0a0a", icon: path.join(__dirname, MAC ? "lithnode.png" : process.platform === "win32" ? "lithnode.ico" : "lithnode.png"),
+    title: "Lithnode", backgroundColor: "#08080a", icon: path.join(__dirname, MAC ? "lithnode.png" : process.platform === "win32" ? "lithnode.ico" : "lithnode.png"),
     // Mac keeps its own traffic lights (top left, over the bar); Windows and Linux draw ours at the right
     ...(MAC ? { titleBarStyle: "hiddenInset" } : { titleBarStyle: "hidden", titleBarOverlay: BAR }),
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },

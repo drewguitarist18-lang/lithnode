@@ -2,7 +2,7 @@
 // cost nothing) and the site served on 8797 (`python -m http.server 8797 -d site`). Writes footage/<clip>.mp4 (30 fps)
 // and footage/<clip>.json (every mouse move, click and key with its time in the clip, so the film can draw the cursor).
 // Frames come from Chrome's screencast with their own timestamps, on the same clock as the log, so they line up exactly.
-// Usage: node capture.js [clip ...]   clips: describe, run, site, phone, ads   (run and ads also record the Office alongside)
+// Usage: node capture.js [clip ...]   clips: describe, run, site, phone, ads, jobs   (run, ads and jobs also record the Office alongside)
 const puppeteer = require("puppeteer-core");
 const fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const FF = process.env.FFMPEG || "ffmpeg";
@@ -102,7 +102,8 @@ const clips = {
     await r.stop(); await p.close();
   },
   // run the big flow from the Run dialog, watch it, approve it, see it finish; the Office records alongside
-  async run(b, { name = "run", flow = "Product hunt", task = "Find home gadgets worth selling this month", office = "office" } = {}) {
+  // details: once the result opens, open its Details too, to end on the last stage's items
+  async run(b, { name = "run", flow = "Product hunt", task = "Find home gadgets worth selling this month", office = "office", details = false } = {}) {
     const id = await flowId(flow);
     const b2 = await launch(), p = await page(b), o = await page(b2);   // the Office in its own browser, so neither tab is in the background
     console.log("run: opening the app"); const f = await openApp(p, id);
@@ -133,6 +134,12 @@ const clips = {
       await sleep(500);
     }
     r.mark("done");
+    if (details) {
+      await f.waitForSelector(".rp-details > summary", { visible: true, timeout: 20000 });
+      await sleep(1400);
+      await r.move(...(await center(f, ".rp-details > summary")), 800); await sleep(150); await r.click();
+      r.mark("details");
+    }
     await sleep(3500);
     await r.stop(); await ro.stop(); await p.close(); await b2.close();
   },
@@ -140,6 +147,11 @@ const clips = {
   async ads(b) {
     await clips.describe(b, { name: "ads-describe", ask: "Write ad scripts for my coffee brand, cut the weak ones, save the winners" });
     await clips.run(b, { name: "ads-run", flow: "Ad scripts", task: "Write TikTok ad scripts for Night Owl Coffee", office: "ads-office" });
+  },
+  // the third job, for phone.html?job=jobs: a team that finds jobs, cuts the bad ones and drafts the cover letters
+  async jobs(b) {
+    await clips.describe(b, { name: "jobs-describe", ask: "Find remote jobs that fit me, cut the bad ones, draft my cover letters" });
+    await clips.run(b, { name: "jobs-run", flow: "Job hunt", task: "Find remote marketing jobs that pay over 70k", office: "jobs-office", details: true });
   },
   // the site on a phone, for the vertical cut: the hero's black hole, live, at 1080x1920
   async phone(b) {

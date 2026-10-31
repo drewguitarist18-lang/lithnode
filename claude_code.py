@@ -352,7 +352,7 @@ def start_login():
     flags = NO_WINDOW if os.environ.get("CLAWD_BOT_CLAUDE_CMD") or not WINDOWS else 0x00000010   # CREATE_NEW_CONSOLE
     try:
         subprocess.Popen(host([*command, "auth", "login", "--claudeai"]), cwd=str(Path.home()), creationflags=flags,
-                         stdin=subprocess.DEVNULL, **NEW_GROUP)
+                         stdin=None if flags == 0x00000010 else subprocess.DEVNULL, **NEW_GROUP)
     except OSError:
         return False
     _status_cache["value"] = None   # so the next status check really asks

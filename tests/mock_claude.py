@@ -166,6 +166,18 @@ if "--append-system-prompt" in flags:
                  "connectors": ["claude.ai Notion"], "summary": "Saves the winners as shot lists"},
                 {"id": "done", "type": "done", "name": "Done"}],
                 "edges": [["master", "trends"], ["trends", "write"], ["write", "ok"], ["ok", "save"], ["save", "done"]]}
+        if "cover letter" in prompt.lower():   # the third film's team: jobs found, checked, and applications drafted
+            draft = {"name": "Job hunt", "nodes": [
+                {"id": "master", "type": "master", "mode": "pass"},
+                {"id": "find", "type": "cluster", "name": "Job scout", "count": 1, "bot": "scout", "tools": "web", "role": "run",
+                 "summary": "Searches the job boards"},
+                {"id": "check", "type": "cluster", "name": "Job checker", "count": 2, "bot": "sentinel", "tools": "web", "role": "build",
+                 "focuses": "Pay and remote\nReviews and red flags", "summary": "One checks the pay, one the company"},
+                {"id": "ok", "type": "approval", "name": "Your pick", "message": "The checkers cut the weak ones. Approve to draft the applications."},
+                {"id": "write", "type": "cluster", "name": "Writer", "count": 1, "bot": "muse", "tools": "none", "role": "run",
+                 "connectors": ["claude.ai Gmail"], "summary": "Drafts a cover letter for each"},
+                {"id": "done", "type": "done", "name": "Done"}],
+                "edges": [["master", "find"], ["find", "check"], ["check", "ok"], ["ok", "write"], ["write", "done"]]}
         text = "nope, no flow here" if "BADJSON" in prompt else "Here it is:\n```json\n" + json.dumps(draft) + "\n```"
         out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
         out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": 0.02, "num_turns": 1, **base})
@@ -254,6 +266,36 @@ if "--append-system-prompt" in flags:
             else:   # saves what the writers passed
                 items = [dict(i, verdict="pass", reason="Saved as a shot list") for i in items if not any(w in i["title"] for w in ("tested", "cures"))]
         text = (f"Done.\n\nREPORT: {stage}: {len(items)} {'trends' if stage == 'Trend scout' else 'scripts'}.\n\n```items\n" + json.dumps(items) + "\n```")
+    if stage in ("Job scout", "Job checker", "Writer"):
+        # the job team: six openings in, the weak ones cut, a cover letter drafted for each one left
+        steps = {"Job scout": [("WebSearch", {"query": "remote marketing jobs over $70k"}), ("WebFetch", {"url": "https://www.linkedin.com/jobs/view/4102"}),
+                               ("WebSearch", {"query": "growth marketer remote salary"})],
+                 "Job checker": [("WebSearch", {"query": "Sunday Studio glassdoor reviews"}), ("WebFetch", {"url": "https://www.glassdoor.com/Reviews"})],
+                 "Writer": [("mcp__claude_ai_Gmail__create_draft", {"subject": "Content Marketing Manager application"})]}[stage]
+        for i, (name, args) in enumerate(steps):
+            time.sleep(pace)
+            out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [
+                {"type": "tool_use", "id": f"toolu_j{i}", "name": name, "input": args}]}, **base})
+        jobs = [("Content Marketing Manager · Brightloop", "$82k", "Remote", 4.4), ("Growth Marketer · Pinecrest Labs", "$95k", "Remote", 4.6),
+                ("Social Media Lead · Kettle & Co", "$64k", "Remote", 4.2), ("Brand Marketer · Northwind Media", "$78k", "Hybrid, NYC", 4.3),
+                ("Marketing Manager · Harbor Health", "$110k", "Remote", 4.5), ("SEO Specialist · Sunday Studio", "$71k", "Remote", 2.9)]
+        items = []
+        for title, pay, where, rating in jobs:
+            item = {"title": title, "price": pay, "rating": rating, "facts": {"Where": where},
+                    "url": "https://www.linkedin.com/jobs/view/" + str(4100000 + len(items) * 7919)}
+            if stage == "Job checker":   # the first checker looks at the pay and where, the second at the company
+                if "# Your focus\nPay" in prompt:
+                    bad = "Pays under $70k" if int(pay[1:-1]) < 70 else "Not remote" if where != "Remote" else ""
+                    item.update(verdict="cut" if bad else "pass", reason=bad or f"{pay}, remote")
+                else:
+                    item.update(verdict="cut" if rating < 3.5 else "pass", reason=f"Reviews {rating}★" + (", staff keep quitting" if rating < 3.5 else ""))
+            items.append(item)
+        if stage == "Writer":   # drafts for what the checkers passed
+            items = [dict(i, verdict="pass", reason="Cover letter in your drafts") for i in items
+                     if not any(w in i["title"] for w in ("Kettle", "Northwind", "Sunday"))]
+        say = (f"{len(items)} cover letters, one for each job. They're in your Gmail drafts." if stage == "Writer"
+               else f"{stage}: {len(items)} jobs.")
+        text = f"Done.\n\nREPORT: {say}\n\n```items\n" + json.dumps(items) + "\n```"
     out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
     used = {"usage": {"input_tokens": 1200, "output_tokens": 800, "cache_read_input_tokens": 30000 + len(text) * 40}} if os.environ.get("CLAWD_MOCK_RICH") else {}
     out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": 0.01,

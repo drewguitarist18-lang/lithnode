@@ -25,39 +25,62 @@
   :root[data-theme="light"] { color-scheme: light; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { background: var(--bg); color: var(--ink); font: 14px/1.4 "Segoe UI", system-ui, sans-serif;
-         display: grid; grid-template-rows: 48px 1fr; overflow: hidden; }
-  header { display: flex; align-items: center; gap: 6px; padding: 0 14px; background: var(--bar);
+  body { background: var(--bg); color: var(--ink); font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+         display: grid; grid-template-rows: 44px 1fr; overflow: hidden; }
+  header { display: flex; align-items: center; gap: 8px; padding: 0 10px 0 12px; background: var(--bar);
            border-bottom: 1px solid var(--line); }
-  .brand { display: flex; align-items: center; gap: 8px; margin-right: 14px; font-weight: 700; font-size: 15px; }
-  .brand canvas { width: 32px; height: 24px; }
-  .brand small { font-weight: 500; font-size: 11.5px; color: var(--muted); margin-left: 4px; }
-  nav { display: flex; gap: 4px; height: 100%; }
-  nav a { display: flex; align-items: center; gap: 8px; padding: 0 14px; color: var(--muted); text-decoration: none;
-          font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .brand { display: flex; align-items: center; gap: 7px; margin-right: 10px; font-size: 12.5px; color: var(--ink); cursor: default; }
+  .brand canvas { width: 28px; height: 21px; }
+  /* Flows | Office: a small segmented switch, the open one raised */
+  nav { display: flex; gap: 2px; padding: 3px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel, var(--bg)); }
+  nav a { display: flex; align-items: center; gap: 7px; height: 26px; padding: 0 12px; border-radius: 7px; color: var(--muted);
+          text-decoration: none; font-weight: 550; transition: background .12s, color .12s; }
   nav a:hover { color: var(--ink); }
-  nav a.on { color: var(--ink); border-bottom-color: var(--accent); }
-  .badge { min-width: 18px; height: 18px; padding: 0 6px; border-radius: 9px; font-size: 11px; font-weight: 700;
-           display: none; align-items: center; justify-content: center; background: var(--accent); color: #fff; }
+  nav a.on { color: var(--ink); background: var(--hover); box-shadow: inset 0 0 0 1px var(--line); }
+  .badge { min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px; font-size: 10.5px; font-weight: 700;
+           display: none; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-variant-numeric: tabular-nums; }
   .badge.show { display: inline-flex; }
   .badge.warn { background: var(--warn); }
-  .status { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
-  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-  .status.ok i { background: var(--ok); } .status.bad i { background: var(--warn); }
-  .status code { background: var(--hover); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
-  .signin { font: 600 12.5px inherit; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+  .status { margin-left: auto; display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 999px;
+            border: 1px solid var(--line); background: transparent; color: var(--muted); font: inherit; font-size: 12px; white-space: nowrap;
+            min-width: 0; cursor: pointer; transition: background .12s, color .12s; }
+  .status:hover, .status[aria-expanded="true"] { background: var(--hover); color: var(--ink); }
+  .status span { overflow: hidden; text-overflow: ellipsis; }
+  .status i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .status.ok i { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+  .status.bad i { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); }
+  .status code { background: var(--hover); padding: 1px 6px; border-radius: 5px; font-size: 11.5px; }
+  .signin { font: 600 12px inherit; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; white-space: nowrap; }
   .signin:disabled { opacity: .6; cursor: default; }
-  .quit { margin-left: 6px; width: 32px; height: 30px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line);
-          background: transparent; color: var(--muted); cursor: pointer; }
-  .quit:hover { color: var(--warn); border-color: var(--warn); }
-  .quit svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+  /* the account card under the status pill: what the sign-in is, and how to fix it */
+  .acct { position: fixed; z-index: 50; top: 48px; right: 10px; width: min(340px, calc(100vw - 20px)); padding: 16px; border-radius: 14px;
+          background: var(--pad, var(--panel)); border: 1px solid var(--line); box-shadow: 0 18px 50px -12px var(--shadow, rgba(0,0,0,.45)); }
+  .acct[hidden] { display: none; }
+  .acct h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 14px; font-weight: 650; color: var(--ink); }
+  .acct h3 i { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+  .acct.ok h3 i { background: var(--ok); }
+  .acct p { margin: 0 0 10px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+  .acct p b { color: var(--ink); font-weight: 600; }
+  .acct ol { margin: 0 0 12px; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: var(--ink); }
+  .acct code { font: 11.5px var(--mono); background: var(--hover); padding: 1px 6px; border-radius: 5px; color: var(--ink); }
+  .acct .row { display: flex; gap: 8px; align-items: center; }
+  .acct .row button, .acct .row a { height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line); background: transparent;
+                                     color: var(--ink); font: 600 12.5px inherit; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+  .acct .row button:hover, .acct .row a:hover { background: var(--hover); }
+  .acct .row .go { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  .acct .row .go:hover { background: var(--ink); filter: brightness(1.1); }
+  .acct .row .go:disabled { opacity: .6; cursor: default; }
+  .acct small { display: block; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+  /* round icon buttons: theme and quit */
+  .icon { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; border: 1px solid transparent;
+          background: transparent; color: var(--muted); cursor: pointer; padding: 0; }
+  .icon:hover { color: var(--ink); background: var(--hover); }
+  .icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .quit:hover { color: var(--warn); }
   .frames { position: relative; min-height: 0; }
   iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; background: var(--bg); }
   iframe.on { display: block; }
-  .theme { margin-left: 12px; display: flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 8px;
-           border: 1px solid var(--line); background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
-  .theme:hover { color: var(--ink); background: var(--hover); }
-  @media (max-width: 640px) { .brand span, .status span, .theme span { display: none; } nav a { padding: 0 10px; } }
+  @media (max-width: 640px) { .brand .word, .status span { display: none; } nav a { padding: 0 10px; } }
   /* In Lithnode's own window this bar is the title bar: drag it to move the window; the window's own
      minimize / maximize / close sit at the right (so the Quit button isn't needed) */
   html.native header { -webkit-app-region: drag; user-select: none;
@@ -70,15 +93,16 @@
 </head>
 <body>
 <header>
-  <div class="brand"><canvas id="logo" width="96" height="72"></canvas><span>Lithnode <small>for Claude Code, Codex and Cursor</small></span></div>
+  <div class="brand" title="Lithnode · teams of agents on Claude Code, Codex and Cursor"><canvas id="logo" width="96" height="72"></canvas><span class="word">Lithnode</span></div>
   <nav>
-    <a href="#flows" data-tab="flows">Flows <b class="badge" id="b-flows"></b></a>
-    <a href="#office" data-tab="office">Office <b class="badge" id="b-office"></b></a>
+    <a href="#flows" data-tab="flows" title="Draw a team of agents and run it">Flows <b class="badge" id="b-flows"></b></a>
+    <a href="#office" data-tab="office" title="Every agent at work right now">Office <b class="badge" id="b-office"></b></a>
   </nav>
-  <div class="status" id="status" title=""><i></i><span>Checking Claude Code…</span></div>
+  <button class="status" id="status" aria-expanded="false" title="How Lithnode signs in"><i></i><span>Checking Claude Code…</span></button>
   <button class="signin" id="signinBtn" hidden title="Opens Claude Code's sign-in in your browser">Sign in</button>
-  <button class="theme" id="themeBtn" title="Switch theme"><b id="themeIcon">◐</b><span id="themeName">Dark</span></button>
-  <button class="quit" id="quitBtn" title="Quit Lithnode" aria-label="Quit Lithnode"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></button>
+  <div class="acct" id="acct" hidden role="dialog" aria-label="Sign-in"></div>
+  <button class="icon theme" id="themeBtn" title="Theme" aria-label="Switch theme"></button>
+  <button class="icon quit" id="quitBtn" title="Quit Lithnode" aria-label="Quit Lithnode"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></button>
 </header>
 <div class="frames" id="frames"></div>
 <script src="/static/sprites.js"></script>
@@ -102,7 +126,11 @@ function show(tab) {
   try { localStorage.setItem("hq-tab", tab); } catch (e) {}
 }
 // ---- theme: dark (default) → light → system, saved and applied to every tab at once
-const THEMES = { dark: ["◐", "Dark"], light: ["☀", "Light"], system: ["◑", "Auto"] };
+const THEMES = {   // icon, name
+  dark: ['<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>', "Dark"],
+  light: ['<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>', "Light"],
+  system: ['<rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 17v3.5"/>', "Same as your computer"],
+};
 let themeMode = "dark";
 try { themeMode = localStorage.getItem("hq-theme") || "dark"; } catch (e) {}
 if (!THEMES[themeMode]) themeMode = "dark";
@@ -116,7 +144,9 @@ function applyTheme(frame) {
 function applyAll() {
   applyTheme();
   for (const f of Object.values(frames)) applyTheme(f);
-  [$("themeIcon").textContent, $("themeName").textContent] = THEMES[themeMode];
+  const [icon, name] = THEMES[themeMode], next = THEMES[Object.keys(THEMES)[(Object.keys(THEMES).indexOf(themeMode) + 1) % 3]][1];
+  $("themeBtn").innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg>`;
+  $("themeBtn").title = `Theme: ${name}. Click for ${next.toLowerCase()}`;
   // the window's title bar matches the top bar, so it isn't a white strip over a dark app
   const css = getComputedStyle(document.documentElement), bar = css.getPropertyValue("--bar").trim() || "#111111";
   $("barColor").content = bar;
@@ -146,10 +176,14 @@ async function poll() {
     badge("b-flows", d.approvals || d.runs, d.approvals > 0);
     badge("b-office", d.agents);
     const cc = d.claude_code || {}, st = $("status");
+    if (signingIn && cc.logged_in) { signingIn = false; resetSignin(); }
+    const changed = JSON.stringify(cc) !== JSON.stringify(account);
+    account = cc;
     st.className = "status " + (cc.logged_in ? "ok" : "bad");
-    st.querySelector("span").innerHTML = cc.logged_in ? "Claude Code signed in"
-      : cc.available ? "Claude Code isn't signed in" : "Claude Code not found · install it from claude.com/claude-code";
+    st.querySelector("span").textContent = cc.logged_in ? "Claude Code signed in"
+      : cc.available ? "Claude Code isn't signed in" : "Claude Code not found";
     $("signinBtn").hidden = !!cc.logged_in || !cc.available;
+    if (changed && !$("acct").hidden) renderAcct();
     document.title = (d.approvals ? "(!) " : "") + "Lithnode" + (d.agents ? ` · ${d.agents} working` : "");
   } catch (e) {
     $("status").className = "status bad"; $("status").querySelector("span").textContent = "Server offline";
@@ -157,14 +191,62 @@ async function poll() {
 }
 poll(); setInterval(poll, 2000);
 
-// sign in: opens Claude Code's own login (a console, then your browser); the status above updates by itself
-$("signinBtn").onclick = async () => {
+// Lithnode has no account of its own: agents run as Claude Code, so "signed in" means Claude Code is.
+// The card under the status pill says that, and walks through signing in when it isn't.
+let account = {}, signingIn = false, signinTimers = [];
+function resetSignin() {
+  signinTimers.forEach(clearTimeout); signinTimers = [];
+  const b = $("signinBtn"); b.disabled = false; b.textContent = "Sign in";
+  if (!$("acct").hidden) renderAcct();
+}
+function renderAcct() {
+  const cc = account, a = $("acct");
+  a.className = "acct" + (cc.logged_in ? " ok" : "");
+  const how = { "claude.ai": "your Claude account", "oauth_token": "a Claude sign-in token", "api_key": "an Anthropic API key",
+                "apiKey": "an Anthropic API key" }[cc.method] || "your Claude account";
+  a.innerHTML = cc.logged_in ? `
+    <h3><i></i>Signed in through Claude Code</h3>
+    <p>Lithnode has no account of its own. Every agent runs as Claude Code on this computer, signed in with <b>${how}</b>, so runs use that plan.</p>
+    <p>Codex and Cursor teams use their own sign-ins. Each team's Model section shows if one isn't ready.</p>
+    <div class="row"><button data-act="check">Check again</button><button data-act="login">Switch account</button></div>`
+  : cc.available ? `
+    <h3><i></i>Claude Code isn't signed in</h3>
+    <p>Lithnode has no account of its own. Its agents run as Claude Code, so Claude Code needs to be signed in with your Claude account.</p>
+    <ol><li>Click <b>Sign in</b>. A small window opens, then your browser.</li><li>Approve in the browser.</li><li>Come back. This turns green by itself.</li></ol>
+    <div class="row"><button class="go" data-act="login"${signingIn ? " disabled" : ""}>${signingIn ? "Waiting for your browser…" : "Sign in"}</button><button data-act="check">Check again</button></div>
+    <small>If the browser shows a code, paste it into the small window. Or run <code>claude auth login</code> in a terminal.</small>`
+  : `
+    <h3><i></i>Claude Code not found</h3>
+    <p>Lithnode runs its agents on Claude Code and couldn't find it on this computer. Install it, or open the Claude desktop app once: Lithnode can use the Claude Code inside it.</p>
+    <div class="row"><a class="go" href="https://claude.com/claude-code" target="_blank" rel="noopener">Get Claude Code</a><button data-act="check">Check again</button></div>`;
+}
+async function startSignin() {
+  signingIn = true; signinTimers.forEach(clearTimeout);
   const b = $("signinBtn"); b.disabled = true; b.textContent = "Finish in your browser…";
+  if (!$("acct").hidden) renderAcct();
   try { await fetch("/api/signin", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) {}
   // no browser yet (Mac and Linux have no console window to run it in): say how to do it by hand
-  setTimeout(() => { if (!b.hidden) b.textContent = "No browser? Run: claude auth login"; }, 20000);
-  setTimeout(() => { b.disabled = false; b.textContent = "Sign in"; }, 90000);
-};
+  signinTimers = [setTimeout(() => { if (!b.hidden) b.textContent = "No browser? Run: claude auth login"; }, 20000),
+                  setTimeout(() => { signingIn = false; resetSignin(); }, 90000)];
+}
+async function checkNow() {
+  try { await fetch("/api/hq?fresh=1", { cache: "no-store" }); } catch (e) {}
+  await poll();
+  if (!$("acct").hidden) renderAcct();
+}
+function toggleAcct(open = $("acct").hidden) {
+  $("acct").hidden = !open; $("status").setAttribute("aria-expanded", String(open));
+  if (open) renderAcct();
+}
+$("status").onclick = () => toggleAcct();
+$("signinBtn").onclick = startSignin;
+$("acct").addEventListener("click", (e) => {
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (act === "login") startSignin();
+  if (act === "check") { e.target.textContent = "Checking…"; checkNow(); }
+});
+document.addEventListener("mousedown", (e) => { if (!$("acct").hidden && !e.target.closest("#acct, #status")) toggleAcct(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("acct").hidden) toggleAcct(false); });
 $("quitBtn").onclick = async () => {
   const ok = await ui.confirm({ title: "Quit Lithnode?", text: "This closes the app and stops any running flows.", ok: "Quit", danger: true });
   if (!ok) return;

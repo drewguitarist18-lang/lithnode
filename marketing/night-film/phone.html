@@ -1,0 +1,769 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Lithnode Phone Shot</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=TikTok+Sans:wght@600&display=swap">
+<style>html,body{margin:0;background:#000}canvas{display:block;width:100vw;height:auto}</style></head>
+<body><canvas id="cv" width="1080" height="1920"></canvas>
+<script src="phonecam.js"></script>
+<script>
+// A phone filming the monitor: a recorded run (FOOTAGE below) plays on a 27-inch monitor in a dark room at night, shot handheld at 2x.
+// The picture is ray traced in WebGL (the panel's pixel grid, IPS glow and coating, the stand, desk, keyboard and wall),
+// then given the phone's look: shake, rolling shutter, motion blur, focus, sharpening, bloom and noise.
+// There are two rooms. "desk": the desk against a wall, a snake plant behind the monitor and a lamp at the desk's left end.
+// "city": the desk under a big window, the city outside at night, a white keyboard on light oak and the lamp off to the right.
+// render.js --phone calls renderFrame(t) for every frame and renderAudio() for the room, the keys and the clicks.
+// Open phone.html?t=5 through any local server for a still (&room=city for the window).
+const Q = new URLSearchParams(location.search);
+const SW = 59.8, SH = 33.6, TILT = 5 * Math.PI / 180, SCREEN_Y = 12 + SH / 2;   // cm; the panel's bottom edge is 12 cm above the desk
+const MON = { c: [0, SCREEN_Y, 0], r: [1, 0, 0], u: [0, Math.cos(TILT), -Math.sin(TILT)], n: [0, Math.sin(TILT), Math.cos(TILT)] };
+// each room's warm lamp (where it is and how bright) and the lens's radius in cm, for the depth of field. At the desk the lamp's light
+// pools on the wall. By the window it's in the glass too, and the lens is wide open for the night, so the city blurs into discs
+const ROOMS = {
+  desk: { lamp: [-72, 58, 6], lampCol: [1.0, 0.62, 0.34].map((c) => c * 1200), ap: 0.14 },
+  city: { lamp: [80, 52, 34], lampCol: [1.0, 0.6, 0.32].map((c) => c * 800), ap: 0.2 },
+};
+const SHUT = 1 / 45, READ = 1 / 50;                     // exposure and the rolling shutter's sweep, seconds
+
+// The footage on the monitor: ?job=jobs for the job hunt (capture.js jobs), otherwise the product hunt in run.mp4.
+// The cut: takes trimmed and stitched in the app. `from`/`to` are seconds in the footage.
+// keys: [take time, x, y, cm, yaw, pitch]: the phone aims at (x, y) on the screen (footage pixels) from that many cm away,
+// that many degrees right of it and above it. 50 cm fills the frame's width with about 650 screen pixels.
+// The footage was typed by a script, evenly at 170 words a minute, which no one does. The typing take keeps its frames but plays them
+// at a person's pace: quick runs inside words, a beat before each new word, now and then a longer one. Each letter shows a moment
+// after its key goes down, on the frame of the footage where it first appeared (shown: found by diffing the task box frame to frame;
+// letters typed close together can land on one frame).
+// folder: from then until Start run the run dialog's project folder box (box, footage pixels) shows a temp path with the username
+// in it, so it keeps the empty box from blankAt.
+const JOB = Q.get("job") || "products";
+const FOOTAGE = {
+  products: { file: "run", folder: [7.9, 10.58], box: [664, 551, 1166, 579], blankAt: 7.6,
+    typed: "Find home gadgets worth selling this month",
+    shown: [149, 151, 155, 156, 157, 160, 162, 163, 166, 168, 172, 174, 175, 178, 179, 181, 181, 184, 187, 190, 191,
+      193, 196, 198, 199, 202, 204, 205, 208, 210, 211, 214, 217, 220, 222, 223, 226, 227, 229, 232, 233, 235],
+    clips: [
+      { from: 4.62, to: 8.1, typist: true, seed: 11, roll: -1.1,   // typing the job, at a person's pace
+        keys: [[0, 975, 445, 58, -8, 13], [6.8, 950, 415, 52, -6, 12]] },
+      { from: 16.3, to: 19.3, seed: 23, roll: 0.7,    // the scout at work: push in on it
+        keys: [[0, 470, 575, 59, 7, 12], [2.5, 375, 550, 50, 5, 11], [3, 372, 550, 49.5, 5, 11]] },
+      { from: 26.2, to: 30.8, seed: 37, roll: -0.5,   // the checker's verdicts land on the six finds, then a look along the rest
+        keys: [[0, 385, 740, 60, -5, 12], [2.9, 380, 735, 57, -5, 12], [4.1, 880, 740, 54, 2, 12], [4.6, 888, 740, 54, 2, 12]] },
+      { from: 36.0, to: 40.0, seed: 41, roll: 0.9,    // the uploader lists the three as drafts; the run's done: up to the result
+        keys: [[0, 382, 850, 59, -4, 11], [1.9, 380, 845, 57, -4, 11], [2.75, 432, 330, 55, -4, 14], [4, 428, 325, 53.5, -4, 14]] },
+    ] },
+  jobs: { file: "jobs-run", folder: [7.9, 10.966], box: [661, 535, 1170, 568], blankAt: 7.6,   // the Gmail checkbox makes its dialog taller
+    typed: "Find remote marketing jobs that pay over 70k",
+    shown: [149, 154, 155, 157, 160, 161, 163, 166, 167, 169, 172, 173, 175, 178, 179, 181, 184, 185, 187, 190, 191, 191,
+      196, 197, 197, 199, 202, 203, 208, 209, 211, 214, 215, 220, 220, 221, 226, 227, 227, 229, 232, 233, 235, 238],
+    clips: [
+      { from: 4.45, to: 8.25, typist: true, seed: 13, roll: 1.0,   // typing the job, from the other side this time
+        keys: [[0, 975, 445, 58, 8, 13], [6.8, 950, 415, 52, 6, 12]] },
+      { from: 16.2, to: 19.6, seed: 29, roll: -0.8,   // the scout reads LinkedIn, then its six finds drop in below
+        keys: [[0, 520, 560, 60, -6, 12], [2.6, 420, 545, 51, -4, 11], [3.4, 418, 545, 50.5, -4, 11]] },
+      { from: 25.9, to: 31.0, seed: 31, roll: 0.6,    // the checkers' verdicts land (faded in by 28.2), then across to the cut ones
+        keys: [[0, 400, 760, 60, 5, 12], [3.2, 395, 755, 57, 5, 12], [4.1, 1090, 760, 56, -3, 12], [5.1, 1096, 760, 55.5, -3, 12]] },
+      { from: 31.0, to: 33.6, seed: 43, roll: -0.7,   // it waits for you: the pointer comes in and hits Approve
+        keys: [[0, 1690, 360, 56, 4, 12], [2.6, 1700, 350, 53, 4, 12]] },
+      { from: 39.9, to: 44.2, seed: 47, roll: 0.8,    // the result, then Details: the three jobs, a cover letter for each
+        keys: [[0, 960, 330, 60, -4, 13], [1.4, 960, 330, 58.5, -4, 13], [2.4, 958, 390, 56, -4, 13], [4.3, 956, 395, 55, -4, 13]] },
+    ] },
+}[JOB];
+const CLIPS = FOOTAGE.clips, TYPED = FOOTAGE.typed, SHOWN = FOOTAGE.shown;
+function typist(c) {   // c.strokes: when each key goes down, in take time; c.knots: the take's clock, [take time, footage time]
+  const r = mulberry(c.seed), LEFT = "qwertasdfgzxcvb", LAG = .045;
+  let o = SHOWN[0] / 30 - c.from - LAG, think = true;   // up to the first letter it plays as captured
+  c.strokes = [o];
+  for (let j = 1; j < TYPED.length; j++) {
+    const a = TYPED[j - 1].toLowerCase(), b = TYPED[j].toLowerCase();
+    let gap = .125 * Math.exp((r() - .5) * .45);
+    if (SHOWN[j] === SHOWN[j - 1]) gap = .06;                            // they showed together, so they went down close together
+    else if (b === " ") gap *= .8;                                       // the thumb
+    else if (a === " ") {                                                // the next word, and once a longer think about it
+      gap += .07 + r() * .13;
+      if (think && r() < .3) { gap += .3; think = false; }
+    }
+    else if (a === b) gap *= .75;                                        // one finger twice
+    else gap *= LEFT.includes(a) === LEFT.includes(b) ? 1.15 : .9;       // one hand is slower than both
+    c.strokes.push(o += gap);
+  }
+  c.knots = [[0, c.from]];
+  SHOWN.forEach((f, j) => { if (SHOWN[j + 1] !== f) c.knots.push([c.strokes[j] + LAG, f / 30 + .001]); });
+  const [ct, s] = c.knots.at(-1); c.knots.push([ct + c.to - s, c.to]);
+}
+function warp(knots, x, i, o) {   // straight lines through the knots, from their column i to column o
+  let k = 1; while (k < knots.length - 1 && x > knots[k][i]) k++;
+  const p = knots[k - 1], q = knots[k];
+  return p[o] + (x - p[i]) * (q[o] - p[o]) / (q[i] - p[i]);
+}
+const srcAt = (c, ct) => c.knots ? warp(c.knots, ct, 0, 1) : c.from + ct;   // take time to footage time
+const takeAt = (c, s) => c.knots ? warp(c.knots, s, 1, 0) : s - c.from;     // and back
+let acc = 0;
+for (const c of CLIPS) { if (c.typist) typist(c); c.t0 = acc; acc = Math.round((acc + (c.knots ? c.knots.at(-1)[0] : c.to - c.from)) * 30) / 30; }   // cuts on frame boundaries
+const LENGTH = window.LENGTH = acc;
+
+// The carousel: photos of the same desk for TikTok's photo mode, telling the run slide by slide. A phone takes a photo steadier than
+// it films and stacks a few frames for it, so these keep the hand but lose most of the shake and grain. src is seconds in the footage
+// (gym and research are of run.mp4, jobs of the job hunt's); key is [x, y, cm, yaw, pitch] as in the clips; wide is the main camera
+// instead of the 2x. say is the slide's text: a line and a smaller one, the line 62 px unless size says otherwise. The text sits at the
+// top, so each photo keeps what matters below it. The jobs set is shot by the window, so it doesn't look like the last post.
+const SET = Q.get("set") || (JOB === "jobs" ? "jobs" : "research");
+const PHOTO_ROOM = Q.get("room") || (SET === "jobs" ? "city" : "desk");
+const PHOTOS = {
+  gym: [   // the desk end of the gym carousel (gym.html has its start)
+    { src: 10.4, key: [955, 335, 50, 6, 11], roll: -.7, seed: 73, say: ["back home. typed one line"] },
+    { src: 31.5, key: [915, 520, 86, 5, 10], roll: .9, seed: 79, wide: true, say: ["4 agents split up the work", "2 of them only check the others"] },
+    { src: 2.5, key: [330, 222, 58, 5, 12], roll: .6, seed: 83, say: ["it's called lithnode", "free, and it runs on the claude plan you already have"] },
+  ],
+  research: [
+  { src: 31.5, key: [915, 520, 88, -6, 10], roll: -1.2, seed: 51, wide: true, size: 72, say: ["i made 4 AI agents do my product research", "2 of them only exist to say no"] },
+  { src: 10.4, key: [960, 330, 52, -5, 12], roll: .8, seed: 53, say: ["all i typed was this"] },
+  { src: 20, key: [430, 470, 46, 7, 11], roll: -.6, seed: 57, say: ["agent 1 went digging for products"] },
+  { src: 31.5, key: [600, 760, 58, -12, 12], roll: 1.1, seed: 59, say: ["agents 2 and 3 checked the margins and reviews", "half got cut"] },
+  { src: 32.7, key: [1740, 150, 50, 8, 12], roll: -.9, seed: 61, say: ["then it stops and waits for me", "nothing gets listed till i hit approve"] },
+  { src: 37.6, key: [380, 740, 55, -6, 12], roll: .7, seed: 67, say: ["agent 4 listed the 3 that survived as drafts"] },
+  { src: 2.5, key: [330, 222, 60, -4, 12], roll: -.5, seed: 71, say: ["it's called lithnode", "free, and it runs on the Claude plan you already have"] },
+  ],
+  jobs: [   // phone.html?job=jobs
+  { src: 29.3, key: [960, 540, 96, 6, 10], roll: 1.1, seed: 89, wide: true, size: 72, say: ["i made 4 AI agents job hunt for me", "2 of them only exist to cut bad jobs"] },
+  { src: 10.4, key: [960, 360, 52, 5, 12], roll: -.8, seed: 97, say: ["all i typed was this"] },
+  { src: 19.5, key: [400, 700, 58, -6, 11], roll: .7, seed: 101, say: ["agent 1 went through linkedin", "came back with 6 remote jobs"] },
+  { src: 29.3, key: [395, 720, 56, 9, 12], roll: -1, seed: 103, say: ["agents 2 and 3 checked the pay and the reviews", "3 got cut"] },
+  { src: 30.5, key: [1100, 700, 54, -9, 12], roll: .9, seed: 107, say: ["one had 2.9 stars and the staff keep quitting", "cut"] },
+  { src: 32, key: [1745, 250, 50, -8, 12], roll: -.6, seed: 109, say: ["then it stops and waits for me", "nothing gets written till i hit approve"] },
+  { src: 43.5, key: [960, 430, 57, 6, 12], roll: .8, seed: 113, say: ["agent 4 wrote a cover letter for each one", "they're already in my gmail drafts"] },
+  { src: 1, key: [400, 260, 62, -5, 12], roll: -.5, seed: 127, say: ["it's called lithnode", "free, and it runs on the Claude plan you already have"] },
+  ],
+}[SET];
+for (const ph of PHOTOS) { ph.keys = [[0, ...ph.key]]; ph.at = 3 + ph.seed % 7; }   // the hand's pose at some moment, held
+window.PHOTO_COUNT = PHOTOS.length;
+
+// ============================================================================ the hand holding the phone
+// smooth 1D noise (Catmull-Rom through random knots); each channel sums a few octaves: drift, sway, wobble, tremor
+function noise1(seed) {
+  const r = mulberry(seed), v = Array.from({ length: 256 }, () => r() * 2 - 1);
+  return (x) => { const i = Math.floor(x), f = x - i, a = v[(i - 1) & 255], b = v[i & 255], c = v[(i + 1) & 255], d = v[(i + 2) & 255];
+    return .5 * (2 * b + (c - a) * f + (2 * a - 5 * b + 4 * c - d) * f * f + (3 * (b - c) + d - a) * f * f * f); };
+}
+const OCTAVES = [[.33, 1], [.85, .45], [2.1, .16], [7.5, .025]];
+function channel(seed, amp) {
+  const ns = OCTAVES.map((_, k) => noise1(seed * 31 + k));
+  return (t) => amp * OCTAVES.reduce((s, [f, a], k) => s + a * ns[k](t * f + k * 17.3), 0);
+}
+for (const c of [...CLIPS, ...PHOTOS]) {
+  const k = c.say ? .4 : 1;   // held still for a photo
+  c.shake = { yaw: channel(c.seed, .24 * k), pitch: channel(c.seed + 1, .2 * k), roll: channel(c.seed + 2, .45 * k),
+    x: channel(c.seed + 3, .35 * k), y: channel(c.seed + 4, .3 * k), z: channel(c.seed + 5, .5 * k) };
+}
+
+function keyed(keys, t) {   // eased from key to key, so each move starts and settles like a hand
+  if (t <= keys[0][0]) return keys[0].slice(1);
+  for (let i = 1; i < keys.length; i++) if (t <= keys[i][0]) {
+    const k = smooth((t - keys[i - 1][0]) / (keys[i][0] - keys[i - 1][0]));
+    return keys[i].slice(1).map((v, j) => lerp(keys[i - 1][j + 1], v, k));
+  }
+  return keys[keys.length - 1].slice(1);
+}
+function screenPoint(x, y) { return add(add(MON.c, mul(MON.r, (x / 1920 - .5) * SW)), mul(MON.u, (.5 - y / 1080) * SH)); }
+const RAD = Math.PI / 180;
+function camAt(clip, t) {
+  const s = clip.shake, [lx, ly, dist, side, above] = keyed(clip.keys, t), aim = screenPoint(lx, ly), a = side * RAD, b = above * RAD;
+  const p = add(add(aim, mul([Math.sin(a) * Math.cos(b), Math.sin(b), Math.cos(a) * Math.cos(b)], dist)), [s.x(t), s.y(t), s.z(t)]);
+  const d = sub(aim, p);
+  const yaw = Math.atan2(d[0], -d[2]) + s.yaw(t) * RAD, pitch = Math.atan2(d[1], Math.hypot(d[0], d[2])) + s.pitch(t) * RAD, roll = (clip.roll + s.roll(t)) * RAD;
+  const f = [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)], r0 = [Math.cos(yaw), 0, Math.sin(yaw)], u0 = cross(r0, f);
+  return { p, f, r: add(mul(r0, Math.cos(roll)), mul(u0, Math.sin(roll))), u: sub(mul(u0, Math.cos(roll)), mul(r0, Math.sin(roll))) };
+}
+function toScreen(p, d) {   // distance along a ray to the panel's plane
+  return -dot(sub(p, MON.c), MON.n) / dot(d, MON.n);
+}
+
+// A snake plant in a pot behind the monitor, left of the stand: stiff flat leaves fanned out of it, the tops of the taller ones over the panel.
+// Each leaf is where it leaves the soil, the way up it and the way across it, and its length and half width, in cm.
+const LEAVES = [];
+{
+  const r = mulberry(8);
+  for (let i = 0; i < 9; i++) {
+    const az = (i + r() * .6) / 9 * 2 * Math.PI, lean = (5 + r() * 12) * RAD, out = [Math.cos(az), 0, Math.sin(az)];
+    const a = norm([Math.sin(lean) * out[0], Math.cos(lean), .35 * Math.sin(lean) * out[2]]);   // squeezed front to back, between the monitor and the wall
+    const turn = az + Math.PI / 2 + (r() - .5) * 1.4, w = [Math.cos(turn), 0, Math.sin(turn)];   // the flat of a leaf faces out of the pot, more or less
+    LEAVES.push({ b: [-7 + 2.5 * out[0], 13, -26 + 2.5 * out[2]], a, u: norm(sub(w, mul(a, dot(w, a)))), len: 36 + r() * 30, hw: 2.4 + r() * 1.2 });
+  }
+}
+
+// ============================================================================ the screen: the footage and the pointer
+const scr = document.createElement("canvas"); scr.width = 1920; scr.height = 1080;
+const sg = scr.getContext("2d");
+const video = document.createElement("video");
+let LOG = [];
+const TEXTAREA = [662, 332, 1258, 436];   // the run dialog's task box, where the pointer is an I-beam
+const blank = document.createElement("canvas");   // the footage at FOOTAGE.blankAt, for its empty folder box
+function pointerAt(s) {   // where the pointer is, and whether Windows has hidden it for typing
+  let x = 960, y = 540, moved = -1, typed = -1;
+  for (const e of LOG) {
+    if (e.t > s) break;
+    if (e.kind === "move" || e.kind === "down" || e.kind === "up") { x = e.x; y = e.y; if (e.kind === "move") moved = e.t; }
+    if (e.kind === "key") typed = e.t;
+  }
+  return { x, y, hidden: typed > moved };
+}
+function drawPointer(s) {
+  const { x, y, hidden } = pointerAt(s);
+  if (hidden) return;
+  sg.save(); sg.translate(Math.round(x), Math.round(y));
+  sg.lineJoin = "miter";
+  if (s < 10.9 && x > TEXTAREA[0] && x < TEXTAREA[2] && y > TEXTAREA[1] && y < TEXTAREA[3]) {
+    sg.strokeStyle = "#000"; sg.lineWidth = 3.2; sg.beginPath(); sg.moveTo(-3, -9); sg.lineTo(3, -9); sg.moveTo(0, -9); sg.lineTo(0, 9); sg.moveTo(-3, 9); sg.lineTo(3, 9); sg.stroke();
+    sg.strokeStyle = "#fff"; sg.lineWidth = 1.2; sg.stroke();
+  } else {
+    sg.beginPath(); sg.moveTo(.5, .5); sg.lineTo(.5, 16.5); sg.lineTo(4.3, 12.8); sg.lineTo(7, 18.8); sg.lineTo(9.6, 17.7); sg.lineTo(7, 11.9); sg.lineTo(12, 11.9); sg.closePath();
+    sg.fillStyle = "#fff"; sg.fill(); sg.strokeStyle = "#000"; sg.lineWidth = 1.1; sg.stroke();
+  }
+  sg.restore();
+}
+function seek(v, s) {
+  s = clamp(s, 0, v.duration - .04); const target = (Math.floor(s * 30) + .5) / 30;
+  if (Math.abs(v.currentTime - target) < 1e-3 && v.readyState >= 2) return Promise.resolve();
+  return new Promise((r) => { v.addEventListener("seeked", r, { once: true }); v.currentTime = target; });
+}
+
+// ============================================================================ WebGL
+const cv = document.getElementById("cv");
+cv.width = W; cv.height = H;
+const gl = cv.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false, alpha: false });
+gl.getExtension("EXT_color_buffer_float");
+const SCENE = `#version 300 es
+precision highp float;
+precision highp int;
+out vec4 fragColor;
+uniform sampler2D uScr;
+uniform vec2 uRes;
+uniform vec3 uP[6], uRr[6], uRu[6], uRf[6];
+uniform float uF, uFocus, uAp, uShut, uRead, uSpan, uSeed, uK1, uBright, uScale;
+uniform vec3 uMc, uMr, uMu, uMn, uLamp, uLampCol;
+const int LEAVES = 9;
+uniform vec3 uLeafB[LEAVES], uLeafA[LEAVES], uLeafU[LEAVES];   // the plant's leaves: base, up, across
+uniform vec2 uLeafS[LEAVES];                                   // length, half width
+
+const int SAMPLES = 8;
+const float SW = 59.8, SH = 33.6;              // the panel's active area, cm
+const float BS = 0.75, BT = 0.75, BB = 2.1;    // bezel: sides, top, chin
+const float BORDER = 0.42, DEPTH = 4.5;        // the panel's black mask inside the bezel; the body's depth
+const float PI = 3.14159265;
+const vec3 KB0 = vec3(-19.0, 0.0, 11.0), KB1 = vec3(17.0, 2.4, 24.5);
+const vec3 NECK0 = vec3(-3.6, 0.9, -11.0), NECK1 = vec3(3.6, 24.0, -6.5);
+const vec3 BASE0 = vec3(-12.5, 0.0, -19.0), BASE1 = vec3(12.5, 0.9, 3.5);
+const float WALL = -36.0, DESK_EDGE = 72.0, KU = 1.905;
+const vec3 AMBIENT = vec3(0.0016, 0.0019, 0.0026);
+const vec3 ROOM = vec3(0.45, 0.35, 0.82);   // which way the lamp-lit rest of the room is, behind the phone
+#ifdef CITY
+// The window behind the desk: an opening in the wall from WIN0 to WIN1 (x and y), the double glazing set GLASS deep, a black frame
+// with a mullion either side of the monitor, and a painted board along the bottom. Outside is the city at night, from 18 floors up.
+const vec2 WIN0 = vec2(-95.0, 17.0), WIN1 = vec2(95.0, 250.0);
+const float GLASS = WALL - 9.0, STREET = -5500.0;
+const vec3 BOARD0 = vec3(-99.0, 14.5, GLASS), BOARD1 = vec3(99.0, 17.0, WALL + 7.0);
+const vec3 FRAME0[5] = vec3[5](vec3(-95.0, 17.0, GLASS), vec3(90.0, 17.0, GLASS), vec3(-50.5, 17.0, GLASS), vec3(45.5, 17.0, GLASS), vec3(-95.0, 17.0, GLASS));
+const vec3 FRAME1[5] = vec3[5](vec3(-90.0, 250.0, GLASS + 4.0), vec3(95.0, 250.0, GLASS + 4.0), vec3(-45.5, 250.0, GLASS + 4.0), vec3(50.5, 250.0, GLASS + 4.0), vec3(95.0, 22.0, GLASS + 4.0));
+const vec3 GLOW = vec3(0.0011, 0.0012, 0.0017);   // the city's light through the window, mostly onto what faces it
+#endif
+// a tenkeyless layout, row by row from the back: key widths in units, gaps negative
+const float KW[120] = float[120](
+  1.,-1.,1.,1.,1.,1.,-.5,1.,1.,1.,1.,-.5,1.,1.,1.,1.,-.5,1.,1.,1.,
+  1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,2.,-.5,1.,1.,1.,0.,0.,
+  1.5,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.5,-.5,1.,1.,1.,0.,0.,
+  1.75,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,2.25,0.,0.,0.,0.,0.,0.,0.,
+  2.25,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,2.75,-1.5,1.,0.,0.,0.,0.,0.,0.,
+  1.25,1.25,1.25,6.25,1.25,1.25,1.25,1.25,-.5,1.,1.,1.,0.,0.,0.,0.,0.,0.,0.,0.);
+
+uint hashu(uint x) { x ^= x >> 16; x *= 0x7feb352dU; x ^= x >> 15; x *= 0x846ca68bU; x ^= x >> 16; return x; }
+float rnd(inout uint s) { s = hashu(s); return float(s) / 4294967296.0; }
+float hash2(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash2(i), hash2(i + vec2(1, 0)), f.x), mix(hash2(i + vec2(0, 1)), hash2(i + vec2(1, 1)), f.x), f.y); }
+float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p *= 2.03; a *= 0.5; } return s; }
+
+bool box(vec3 ro, vec3 rd, vec3 lo, vec3 hi, out float t, out vec3 n) {
+  vec3 inv = 1.0 / rd, t0 = (lo - ro) * inv, t1 = (hi - ro) * inv, mn = min(t0, t1), mx = max(t0, t1);
+  float tn = max(max(mn.x, mn.y), mn.z), tf = min(min(mx.x, mx.y), mx.z);
+  t = tn; n = vec3(0.0, 0.0, 1.0);
+  if (tn > tf || tn <= 0.0) return false;
+  n = tn == mn.x ? vec3(-sign(rd.x), 0.0, 0.0) : tn == mn.y ? vec3(0.0, -sign(rd.y), 0.0) : vec3(0.0, 0.0, -sign(rd.z));
+  return true;
+}
+vec3 toLocal(vec3 v) { return vec3(dot(v, uMr), dot(v, uMu), dot(v, uMn)); }
+bool monitorBox(vec3 ro, vec3 rd, out float t, out vec3 n) {   // in the monitor's own frame
+  return box(toLocal(ro - uMc), toLocal(rd), vec3(-SW * 0.5 - BS, -SH * 0.5 - BB, -DEPTH), vec3(SW * 0.5 + BS, SH * 0.5 + BT, 0.0), t, n);
+}
+
+float leafWidth(float s) { return smoothstep(0.0, 0.15, s) * pow(clamp((1.0 - s) / 0.35, 0.0, 1.0), 0.8); }   // a sword: narrow at the soil, then full, then a long point
+bool leaf(vec3 ro, vec3 rd, int i, out float t, out vec2 q) {   // q: across the leaf (+-1 at its full width) and up it (0 to 1)
+  vec3 n = cross(uLeafU[i], uLeafA[i]);
+  t = dot(uLeafB[i] - ro, n) / dot(rd, n);
+  vec3 p = ro + rd * t - uLeafB[i];
+  q = vec2(dot(p, uLeafU[i]) / uLeafS[i].y, dot(p, uLeafA[i]) / uLeafS[i].x);
+  return t > 0.0 && q.y > 0.0 && q.y < 1.0 && abs(q.x) < leafWidth(q.y);
+}
+
+int trace(vec3 ro, vec3 rd, out float tt, out vec3 n, out vec3 lp) {
+  tt = 1e9; int id = 0; n = vec3(0.0, 0.0, 1.0); lp = vec3(0.0);
+  float t; vec3 nn; vec2 q;
+  if (monitorBox(ro, rd, t, nn)) { tt = t; lp = toLocal(ro - uMc) + toLocal(rd) * t; n = uMr * nn.x + uMu * nn.y + uMn * nn.z; id = nn.z > 0.5 ? 1 : 2; }
+  if (box(ro, rd, NECK0, NECK1, t, nn) && t < tt) { tt = t; n = nn; id = 3; }
+  if (box(ro, rd, BASE0, BASE1, t, nn) && t < tt) { tt = t; n = nn; id = 4; }
+  if (box(ro, rd, KB0, KB1, t, nn) && t < tt) { tt = t; n = nn; id = 7; }
+#ifdef CITY
+  if (box(ro, rd, BOARD0, BOARD1, t, nn) && t < tt) { tt = t; n = nn; id = 11; }
+  for (int i = 0; i < 5; i++) if (box(ro, rd, FRAME0[i], FRAME1[i], t, nn) && t < tt) { tt = t; n = nn; id = 10; }
+#else
+  for (int i = 0; i < LEAVES; i++) if (leaf(ro, rd, i, t, q) && t < tt) {   // lp: the spot on the leaf, and which leaf
+    tt = t; n = cross(uLeafU[i], uLeafA[i]); n *= -sign(dot(n, rd)); lp = vec3(q, float(i)); id = 8;
+  }
+#endif
+  if (rd.y < 0.0) { t = -ro.y / rd.y; vec3 p = ro + rd * t; if (t < tt && p.z < DESK_EDGE && p.z > WALL) { tt = t; n = vec3(0.0, 1.0, 0.0); id = 5; } }
+#ifdef CITY
+  if (rd.z < 0.0) {   // the wall, or through the opening in it to the glass
+    t = (WALL - ro.z) / rd.z; vec3 p = ro + rd * t;
+    if (p.x < WIN0.x || p.x > WIN1.x || p.y < WIN0.y || p.y > WIN1.y) { if (t < tt && p.y > 0.0) { tt = t; n = vec3(0.0, 0.0, 1.0); id = 6; } }
+    else { t = (GLASS - ro.z) / rd.z; if (t < tt) { tt = t; n = vec3(0.0, 0.0, 1.0); id = 9; } }
+  }
+#else
+  if (rd.z < 0.0) { t = (WALL - ro.z) / rd.z; vec3 p = ro + rd * t; if (t < tt && p.y > 0.0) { tt = t; n = vec3(0.0, 0.0, 1.0); id = 6; } }
+#endif
+  return id;
+}
+bool blocked(vec3 ro, vec3 rd, float far) {
+  float t; vec3 nn; vec2 q;
+  if ((monitorBox(ro, rd, t, nn) && t < far) || (box(ro, rd, NECK0, NECK1, t, nn) && t < far) || (box(ro, rd, KB0, KB1, t, nn) && t < far)) return true;
+#ifndef CITY
+  for (int i = 0; i < LEAVES; i++) if (leaf(ro, rd, i, t, q) && t < far) return true;
+#endif
+  return false;
+}
+
+// light from the panel itself, as a 6x4 grid of patches of what it's showing
+vec3 screenLight(vec3 p, vec3 n) {
+  vec3 s = vec3(0.0);
+  for (int j = 0; j < 4; j++) for (int i = 0; i < 6; i++) {
+    vec2 uv = (vec2(float(i), float(j)) + 0.5) / vec2(6.0, 4.0);
+    vec3 d = uMc + uMr * ((uv.x - 0.5) * SW) + uMu * ((0.5 - uv.y) * SH) - p;
+    float r2 = dot(d, d); d *= inversesqrt(r2);
+    s += textureLod(uScr, uv, 7.5).rgb * max(dot(n, d), 0.0) * max(-dot(uMn, d), 0.0) / r2;
+  }
+  return s * uBright * SW * SH / (24.0 * PI);
+}
+vec3 lampLight(vec3 p, vec3 n, inout uint seed, out vec3 l) {   // l: which way the light came from
+  l = uLamp + (vec3(rnd(seed), rnd(seed), rnd(seed)) - 0.5) * 20.0 - p;   // a lamp head, so the shadows are soft
+  float r2 = dot(l, l), r = sqrt(r2); l /= r;
+  float c = dot(n, l);
+  if (c <= 0.0 || blocked(p + n * 0.03, l, r)) return vec3(0.0);
+  return uLampCol * c / r2;
+}
+vec3 lampLight(vec3 p, vec3 n, inout uint seed) { vec3 l; return lampLight(p, n, seed, l); }
+vec3 bounce(vec3 p, vec3 n) {   // the lamp's light back off the ceiling and walls: no shadows, from all round but mostly from its side
+  vec3 l = uLamp - p; float r2 = dot(l, l);
+  return uLampCol * 0.2 * (0.45 + 0.55 * max(dot(n, l * inversesqrt(r2)), 0.0)) / r2;
+}
+vec3 lit(vec3 p, vec3 n, vec3 albedo, inout uint seed) {
+  vec3 e = screenLight(p, n) + lampLight(p, n, seed) + bounce(p, n) + AMBIENT;
+#ifdef CITY
+  e += GLOW * (0.5 + 0.5 * max(-n.z, 0.0));
+#endif
+  return albedo * e;
+}
+
+vec3 reflScreen(vec3 p, vec3 r, float lod) {   // a blurry reflection of the panel in something below it
+  float dn = dot(r, uMn); if (dn >= 0.0) return vec3(0.0);
+  vec3 oc = p - uMc; float t = -dot(oc, uMn) / dn; if (t < 0.0) return vec3(0.0);
+  vec3 q = oc + r * t; vec2 uv = vec2(dot(q, uMr) / SW + 0.5, 0.5 - dot(q, uMu) / SH);
+  if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return vec3(0.0);
+  return textureLod(uScr, uv, lod).rgb * uBright;
+}
+
+// the panel: RGB stripes box-filtered over what one camera pixel sees, so they beat into moire like the real thing
+float stripeI(float x, float a, float b) { return floor(x) * (b - a) + clamp(fract(x), a, b) - a; }
+float stripe(float x, float w, float a, float b) { w = max(w, 1e-3); return (stripeI(x + 0.5 * w, a, b) - stripeI(x - 0.5 * w, a, b)) / w; }
+vec3 subpixels(vec2 px, vec2 w) {
+  float row = stripe(px.y, w.y, 0.05, 0.95) / 0.9;
+  return vec3(stripe(px.x, w.x, 0.02, 0.31), stripe(px.x, w.x, 0.35, 0.64), stripe(px.x, w.x, 0.68, 0.97)) / 0.29 * row;
+}
+vec3 coating(vec3 lp, vec3 p, vec3 rd) {   // the matte anti-glare film: a faint haze of the room, smudged
+  vec3 r = reflect(rd, uMn), l = normalize(uLamp - p);
+  float smudge = 0.35 + 0.9 * smoothstep(0.5, 0.85, fbm(lp.xy * 0.16 + 7.3));
+  vec3 room = vec3(0.0018, 0.0013, 0.0008) * exp((dot(r, normalize(ROOM)) - 1.0) * 4.0);   // the room behind the phone, a warm veil sliding as it moves
+  return (uLampCol * 1.6e-6 * exp((dot(r, l) - 1.0) * 9.0) + room + vec3(0.0009, 0.001, 0.0012)) * smudge;
+}
+vec3 screenAt(vec3 lp, vec3 rd, vec2 fp) {
+  vec2 uv = vec2(lp.x / SW + 0.5, 0.5 - lp.y / SH);
+  vec3 c = textureLod(uScr, uv, max(log2(max(fp.x, fp.y)), 0.0)).rgb * mix(vec3(1.0), subpixels(uv * vec2(1920.0, 1080.0), fp * 0.6), 0.6);
+  float cosv = clamp(-dot(rd, uMn), 0.0, 1.0);
+  vec2 e = vec2(SW, SH) * 0.5 - abs(lp.xy);
+  float glow = 0.012 * pow(1.0 - cosv, 1.3) + 0.0022 * exp(-e.y / 1.8) * (0.4 + fbm(lp.xy * 0.25)) + 0.0012 * exp(-e.x / 2.5);   // IPS glow and backlight bleed
+  return (c + vec3(0.82, 0.88, 1.0) * glow) * uBright;
+}
+// 0 between the keys, 0.6 on a cap's sides, 1 on its top; k is cm from the keyboard's back-left corner, b the blur in cm
+float keycap(vec2 k, float b) {
+  float z = k.y - 0.75, rz; int row;
+  if (z < 0.0) return 0.0;
+  if (z < KU) { row = 0; rz = z; }
+  else { z -= KU * 1.25; if (z < 0.0) return 0.0; row = 1 + int(z / KU); rz = z - float(row - 1) * KU; if (row > 5) return 0.0; }
+  float x = k.x - 0.8, xs = 0.0;
+  for (int i = 0; i < 20; i++) {
+    float w = KW[row * 20 + i];
+    if (w == 0.0) break;
+    float aw = abs(w) * KU;
+    if (x < xs + aw) {
+      if (w < 0.0 || x < 0.0) return 0.0;
+      vec2 c = vec2(x - xs, rz), sz = vec2(aw, KU);
+      float bb = max(b, 0.05);
+      vec2 d1 = min(c, sz - c);
+      float side = smoothstep(0.03, 0.03 + bb, min(d1.x, d1.y));
+      float top = smoothstep(0.26, 0.26 + bb, min(min(c.x, sz.x - c.x), min(c.y - 0.12, sz.y - 0.45 - c.y)));
+      return side * mix(0.6, 1.0, top);
+    }
+    xs += aw;
+  }
+  return 0.0;
+}
+
+#ifdef CITY
+// ============================================================================ the city through the window
+// rows of buildings at 120, 220, 420 and 900 m, the street 55 m down, then the sky; all in cm like the rest. The near rows are mostly
+// lower than these 18 floors, so you look over their roofs to the towers
+const vec3 HAZE = vec3(0.0095, 0.0062, 0.0046);   // the city's own light in the air, low down
+vec3 sky(vec3 d) {
+  vec3 c = mix(HAZE, vec3(0.0009, 0.0013, 0.0029), smoothstep(-0.02, 0.38, d.y));   // orange low down, navy above
+  return c * (0.72 + 0.56 * fbm(d.xz / max(d.y + 0.12, 0.05) * 1.6 + 4.7));   // low cloud, lit from below
+}
+vec3 windows(vec2 q, float b) {   // a facade: q is cm across it and up from the street, b the building's own random number
+  bool office = fract(b * 3.77) < 0.28;   // offices are lit a floor at a time, in long cool bands; flats a room at a time
+  vec2 size = office ? vec2(mix(150.0, 210.0, fract(b * 7.31)), mix(340.0, 400.0, fract(b * 13.7)))
+                     : vec2(mix(240.0, 380.0, fract(b * 7.31)), mix(290.0, 340.0, fract(b * 13.7)));
+  vec2 s = q / size, cell = floor(s), f = s - cell;
+  vec2 m = office ? vec2(0.04, 0.22) : vec2(mix(0.14, 0.3, fract(b * 17.9)), mix(0.16, 0.3, fract(b * 23.3)));   // the wall round each window
+  if (f.x < m.x || f.x > 1.0 - m.x || f.y < m.y || f.y > 1.0 - 0.6 * m.y) return vec3(0.0022, 0.002, 0.0019) * (0.5 + fract(b * 5.93));
+  vec2 w = (f - m) / vec2(1.0 - 2.0 * m.x, 1.0 - 1.6 * m.y);   // 0 to 1 across the window
+  float h = hash2(cell + b * 97.3), h2 = hash2(cell * 1.37 + b * 31.1 + 5.0), lived = hash2(vec2(cell.y, b * 51.0));
+  bool isOn = office ? lived > 0.45 && h < 0.9 : h < mix(0.12, 0.42, fract(b * 11.3)) * (0.6 + 0.8 * lived);
+  if (!isOn) return vec3(0.0013, 0.0015, 0.0021);   // a dark window, the sky in its glass
+  vec3 col = office ? vec3(0.78, 0.9, 1.0) : h2 < 0.6 ? vec3(1.0, 0.58, 0.28) : h2 < 0.88 ? vec3(1.0, 0.75, 0.48) : vec3(0.62, 0.74, 1.0);
+  float lum = office ? 0.07 : 0.012 * exp(2.6 * fract(h2 * 23.0));   // most rooms dim, a few bright
+  float glass = fract(h2 * 7.0);   // what's at the glass: nothing, a curtain drawn over one side, or blinds half down
+  lum *= glass < 0.35 ? 1.0 : glass < 0.7 ? mix(1.0, 0.35, step(0.25 + 0.5 * fract(h2 * 3.0), w.x)) : mix(1.0, 0.3, step(0.55, w.y));
+  if (!office && fract(b * 29.1) < 0.5) lum *= smoothstep(0.0, 0.06, abs(w.x - 0.5));   // a frame down the middle
+  return col * lum * (0.75 + 0.5 * w.y);
+}
+vec3 outside(vec3 o, vec3 d) {
+  for (int k = 0; k < 4; k++) {
+    float D = k == 0 ? 12000.0 : k == 1 ? 22000.0 : k == 2 ? 42000.0 : 90000.0, cell = mix(3600.0, 6000.0, float(k) / 3.0);
+    vec3 p = o + d * ((-D - o.z) / d.z);
+    if (p.y < STREET) break;   // the street comes first
+    float x = p.x / cell + 0.37 * float(k), i = floor(x), fx = x - i;
+    float b = hash2(vec2(i, 19.0 * float(k) + 1.0)), b2 = hash2(vec2(i * 1.7, 7.0 * float(k) + 5.0));
+    float w0 = 0.04 + 0.2 * fract(b * 3.3), w1 = 0.96 - 0.2 * fract(b * 5.1);
+    float tall = k == 0 ? mix(1500.0, 6500.0, b2) : k == 1 ? mix(2500.0, 10000.0, b2 * b2) : k == 2 ? mix(3000.0, 16000.0, b2 * b2) : mix(4000.0, 30000.0, b2 * b2 * b2);
+    float top = STREET + tall, haze = 1.0 - exp(-D / 150000.0);
+    if (b < 0.2 || fx < w0 || fx > w1) continue;   // a gap between buildings
+    float sb = tall > 12000.0 && fract(b * 41.0) < 0.5 && p.y > top - tall * 0.12 ? 0.22 * (w1 - w0) : 0.0;   // a tower's setback near the top
+    if (p.y < top && fx > w0 + sb && fx < w1 - sb) {
+      vec3 c = windows(vec2((fx - w0) * cell, p.y - STREET), b);
+      if (tall > 14000.0 && fract(b * 53.0) < 0.4 && p.y > top - 900.0) c = vec3(0.034, 0.038, 0.042);   // a lit crown
+      return mix(c, HAZE, haze);
+    }
+    if (d.y < 0.0 && p.y > top && p.y - top < 2500.0 * d.y / d.z) return mix(vec3(0.0016, 0.0015, 0.0015), HAZE, haze);   // its roof, from above
+    vec2 e = vec2((fx - 0.5 * (w0 + w1)) * cell, p.y - top - 300.0);   // the red light on top of some of the tallest
+    if (tall > 15000.0 && fract(b * 61.0) < 0.6 && dot(e, e) < 10000.0) return vec3(3.0, 0.12, 0.05);
+  }
+  if (d.y < 0.0) {   // the street: dark, and the streetlights' pools along it
+    vec3 p = o + d * ((STREET - o.y) / d.y);
+    float a = mod(p.x, 3200.0) - 1600.0, c = mod(p.z, 17000.0) - 8500.0;
+    return vec3(0.0012, 0.001, 0.0009) + vec3(1.0, 0.55, 0.22) * 0.05 * exp(-(a * a + c * c) / 4.0e5);
+  }
+  return sky(d);
+}
+vec3 glassView(vec3 p, vec3 d, inout uint seed) {   // the city through the glass, and the dark room reflected in it
+  float f = 0.08 + 0.92 * pow(1.0 - clamp(-d.z, 0.0, 1.0), 5.0);   // two panes reflect about twice what one does
+  vec3 r = vec3(d.xy, -d.z), n, lp; float t;
+  int id = trace(p + r * 0.05, r, t, n, lp);
+  vec3 back;
+  if (id == 0) {   // the rest of the room, behind the phone: dark but for the lamp
+    float c = dot(r, normalize(uLamp - p));
+    back = vec3(0.003, 0.0024, 0.0019) + uLampCol * (3.0e-3 * smoothstep(0.9965, 0.9985, c) + 3.0e-6 * exp((c - 1.0) * 5.0));
+  } else back = lit(p + r * t, n, id == 5 ? vec3(0.34, 0.235, 0.145) : id == 7 || id == 11 ? vec3(0.45) : vec3(0.03), seed);
+  return outside(p, d) * (1.0 - f) * 0.92 + back * f;
+}
+#endif
+
+vec3 radiance(vec3 o, vec3 d, vec2 fp, inout uint seed) {
+  float t; vec3 n, lp;
+  int id = trace(o, d, t, n, lp);
+  vec3 p = o + d * t;
+  if (id == 1) {
+    vec2 a = abs(lp.xy) - vec2(SW, SH) * 0.5;
+    if (a.x < 0.0 && a.y < 0.0) return screenAt(lp, d, fp) + coating(lp, p, d);
+    if (max(a.x, a.y) < BORDER) return vec3(0.0003) + coating(lp, p, d);
+    vec3 c = lit(p, n, vec3(0.028, 0.028, 0.03), seed);
+    vec2 led = vec2(SW * 0.5 - 2.6, -SH * 0.5 - 1.05);   // the power light on the chin
+    return c + vec3(0.9, 0.95, 1.0) * 0.3 * smoothstep(0.13, 0.07, length(lp.xy - led));
+  }
+  if (id == 2) return lit(p, n, vec3(0.03), seed);
+  if (id == 3) return lit(p, n, vec3(0.05, 0.05, 0.055), seed);
+  if (id == 4) {   // the stand's foot: dark metal, with the panel glinting in it
+    vec3 c = lit(p, n, vec3(0.05), seed);
+    if (n.y > 0.5) c += reflScreen(p, reflect(d, n), 4.5) * 0.05;
+    return c;
+  }
+#ifdef CITY
+  if (id == 5) {   // light oak, its grain along the desk, in a satin finish that catches the panel
+    vec3 oak = vec3(0.34, 0.235, 0.145) * (0.78 + 0.44 * fbm(p.xz * vec2(0.045, 0.9)));
+    return lit(p, n, oak, seed) + reflScreen(p, reflect(d, n), 5.0) * 0.025;
+  }
+  if (id == 6) return lit(p, n, vec3(0.42, 0.42, 0.43) * (0.95 + 0.1 * fbm(p.xy * 0.05)), seed);
+  if (id == 7) {   // a white keyboard
+    if (n.y > 0.5) return lit(p, n, vec3(mix(0.1, 0.5, keycap(p.xz - KB0.xz, 2.0 * uAp * abs(1.0 - t / uFocus) + t / uF))), seed);
+    return lit(p, n, vec3(0.42), seed);
+  }
+  if (id == 9) return glassView(p, d, seed);
+  if (id == 10) return lit(p, n, vec3(0.02), seed);              // the frame, black aluminium
+  if (id == 11) return lit(p, n, vec3(0.6, 0.59, 0.56), seed);   // the board under the window, painted white
+#else
+  if (id == 5) {   // a felt desk mat on dark wood
+    vec2 q = p.xz;
+    float mat = step(abs(q.x), 42.0) * step(-6.0, q.y) * step(q.y, 40.0);
+    vec3 wood = vec3(0.075, 0.045, 0.028) * (0.7 + 0.6 * fbm(q * vec2(0.08, 1.4)));
+    vec3 felt = vec3(0.032, 0.033, 0.036) * (0.85 + 0.3 * fbm(q * 3.0));
+    return lit(p, n, mix(wood, felt, mat), seed);
+  }
+  if (id == 6) return lit(p, n, vec3(0.30, 0.29, 0.27) * (0.92 + 0.16 * fbm(p.xy * 0.05)), seed);
+  if (id == 7) {
+    if (n.y > 0.5) return lit(p, n, vec3(mix(0.01, 0.055, keycap(p.xz - KB0.xz, 2.0 * uAp * abs(1.0 - t / uFocus) + t / uF))), seed);
+    return lit(p, n, vec3(0.025), seed);
+  }
+#endif
+  if (id == 8) {   // a leaf: deep green, paler zigzag bands across it, a yellow rim and a waxy shine; the lamp glows through it a little from behind
+    int i = int(lp.z + 0.5); float x = lp.x / max(leafWidth(lp.y), 1e-3);   // -1 to 1, edge to edge
+    float band = smoothstep(0.42, 0.68, fbm(vec2(lp.y * uLeafS[i].x * 0.6 + abs(x) * 1.8, float(i) * 13.7)));
+    vec3 alb = mix(vec3(0.02, 0.045, 0.018), vec3(0.055, 0.08, 0.045), band);
+    alb = mix(alb, vec3(0.15, 0.13, 0.03), smoothstep(0.75, 0.9, abs(x)));
+    vec3 l, e = lampLight(p, n, seed, l);   // the panel faces away from it, so only the lamp and the room light it
+    return alb * (e + bounce(p, n) + AMBIENT) + e * 0.05 * pow(max(dot(n, normalize(l - d)), 0.0), 24.0) + lampLight(p, -n, seed) * vec3(0.01, 0.025, 0.004);
+  }
+  return vec3(0.0);
+}
+
+vec2 screenPx(vec3 o, vec3 d) {   // where a ray meets the panel's plane, in panel pixels
+  vec3 oc = o - uMc; float t = -dot(oc, uMn) / dot(d, uMn); vec3 p = oc + d * t;
+  return vec2((dot(p, uMr) / SW + 0.5) * 1920.0, (0.5 - dot(p, uMu) / SH) * 1080.0);
+}
+void main() {
+  uint seed = hashu(uint(gl_FragCoord.x) * 1973u + uint(gl_FragCoord.y) * 9277u + uint(uSeed) * 26699u);
+  // how many panel pixels one camera pixel covers, for the stripes' filter
+  vec2 c0 = gl_FragCoord.xy - 0.5 * uRes;
+  vec2 a = screenPx(uP[0], normalize(uRr[0] * c0.x + uRu[0] * c0.y + uRf[0] * uF));
+  vec2 dx = screenPx(uP[0], normalize(uRr[0] * (c0.x + 1.0) + uRu[0] * c0.y + uRf[0] * uF)) - a;
+  vec2 dy = screenPx(uP[0], normalize(uRr[0] * c0.x + uRu[0] * (c0.y + 1.0) + uRf[0] * uF)) - a;
+  vec2 fp = vec2(length(vec2(dx.x, dy.x)), length(vec2(dx.y, dy.y)));
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < SAMPLES; i++) {
+    vec2 pix = gl_FragCoord.xy - 0.5 + vec2(rnd(seed), rnd(seed));
+    // the rolling shutter sweeps across the portrait frame; each sample is a moment in the exposure
+    float tm = pix.x / uRes.x * uRead + (float(i) + rnd(seed)) / float(SAMPLES) * uShut;
+    float k = clamp(tm / uSpan, 0.0, 1.0) * 5.0; int i0 = min(int(k), 4); float fk = k - float(i0);
+    vec3 P = mix(uP[i0], uP[i0 + 1], fk), R = normalize(mix(uRr[i0], uRr[i0 + 1], fk)), U = normalize(mix(uRu[i0], uRu[i0 + 1], fk)), Fw = normalize(mix(uRf[i0], uRf[i0 + 1], fk));
+    vec2 c = pix - 0.5 * uRes;
+    c *= 1.0 + uK1 * dot(c, c) / dot(0.5 * uRes, 0.5 * uRes);   // a little barrel distortion
+    vec3 dir = normalize(R * c.x + U * c.y + Fw * uF);
+    float ang = rnd(seed) * 6.2831853, rr = sqrt(rnd(seed)) * uAp;   // a thin lens focused on the panel
+    vec3 o = P + (R * cos(ang) + U * sin(ang)) * rr;
+    acc += radiance(o, normalize(P + dir * (uFocus / dot(dir, Fw)) - o), fp, seed);
+  }
+  acc /= float(SAMPLES);
+  if (any(isnan(acc)) || any(isinf(acc))) acc = vec3(0.0);   // one bad sample would black out a block through the glare's mips
+  fragColor = vec4(acc * uScale, 1.0);   // a photo adds up several passes
+}`;
+
+const scenes = { desk: compile(gl, SCENE), city: compile(gl, SCENE.replace("\n", "\n#define CITY\n")) }, post = compile(gl, POST);
+gl.bindVertexArray(gl.createVertexArray());
+const scrTex = texture(gl, gl.SRGB8_ALPHA8, 1920, 1080), hdrTex = texture(gl, gl.RGBA16F, W, H);
+const fbo = gl.createFramebuffer();
+gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, hdrTex, 0);
+
+function clipAt(t) { let i = 0; while (i < CLIPS.length - 1 && t >= CLIPS[i + 1].t0) i++; return CLIPS[i]; }
+// the take (or photo) at its own time ct, in that room; passes adds up that many, for a photo with less noise in its blur
+function draw(clip, ct, frame, focal = FOCAL, grain = 1, room = "desk", passes = 1) {
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, scrTex);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, scr); gl.generateMipmap(gl.TEXTURE_2D);
+  const poses = Array.from({ length: 6 }, (_, k) => camAt(clip, ct - SHUT / 2 + k / 5 * (SHUT + READ)));
+  const af = camAt(clip, ct - .08);   // the focus trails the moves a little
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, W, H);
+  const { p, u } = scenes[room]; gl.useProgram(p);
+  gl.uniform1i(u.uScr, 0); gl.uniform2f(u.uRes, W, H);
+  gl.uniform3fv(u.uP, poses.flatMap((c) => c.p)); gl.uniform3fv(u.uRr, poses.flatMap((c) => c.r));
+  gl.uniform3fv(u.uRu, poses.flatMap((c) => c.u)); gl.uniform3fv(u.uRf, poses.flatMap((c) => c.f));
+  gl.uniform1f(u.uF, focal); gl.uniform1f(u.uFocus, toScreen(af.p, af.f)); gl.uniform1f(u.uAp, ROOMS[room].ap);
+  gl.uniform1f(u.uShut, SHUT); gl.uniform1f(u.uRead, READ); gl.uniform1f(u.uSpan, SHUT + READ);
+  gl.uniform1f(u.uK1, -.012); gl.uniform1f(u.uBright, 1); gl.uniform1f(u.uScale, 1 / passes);
+  gl.uniform3fv(u.uMc, MON.c); gl.uniform3fv(u.uMr, MON.r); gl.uniform3fv(u.uMu, MON.u); gl.uniform3fv(u.uMn, MON.n);
+  gl.uniform3fv(u.uLamp, ROOMS[room].lamp); gl.uniform3fv(u.uLampCol, ROOMS[room].lampCol);
+  if (u.uLeafB) {   // the snake plant, at the desk
+    gl.uniform3fv(u.uLeafB, LEAVES.flatMap((l) => l.b)); gl.uniform3fv(u.uLeafA, LEAVES.flatMap((l) => l.a));
+    gl.uniform3fv(u.uLeafU, LEAVES.flatMap((l) => l.u)); gl.uniform2fv(u.uLeafS, LEAVES.flatMap((l) => [l.len, l.hw]));
+  }
+  if (passes > 1) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); }
+  for (let k = 0; k < passes; k++) { gl.uniform1f(u.uSeed, frame + 1 + k * 1009); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+  gl.disable(gl.BLEND);
+  develop(gl, post, hdrTex, { expo: 1.55, seed: frame % 997 + 1, grain });
+}
+
+async function showScreen(s) {   // the footage at s seconds on the panel, with the pointer
+  await seek(video, s);
+  sg.drawImage(video, 0, 0, 1920, 1080);
+  if (s >= FOOTAGE.folder[0] && s < FOOTAGE.folder[1]) { const [x0, y0, x1, y1] = FOOTAGE.box; sg.drawImage(blank, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0); }
+  drawPointer(s);
+}
+window.renderFrame = async (t) => {
+  const clip = clipAt(t), ct = t - clip.t0;
+  await showScreen(srcAt(clip, ct));
+  draw(clip, ct, Math.round(t * 30), FOCAL, 1, Q.get("room") || "desk");
+};
+
+// one slide of the carousel, as a JPEG in base64. By the window the city's lights are well out of focus, and 12 passes smooth their blur
+window.renderPhoto = async (i, passes = PHOTO_ROOM === "city" ? 12 : 1) => {
+  const ph = PHOTOS[i];
+  await showScreen(ph.src);
+  draw(ph, ph.at, 500 + i, ph.wide ? WIDE : FOCAL, .45, PHOTO_ROOM, passes);
+  return slide(cv, ph.say, ph.size);
+};
+window.ready = (async () => {
+  const file = `footage/${FOOTAGE.file}`;
+  await new Promise((r, j) => { video.muted = true; video.preload = "auto"; video.oncanplaythrough = r; video.onerror = () => j(new Error(file + ".mp4")); video.src = file + ".mp4"; video.load(); });
+  LOG = (await (await fetch(file + ".json")).json()).log;
+  await seek(video, FOOTAGE.blankAt); blank.width = 1920; blank.height = 1080; blank.getContext("2d").drawImage(video, 0, 0, 1920, 1080);
+  const q = Q.get("t");
+  if (q !== null) await window.renderFrame(+q);
+  return true;
+})();
+
+// ============================================================================ the sound the phone heard
+// a quiet room, the keyboard close by and the mouse to its right; each take keeps its own room tone, cut hard
+let ac, white;
+function noiseBuffer(sec, seed, pink) {
+  const n = Math.ceil(ac.sampleRate * sec), b = ac.createBuffer(2, n, ac.sampleRate), r = mulberry(seed);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch); let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < n; i++) {
+      const w = r() * 2 - 1;
+      if (!pink) { d[i] = w; continue; }
+      b0 = .99886 * b0 + w * .0555179; b1 = .99332 * b1 + w * .0750759; b2 = .969 * b2 + w * .153852;
+      b3 = .8665 * b3 + w * .3104856; b4 = .55 * b4 + w * .5329522; b5 = -.7616 * b5 - w * .016898;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * .5362) * .11; b6 = w * .115926;
+    }
+  }
+  return b;
+}
+function burst(at, dst, r, { vol, freq, q = 1, decay, pan = 0 }) {
+  const s = ac.createBufferSource(); s.buffer = white;
+  const f = ac.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q;
+  const g = ac.createGain(); g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol, at + .0006); g.gain.exponentialRampToValueAtTime(vol * .001, at + decay);
+  const p = ac.createStereoPanner(); p.pan.value = pan;
+  s.connect(f); f.connect(g); g.connect(p); p.connect(dst);
+  s.start(at, r() * .8, decay + .02);
+}
+// The keyboard: clicky switches, tuned against a close-miked recording of a QK65 with Outemu clickies. A press is the switch's click jacket
+// snapping as the key registers (a hard tick near 10 kHz and a short ring near 2.3 kHz), then the stem bottoming out 10–20 ms later; letting go
+// snaps the jacket back up a little quieter, then the stem tops out. A key's modes come from where it sits on the board, so it sounds the same each time.
+const BOARD = ["qwertyuiop", "asdfghjkl", "zxcvbnm"], voices = {};
+function keyVoice(ch) {
+  ch = ch.toLowerCase();
+  if (voices[ch]) return voices[ch];
+  let row = 3, col = 4.6;   // the space bar, under the middle of the board
+  if (ch === "shift") { row = 2; col = -1.2; }   // the left one
+  BOARD.forEach((keys, i) => { const j = keys.indexOf(ch); if (j >= 0) { row = i; col = j + i * .45; } });
+  const wide = ch === " " || ch === "shift", r = mulberry([...ch].reduce((h, c) => h * 31 + c.charCodeAt(0), 7)), edge = Math.hypot((col - 4.7) / 5, (row - 1.2) / 2.5);
+  const sw = (lo, hi) => lo + r() * (hi - lo);   // no two switches click quite alike
+  const hz = (lo, hi) => sw(lo, hi) * (1 + edge * .12) * (ch === " " ? .72 : wide ? .85 : 1);   // out at the edges the plate is stiffer and rings higher; long keys ring lower
+  return (voices[ch] = { wide, pan: -.27 + col * .033,
+    click: [[sw(2000, 2300), .0007, 1.4], [sw(2950, 3350), .0008, .4], [sw(9300, 10700), .00015, 3.5], [sw(6000, 7000), .0002, 1.2]],   // the jacket's housing, then the snap itself
+    bottom: [[hz(110, 140), .008, .12], [hz(1150, 1450), .002, .35], [hz(1900, 2400), .0016, 1], [hz(2700, 3300), .001, .4], [hz(8500, 10500), .00018, 2.6]],   // the desk, the plate, the cap
+  });
+}
+function ring([L, R], at, modes, v, vel, r, { pitch = 1, snap = 0, stretch = 1 } = {}) {   // strikes `modes` at `at` seconds into [L, R], on a hard tick of `snap`
+  const rate = ac.sampleRate, i0 = Math.round(at * rate), gl = Math.cos((v.pan + 1) * Math.PI / 4), gr = Math.sin((v.pan + 1) * Math.PI / 4);
+  const add = (i, x) => { const j = i0 + i; if (j >= 0 && j < L.length) { L[j] += x * gl; R[j] += x * gr; } };
+  for (const [f0, tau0, a0] of modes) {
+    const f = f0 * pitch * (1 + (r() - .5) * .025), tau = tau0 * stretch * (v.wide ? 1.5 : 1) * (.9 + r() * .2);
+    const a = a0 * (.85 + r() * .3) * vel ** (f0 > 5000 ? 1.5 : 1);   // harder presses are brighter
+    const w = 2 * Math.PI * f / rate, k = Math.exp(-1 / (tau * rate)), n = Math.ceil(tau * 7 * rate), ph = r() * 2 * Math.PI;
+    for (let i = 0, e = a; i < n; i++, e *= k) add(i, e * Math.sin(w * i + ph) * Math.min(1, i / 3));
+  }
+  // the tick: a fraction of a millisecond of hard plastic, and on a long key its stabiliser wires rattling a moment later
+  const m = Math.round(rate * (v.wide ? .008 : .002)), wire = Math.round(rate * .003);
+  for (let i = 0, x0 = 0, hi = 0; i < m; i++) {
+    const x = r() * 2 - 1; hi = .55 * (hi + x - x0); x0 = x;
+    add(i, vel * hi * (snap * Math.exp(-i / (rate * .00025)) + (v.wide && i >= wire ? .4 * Math.exp(-(i - wire) / (rate * .0006)) : 0)));
+  }
+}
+function press(kb, at, v, vel, r) {   // the jacket snaps as the key registers and bounces once, and the stem bottoms out just after
+  ring(kb, at, v.click, v, vel, r, { snap: .9 });
+  ring(kb, at + .0018 + r() * .0008, v.click.slice(2), v, vel * .6, r);
+  ring(kb, at + .009 + r() * .012, v.bottom, v, vel * (.75 + r() * .3), r, { snap: .4 });
+}
+function release(kb, at, v, vel, r) {   // letting go snaps the jacket back, then the stem tops out in its housing
+  ring(kb, at, v.click, v, vel * .6, r, { pitch: 1.05, snap: .6 });
+  ring(kb, at + .004 + r() * .004, v.bottom.slice(1), v, vel * .3, r, { pitch: 1.3, stretch: .6 });
+}
+function mouseClick(at, down, r, dst) {
+  burst(at, dst, r, { vol: down ? 2.2 : 1.6, freq: down ? 4800 : 5600, q: 6, decay: .008, pan: .4 });
+  burst(at, dst, r, { vol: down ? .5 : .35, freq: 1800, q: 1.5, decay: .012, pan: .4 });
+}
+window.renderAudio = async () => {
+  await window.ready;
+  const rate = 48000, off = new OfflineAudioContext(2, Math.ceil(rate * LENGTH), rate);
+  ac = off; white = noiseBuffer(1, 3, false);
+  // the phone's mic: no lows, a presence lift, an automatic gain that breathes a little
+  const hp = ac.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 110; hp.Q.value = .7;
+  const pres = ac.createBiquadFilter(); pres.type = "peaking"; pres.frequency.value = 3500; pres.gain.value = 3; pres.Q.value = .8;
+  const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 13000;
+  const agc = ac.createDynamicsCompressor(); agc.threshold.value = -30; agc.knee.value = 10; agc.ratio.value = 3; agc.attack.value = .005; agc.release.value = .3;
+  const master = ac.createGain(); master.gain.value = 1.6;
+  hp.connect(pres); pres.connect(lp); lp.connect(agc); agc.connect(master); master.connect(ac.destination);
+  // a small room around everything
+  const room = ac.createConvolver(), len = Math.floor(rate * .35), ir = ac.createBuffer(2, len, rate), rr = mulberry(9);
+  for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (rr() * 2 - 1) * Math.pow(1 - i / len, 4) * (i < 60 ? 0 : 1); }
+  room.buffer = ir;
+  const dry = ac.createGain(), wet = ac.createGain(); wet.gain.value = .16;
+  dry.connect(hp); dry.connect(room); room.connect(wet); wet.connect(hp);
+  const kb = [new Float32Array(Math.ceil(rate * LENGTH)), new Float32Array(Math.ceil(rate * LENGTH))];
+  CLIPS.forEach((clip, ci) => {
+    const r = mulberry(100 + ci), start = clip.t0, dur = (CLIPS[ci + 1]?.t0 ?? LENGTH) - start;
+    const tone = ac.createBufferSource(); tone.buffer = noiseBuffer(dur + .1, 50 + ci, true);
+    const tl = ac.createBiquadFilter(); tl.type = "lowpass"; tl.frequency.value = 1800 + ci * 300;
+    const tg = ac.createGain(); tg.gain.value = .014 * (1 + (r() - .5) * .3);
+    tone.connect(tl); tl.connect(tg); tg.connect(hp);
+    tone.start(start); tone.stop(start + dur);
+    for (const e of LOG) {
+      if (e.t >= clip.from && e.t < clip.to && (e.kind === "down" || e.kind === "up")) mouseClick(start + takeAt(clip, e.t), e.kind === "down", r, dry);
+    }
+    (clip.strokes || []).forEach((o, j) => {   // the keys, at the typist's pace
+      const at = start + o, v = keyVoice(TYPED[j]), vel = (.75 + r() * .35) * (v.wide ? 1.15 : 1);
+      if (TYPED[j] !== TYPED[j].toLowerCase()) {   // a capital: shift goes down first and comes up last
+        const sh = keyVoice("shift");
+        press(kb, at - .09 - r() * .03, sh, .8, r);
+        release(kb, at + .17 + r() * .05, sh, .6, r);
+      }
+      press(kb, at + .002, v, vel, r);                                        // it clicks as it registers
+      release(kb, at + .075 + r() * .05, v, vel * (.75 + r() * .3), r);   // and is let go a moment later
+    });
+  });
+  const keys = ac.createBuffer(2, kb[0].length, rate), ks = ac.createBufferSource(), kg = ac.createGain();
+  keys.copyToChannel(kb[0], 0); keys.copyToChannel(kb[1], 1); ks.buffer = keys; kg.gain.value = .1;
+  ks.connect(kg); kg.connect(dry); ks.start(0);
+  const buf = await off.startRendering(), n = buf.length, L = buf.getChannelData(0), R = buf.getChannelData(1);
+  // the phone's limiter: it looks a millisecond ahead and pulls the hardest clicks under a ceiling that leaves the codec room
+  const CEIL = .67, ahead = rate * .001, back = rate * .04, g = new Float32Array(n);
+  for (let i = n - 1, a = 1; i >= 0; i--) g[i] = a = Math.min(CEIL / Math.max(CEIL, Math.abs(L[i]), Math.abs(R[i])), a + (1 - a) / ahead);
+  for (let i = 0, a = 1; i < n; i++) { a = Math.min(g[i], a + (1 - a) / back); L[i] *= a; R[i] *= a; }
+  const pcm = new Int16Array(n * 2);
+  for (let i = 0; i < n; i++) { const fade = Math.min(1, (n - i) / (rate * .03)); pcm[i * 2] = clamp(L[i] * fade, -1, 1) * 32767; pcm[i * 2 + 1] = clamp(R[i] * fade, -1, 1) * 32767; }
+  let s = ""; const u8 = new Uint8Array(pcm.buffer); for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);   // raw 16-bit stereo at 48 kHz
+};
+</script>
+</body></html>
