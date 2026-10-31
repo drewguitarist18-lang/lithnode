@@ -719,13 +719,15 @@ function teamText(n) {   // [title html, footer html] for a team card, at rest o
   const model = `<span class="mdl">${esc(engineOf(n) === "claude" ? modelLabel(n.model).replace(/^Claude /, "") : (n.engine_model ? teamModel(n).split(" · ")[1] : ENGINE_NAME[engineOf(n)]))}</span>`;
   const sum = summaryOf(n);
   let job = sum ? `<div class="jb" title="${esc(sum)}">${esc(sum)}</div>` : `<div class="jb warn">Click to give this team a job</div>`;
-  const shown = Math.min(count, 6), at = (i) => `style="--a:${90 + (i - (shown - 1) / 2) * 34}deg"`;   // fanned around the bottom of the orb
-  let dots = Array.from({ length: shown }, (_, i) => `<i ${at(i)}></i>`).join("");
+  const shown = Math.min(count, 4), at = (i) => `style="--a:${90 + (i - (shown - 1) / 2) * 38}deg"`;   // fanned around the bottom of the orb
+  const agent = (i, cls, title) => `<i ${at(i)} class="${cls}" title="${esc(title)}"><canvas width="24" height="18"></canvas></i>`;
+  const label = (i) => `Agent ${i + 1}` + (agentFocus(n, i + 1) ? `: ${agentFocus(n, i + 1)}` : "");
+  let dots = Array.from({ length: shown }, (_, i) => agent(i, "", label(i))).join("");
   let foot = `<span class="how" title="${esc(how)}">${count < 2 ? "1 agent" : count + " agents"}</span>${toolIcons(n)}${model}`;
   if (st) {
     const ag = st.agents || [], running = ag.find((a) => a.status === "running");
     dots = Array.from({ length: shown }, (_, i) => {
-      const a = ag[i]; return `<i ${at(i)} class="${!a ? "wait" : { running: "run", done: "done", failed: "fail" }[a.status] || "wait"}" title="${esc(a ? a.name + ": " + a.status : "Waiting")}"></i>`;
+      const a = ag[i]; return agent(i, !a ? "wait" : { running: "run", done: "done", failed: "fail" }[a.status] || "wait", a ? a.name + ": " + a.status : label(i) + " · waiting");
     }).join("");
     const doneN = ag.filter((a) => a.status === "done").length;
     const took = st.started ? mmss(((st.ended || Date.now() / 1000)) - st.started) : "";
@@ -773,7 +775,11 @@ function renderNodes() {
       const [tt, ft, ag] = teamText(n);
       if (tt !== e.tt) { e.el.querySelector(".tt").innerHTML = tt; e.tt = tt; }
       if (ft !== e.ft) { e.el.querySelector(".ft").innerHTML = ft; e.ft = ft; }
-      if (ag !== e.ag) { e.el.querySelector(".ag").innerHTML = ag; e.ag = ag; }
+      if (ag !== e.ag) {
+        const box = e.el.querySelector(".ag"), had = e.ag ? box.children.length : Infinity;
+        box.innerHTML = ag; e.ag = ag;
+        [...box.children].forEach((a, i) => { if (i >= had) a.classList.add("pop"); });
+      }
     } else {
       e.el.querySelector(".pname").textContent = n.name;
       e.el.querySelector(".pstate").textContent = pillState(n);
@@ -1287,7 +1293,7 @@ function renderInspector() {
       <div class="isec"><h4>Agents</h4>
         <div class="agents"><div class="stepper"><button type="button" data-step="-1" aria-label="One agent fewer"${n.count <= 1 ? " disabled" : ""}>−</button><output>${n.count}</output><button type="button" data-step="1" aria-label="One agent more"${n.count >= meta.max_agents ? " disabled" : ""}>+</button></div>
           <div class="how"><b>${how[0]}</b>${esc(how[1])}</div></div>
-        ${n.count > 1 ? `<label class="switch mini"><span><b>Split the job</b></span><input type="checkbox" id="splitSw"${n.split ? " checked" : ""} title="${esc(n.split ? `One job, cut into ${n.count} parts` : "Every agent does the whole job")}"></label>` : ""}</div>
+        <label class="switch mini"><span><b>Split the job</b></span><input type="checkbox" id="splitSw"${n.split ? " checked" : ""} title="${esc(n.split ? `One job, cut into ${n.count} parts` : n.count > 1 ? "Every agent does the whole job" : "Adds a second agent and cuts the job in two")}"></label></div>
       <div class="isec"><h4>Model</h4>${engineCards(n)}
         ${claude ? `${modelPick(n)}${effortBar(n)}` : engineModels(n)}</div>
       <div class="isec"><h4>Access</h4>
@@ -1382,7 +1388,11 @@ function renderInspector() {
     }
     changed(false); renderInspector();
   }));
-  if ($("splitSw")) $("splitSw").onchange = (e) => { n.split = e.target.checked; changed(false); renderInspector(); };
+  if ($("splitSw")) $("splitSw").onchange = (e) => {
+    n.split = e.target.checked;
+    if (n.split && n.count < 2) n.count = Math.min(2, meta.max_agents);   // a split needs someone to split with
+    changed(false); renderInspector();
+  };
   // the sliders: live while dragging (value, fill, the picture above), a full redraw when let go
   const live = (id, set) => {
     const r = $(id); if (!r) return;
@@ -2047,7 +2057,13 @@ function drawIcons(t) {
     if (!e.cv) continue;
     const c = e.cv.getContext("2d"); c.clearRect(0, 0, e.cv.width, e.cv.height);
     const st = nodeState(id), state = st ? ({ running: "working", approval: "waiting", done: "idle" }[st.status] || "idle") : "idle";
-    if (n.type === "cluster") drawBot(c, { shape: n.shape, color: n.color }, 6, 7, 5, { state, t });   // the dots in the footer show how many
+    if (n.type !== "cluster") continue;
+    drawBot(c, { shape: n.shape, color: n.color }, 6, 7, 5, { state, t });
+    e.el.querySelectorAll(".ag i").forEach((a, i) => {   // its agents, small, around the bottom
+      const cv = a.firstChild; if (!cv) return;
+      const m = cv.getContext("2d"); m.clearRect(0, 0, cv.width, cv.height);
+      drawBot(m, { shape: n.shape, color: n.color }, 3, 4, 1.5, { state: a.classList.contains("run") ? "working" : "idle", t: t + i * 0.7 });
+    });
   }
   document.querySelectorAll(".pal canvas").forEach((cv, i) => {
     const c = cv.getContext("2d"); c.clearRect(0, 0, cv.width, cv.height);

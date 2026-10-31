@@ -224,7 +224,7 @@ h3 { font-size: 12.5px; color: var(--ink); margin: 6px 2px 8px; font-weight: 600
                  background: var(--done); color: #fff; box-shadow: 0 0 0 3px var(--bg); }
 .node .orb .ok svg { width: 13px; height: 13px; }
 .node.st-done .orb .ok { display: grid; }
-.node .tt { min-width: 0; max-width: 100%; margin-top: 13px; }
+.node .tt { min-width: 0; max-width: 100%; margin-top: 19px; }   /* room for the agents under the orb */
 .node .nm { font-size: 14px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node .jb { font-size: 12px; line-height: 1.4; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node .jb.live { color: var(--running); font-weight: 550; }
@@ -235,12 +235,16 @@ h3 { font-size: 12.5px; color: var(--ink); margin: 6px 2px 8px; font-weight: 600
             font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--pad) 80%, transparent); backdrop-filter: blur(8px);
             border: 1px solid color-mix(in srgb, var(--tc) 18%, var(--line)); }
 .node .ag { position: absolute; inset: 0; pointer-events: none; }
-.node .ag i { position: absolute; left: calc(50% - 7px); top: calc(50% - 7px); width: 14px; height: 14px; border-radius: 50%; pointer-events: auto;
-              transform: rotate(var(--a)) translate(42px) rotate(calc(-1 * var(--a)));
-              background: color-mix(in srgb, var(--tc) 70%, var(--pad)); box-shadow: 0 0 0 3px var(--bg); transition: background .25s; }
-.node .ag i.wait { background: color-mix(in srgb, var(--waiting) 55%, var(--pad)); }
-.node .ag i.run { background: var(--running); animation: agent-pulse 1.1s ease-in-out infinite; }
-.node .ag i.done { background: var(--done); } .node .ag i.fail { background: var(--failed); }
+.node .ag i { position: absolute; left: calc(50% - 14px); top: calc(50% - 14px); width: 28px; height: 28px; border-radius: 50%; pointer-events: auto;
+              display: grid; place-items: center; transform: rotate(var(--a)) translate(43px) rotate(calc(-1 * var(--a)));
+              background: color-mix(in srgb, var(--tc) 16%, var(--pad)); border: 1.5px solid color-mix(in srgb, var(--tc) 45%, var(--line));
+              box-shadow: 0 0 0 3px var(--bg); transition: border-color .25s; }
+.node .ag i canvas { width: 24px; height: 18px; image-rendering: pixelated; }
+.node .ag i.pop { animation: agent-pop .45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes agent-pop { from { opacity: 0; transform: rotate(var(--a)) translate(22px) rotate(calc(-1 * var(--a))) scale(.3); } }
+.node .ag i.wait { border-color: color-mix(in srgb, var(--waiting) 55%, var(--line)); opacity: .7; }
+.node .ag i.run { border-color: var(--running); animation: agent-pulse 1.1s ease-in-out infinite; }
+.node .ag i.done { border-color: var(--done); } .node .ag i.fail { border-color: var(--failed); }
 @keyframes agent-pulse { 50% { box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px color-mix(in srgb, var(--running) 35%, transparent); } }
 .node .how { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node .tools { display: flex; align-items: center; gap: 7px; flex: none; color: var(--muted); }
@@ -860,7 +864,7 @@ html body .rp-bottom p { font-family: var(--sans); }
   background: none; border: 0; box-shadow: none; animation: none; }
 .node.nd-team .ft { max-width: none; white-space: nowrap; } .node.nd-team .how { flex: none; }
 .node.nd-team .jb.live { color: var(--tc); }
-.node.nd-team .ag i.run { background: var(--tc); }
+.node.nd-team .ag i.run { border-color: var(--tc); }
 .node.nd-team .mdl { color: color-mix(in srgb, var(--tc) 55%, var(--muted)); background: color-mix(in srgb, var(--tc) 12%, transparent); }
 .node.nd-team.st-running .orb { border-color: var(--tc); animation: team-glow 2.2s ease-in-out infinite; }
 @keyframes team-glow { 0%, 100% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--tc) 18%, transparent), 0 0 40px -6px color-mix(in srgb, var(--tc) 70%, transparent); }
