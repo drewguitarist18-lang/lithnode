@@ -1,0 +1,69 @@
+"""Fast checks of the pure helpers: no server, no agents, no network. Runs in about a second.
+
+    .venv\\Scripts\\python tests\\unit_test.py
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import agents  # noqa: E402
+import flows  # noqa: E402
+
+failures = []
+
+
+def check(name, ok, detail=""):
+    print(("PASS " if ok else "FAIL ") + name + (f"  [{str(detail)[:300]}]" if detail and not ok else ""))
+    if not ok:
+        failures.append(name)
+
+
+def raises(fn, kind=ValueError):
+    try:
+        fn()
+    except kind:
+        return True
+    return False
+
+
+# ---- agents: what an agent hands on, and how its steps read --------------------------------------------------
+check("report: only what follows REPORT: is handed on", agents.report_of("thinking...\nREPORT: all good", 500) == "all good")
+check("report: the last REPORT: wins", agents.report_of("REPORT: draft\nmore\nREPORT: final", 500) == "final")
+check("report: **REPORT:** leaves no stray **", agents.report_of("**REPORT:** all good", 500) == "all good")
+check("report: bold right after the marker is kept", agents.report_of("REPORT: **Found** a bug", 500) == "**Found** a bug")
+check("report: _REPORT:_ and __REPORT:__ too", agents.report_of("__REPORT:__ ok", 500) == "ok" and agents.report_of("*REPORT:* fine", 500) == "fine")
+check("report: no marker hands on the whole answer", agents.report_of("just text", 500) == "just text")
+long = agents.report_of("REPORT: " + "x" * 50, 10)
+check("report: a long one is cut and says so", long.startswith("x" * 10) and "cut to save credits" in long, long)
+check("report: empty is empty", agents.report_of("", 500) == "" and agents.report_of(None, 500) == "")
+
+check("tokens read short", (agents.short_tokens(1234), agents.short_tokens(291_000), agents.short_tokens(2_500_000))
+      == ("1k tokens", "291k tokens", "2.5M tokens"))
+check("a Read step names the file, not the path", agents.describe("Read", {"file_path": "C:/x/session.ts"}) == "Reading session.ts")
+check("a web search shows its query", agents.describe("WebSearch", {"query": "rust async"}) == "Searching the web: rust async")
+
+# ---- flows: what gets saved and what can run --------------------------------------------------------------------
+check("token limit: junk falls back to 1M", flows.clean_limit("abc") == 1_000_000)
+check("token limit: clamped to 50k..100M", flows.clean_limit(5) == 50_000 and flows.clean_limit(10**12) == 100_000_000)
+check("token limit: a sane one is kept", flows.clean_limit(500_000) == 500_000)
+check("a loop is caught", flows._has_cycle(["a", "b"], [{"from": "a", "to": "b"}, {"from": "b", "to": "a"}]))
+check("a straight line isn't a loop", not flows._has_cycle(["a", "b"], [{"from": "a", "to": "b"}]))
+ship = flows.from_template("ship-it")
+check("the ship-it template is ready to run", ship and len(ship["nodes"]) == 9 and flows.check_runnable(ship) == [], ship and flows.check_runnable(ship))
+check("an unknown template is None", flows.from_template("nope") is None)
+check("every template is ready to run", all(flows.check_runnable(flows.from_template(t["id"])) == [] for t in flows.TEMPLATES),
+      [t["id"] for t in flows.TEMPLATES if flows.check_runnable(flows.from_template(t["id"]))])
+check("an unknown node type is refused", raises(lambda: flows.clean_node({"id": "a", "type": "bogus"})))
+check("model names can't be command-line flags", flows.MODEL_RE.match("--help") is None and flows.MODEL_RE.match("claude-sonnet-5-5"))
+
+fence = "```"
+check("items: a fenced list is read", flows.parse_items(f"x\n{fence}items\n[{{\"title\": \"a\"}}]\n{fence}") == [{"title": "a"}])
+check("items: the fence is stripped from the text", flows.strip_items(f"hi\n{fence}items\n[]\n{fence}") == "hi")
+check("webhooks: https is fine, file: isn't", flows.webhook_ok("https://ntfy.sh/x") and not flows.webhook_ok("file:///c:/x"))
+check("design: no JSON is a friendly error", raises(lambda: flows.parse_design("no json here")))
+
+print()
+if failures:
+    print(f"{len(failures)} FAILED: " + ", ".join(failures))
+    sys.exit(1)
+print("ALL PASSED")
