@@ -127,7 +127,7 @@ def corner(scale):
 sizes = (256, 64, 48, 32, 16)
 images = [icon_png(s) for s in sizes]
 offset, entries = 6 + 16 * len(images), b""
-for img, s in zip(images, sizes):
+for img, s in zip(images, sizes, strict=True):
     entries += struct.pack("<BBBBHHII", s % 256, s % 256, 0, 0, 1, 32, len(img), offset)
     offset += len(img)
 (HERE / "lithnode.ico").write_bytes(struct.pack("<HHH", 0, 1, len(images)) + entries + b"".join(images))

@@ -1,0 +1,16 @@
+# Lithnode runs on the standard library alone; this file only configures the dev tools.
+#   .venv\Scripts\python -m pip install -r requirements-dev.txt
+#   .venv\Scripts\python -m ruff check .
+[tool.ruff]
+line-length = 190   # long lines are this codebase's style; 190 is its longest
+target-version = "py312"
+extend-exclude = ["build", "dist", "site", "marketing", "installer/app", "packaging/linux"]
+
+[tool.ruff.lint]
+# errors, pyflakes, import order, bugbear, and pyupgrade
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+  "E701", "E702",   # one-line `if x: return` and `a; b` are this codebase's style
+  "E731",           # small lambdas assigned to names are fine
+  "B008",
+]

@@ -87,7 +87,7 @@ def main():
                 break
             time.sleep(0.5)
         check("the whole flow runs to the end", run.get("status") == "done", {k: run.get(k) for k in ("status", "error")})
-        calls = [json.loads(l) for l in (work / "calls.jsonl").read_text().splitlines()] if (work / "calls.jsonl").exists() else []
+        calls = [json.loads(line) for line in (work / "calls.jsonl").read_text().splitlines()] if (work / "calls.jsonl").exists() else []
         agents = [c for c in calls if "flags" in c and "--append-system-prompt" in c["flags"]]
         check("its agents really ran Claude Code", len(agents) >= 2, len(agents))
         check("in the project folder", all(c.get("cwd", str(project)).rstrip("/") == str(project) for c in agents),

@@ -651,7 +651,7 @@ def parse_design(text):
     try:
         return json.loads(text[start:end + 1])
     except ValueError:
-        raise ValueError("The designer's flow wasn't valid. Try again, or describe it a bit differently.")
+        raise ValueError("The designer's flow wasn't valid. Try again, or describe it a bit differently.") from None
 
 
 def build_design(raw, bots):

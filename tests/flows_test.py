@@ -39,7 +39,7 @@ def call(path, body=None, method=None):
 
 def cli_calls():
     log = Path(cli_dir, "calls.jsonl")
-    return [json.loads(l) for l in log.read_text().splitlines()] if log.exists() else []
+    return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
 
 
 def agent_calls(since=0):
@@ -198,7 +198,8 @@ try:
         conn.putrequest("POST", "/api/flows"); conn.putheader("Content-Length", bad); conn.endheaders()
         check(f"Content-Length {bad} is a 400", conn.getresponse().status == 400)
         conn.close()
-    sys.path.insert(0, str(ROOT)); import flows
+    sys.path.insert(0, str(ROOT))
+    import flows
     check("model names can't start with a dash", flows.MODEL_RE.match("--help") is None and flows.MODEL_RE.match("haiku"))
     check("a ``` inside an item doesn't cut the list short",
           len(flows.parse_items('```items\n[{"title":"A","detail":"run ```x```"},{"title":"B"}]\n```')) == 2)
@@ -379,7 +380,7 @@ try:
     check("the agent is told which apps it has and to search narrowly",
           "Connected apps you can use: Vercel." in f.get("--append-system-prompt", "") and "Gone" not in f.get("--append-system-prompt", ""))
     check("a connector that isn't available is reported, and the team runs without it",
-          "Gone isn't available" in (run["nodes"]["rev"].get("note") or "") and any("Gone isn't available" in l["text"] for l in run["log"]), run["nodes"]["rev"])
+          "Gone isn't available" in (run["nodes"]["rev"].get("note") or "") and any("Gone isn't available" in e["text"] for e in run["log"]), run["nodes"]["rev"])
     check("teams without connectors still load none", other and all("--strict-mcp-config" in c["flags"] and c["flags"]["--disallowedTools"] == "mcp__*"
                                                                       and c["connectors"] == "false" for c in other))
 

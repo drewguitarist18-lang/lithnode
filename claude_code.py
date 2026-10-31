@@ -137,8 +137,9 @@ TOOLS_BIN = None   # Lithnode's own commands for agents (lithnode-shot), set by 
 def setup_tools(home):
     """Puts `lithnode-shot` (shot.py) in home/bin for the agents' PATH. Returns that folder."""
     global TOOLS_BIN
-    import shot
     import sys
+
+    import shot
     frozen = getattr(sys, "frozen", False)
     command = (["flatpak", "run", "--command=" + own_exe("lithnode-cli"), os.environ["FLATPAK_ID"], "shot"] if frozen and FLATPAK
                else [own_exe("lithnode-cli"), "shot"]) if frozen else [sys.executable, str(Path(shot.__file__).resolve())]

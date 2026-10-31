@@ -48,7 +48,7 @@ def set_cli(logged_in):
 
 def cli_calls():
     log = Path(cli_dir, "calls.jsonl")
-    return [json.loads(l) for l in log.read_text().splitlines()] if log.exists() else []
+    return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
 
 
 def start():

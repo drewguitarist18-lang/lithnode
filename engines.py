@@ -6,7 +6,6 @@ into Lithnode's steps and final report. Both sign in with the person's own accou
 """
 import json
 import os
-import shutil
 import subprocess
 import threading
 import time
