@@ -28,8 +28,8 @@
       float f = fract(uT / P), g = fract(uT / P + .5), a1 = a + f * P * spin, a2 = a + g * P * spin;
       float k = abs(2. * f - 1.);   // 1 when copy one restarts: then it's all copy two
       float n = mix(clouds(vec3(cos(a1) * r * .4, sin(a1) * r * .4, r * .7)), clouds(vec3(cos(a2) * r * .4, sin(a2) * r * .4, r * .7) + 19.), k);
-      n = (n - .5) / sqrt(k * k + (1. - k) * (1. - k)) + .5;   // a blend of two is flatter than either: undo that
-      return .25 + 1.6 * n * n;
+      n = clamp((n - .5) * 1.3 / sqrt(k * k + (1. - k) * (1. - k)) + .5, 0., 1.);   // a blend of two is flatter than either: undo that
+      return .15 + 1.9 * n * n;
     }
     // the stars: round dots a pixel or two across, scattered on the six faces of a cube round the sky, three sizes
     float stars(vec3 d){
@@ -43,11 +43,11 @@
         float l = float(L), n = 125. / pow(2.4, l);
         vec2 g = f * n, id = floor(g) + face * 517. + l * 91.;
         float h = hash(id);
-        if (h < .24 - .05 * l) {
+        if (h < .12 - .025 * l) {
           vec2 at = floor(g) + .5 + .3 * (vec2(hash(id + 2.3), hash(id + 5.9)) * 2. - 1.);
-          float r = length(g - at) / n * .8, R = uK * (.8 + .5 * l);
+          float r = length(g - at) / n * .8, R = uK * (.65 + .4 * l);
           float tw = .78 + .22 * sin(uT * (1.2 + 2. * hash(id + 8.1)) + 40. * h);
-          c += (.2 + .8 * pow(hash(id + 3.7), 3.)) * (.5 + .45 * l) * tw * exp(-sq(r / R));
+          c += (.2 + .8 * pow(hash(id + 3.7), 3.)) * (.35 + .35 * l) * tw * exp(-sq(r / R));
         }
       }
       return c;
