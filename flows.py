@@ -236,6 +236,18 @@ def clean_models(raw: Any) -> dict[str, str]:
     return out
 
 
+def clean_engine_models(raw: Any) -> dict[str, dict[str, str]]:
+    """Which model fills each role on Codex and Cursor. "" is the CLI's own default, since their model lists differ per account."""
+    raw = raw if isinstance(raw, dict) else {}
+    out = {}
+    for engine in engines.ENGINES:
+        if engine == "claude":
+            continue
+        picks = raw.get(engine) if isinstance(raw.get(engine), dict) else {}
+        out[engine] = {role: m if MODEL_RE.match(m := str(picks.get(role) or "").strip()[:60]) else "" for role in ROLES}
+    return out
+
+
 def clean_flow(raw: Any) -> dict[str, Any]:
     """A validated flow dict from page input or disk; raises ValueError with a readable reason."""
     if not isinstance(raw, dict) or not isinstance(raw.get("nodes") or [], list) or not isinstance(raw.get("edges") or [], list):
@@ -261,9 +273,12 @@ def clean_flow(raw: Any) -> dict[str, Any]:
     if _has_cycle(ids, edges):
         raise ValueError("the flow has a loop; connections must go one way")
     models = clean_models(raw.get("models"))
+    engine_models = clean_engine_models(raw.get("engine_models"))
     for n in nodes:
         if n.get("role"):
             n["model"] = models[n["role"]]
+            if n.get("engine", "claude") != "claude":   # a Codex or Cursor team: the role picks its model there too
+                n["engine_model"] = engine_models[n["engine"]][n["role"]]
     start = next((n["id"] for n in nodes if n["type"] == "master"), None)
     if start:
         edges += [{"from": start, "to": nid} for nid in fed_by_start({"nodes": nodes, "edges": edges})]
@@ -272,7 +287,8 @@ def clean_flow(raw: Any) -> dict[str, Any]:
             "task": _text(raw, "task", 4000),   # what the Run menu opens with: your description, or the last task run
             "dir": raw.get("dir") if raw.get("dir") in ("tb", "lr") else "lr",
             "auto": raw.get("auto") is not False,   # auto-arrange: re-lay out the nodes on every change
-            "limit": clean_limit(raw.get("limit", DEFAULT_LIMIT)), "models": models}
+            "limit": clean_limit(raw.get("limit", DEFAULT_LIMIT)), "models": models,
+            "engine_models": engine_models}
 
 
 DEFAULT_LIMIT = 1_000_000   # tokens a run may use before it's stopped; no agent may use more than half of it
@@ -633,7 +649,8 @@ Bots you can base a cluster on (set "bot" and reuse their role): <<BOTS>>
 
 Rules: ids are short, lowercase, with dashes. Every node is reachable from master, and the last stage feeds a done node.
 No loops. Keep it lean: 1-3 agents per cluster unless asked for more. Reviewers are read-only (tools "read").
-Only builders get "edit"; only testers get "full". Prefer clis over "full" when a team only needs a few tools.
+Only builders get "edit"; only testers get "full"; "all" (files, commands and the web) only when a team truly needs every one.
+Prefer clis over "full" when a team only needs a few tools.
 Name the flow in 2-5 words."""
 
 
@@ -1000,7 +1017,7 @@ class Run:
     def _clis_for(self, node: dict[str, Any], st: dict[str, Any]) -> list[str]:
         """The node's command-line tools that are installed here; notes the ones that aren't."""
         want = node.get("clis") or []
-        if node.get("tools") == "full" or node.get("engine", "claude") != "claude":   # can already run commands, or picks its own
+        if node.get("tools") in ("full", "all") or node.get("engine", "claude") != "claude":   # can already run commands, or picks its own
             return []
         use = [c for c in want if claude_code.cli_installed(c)]
         missing = [c for c in want if c not in use]
@@ -1020,6 +1037,7 @@ class Run:
             "research": "You can read files here and search the web, but not change files.",
             "edit": "You can read and edit files in this folder. You can't run commands.",
             "full": "You can read and edit files and run commands in this folder.",
+            "all": "You can read and edit files, run commands in this folder, and search and read the web.",
         }[node.get("tools", "read")]
         lines = [
             f'You are agent {i} of {n} in the "{node["name"]}" stage of a multi-agent pipeline run by Lithnode.',
@@ -1049,7 +1067,7 @@ class Run:
                "wait <seconds>, reload, shot). It reports each step, any JavaScript errors and the page text, and saves "
                "screenshots. Play or click through what you build or check this way; never report that you couldn't run "
                "it. A canvas must be sized by devicePixelRatio, or it looks blurry when the window is bigger than it."]
-              if node.get("tools", "read") in ("read", "research", "edit", "full") else []),
+              if node.get("tools", "read") in ("read", "research", "edit", "full", "all") else []),
             "Work economically: read only the files you need, prefer Grep and Glob over reading whole files, "
             "and skip exploratory detours.",
             "Do your stage's job only; other stages handle the rest.",
@@ -1165,7 +1183,7 @@ class Run:
         apps, known = self._connectors_for(node, st)
         clis = self._clis_for(node, st)
         engine = node.get("engine", "claude")
-        if engine == "codex" and engines.status("codex").get("sandbox") is False and node["tools"] != "full":
+        if engine == "codex" and engines.status("codex").get("sandbox") is False and node["tools"] not in ("full", "all"):
             st["note"] = (st.get("note", "") + " Codex's sandbox doesn't work on this computer, so this team ran with full access.").strip()
 
         def one(i: int, teammates: str = "") -> dict[str, Any]:

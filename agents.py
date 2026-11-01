@@ -43,8 +43,9 @@ TOOLSETS = {
     "research": ["Read", "Glob", "Grep", "WebSearch", "WebFetch"],
     "edit": ["Read", "Glob", "Grep", "Edit", "Write"],
     "full": ["Read", "Glob", "Grep", "Edit", "Write", "Bash"],
+    "all": ["Read", "Glob", "Grep", "Edit", "Write", "Bash", "WebSearch", "WebFetch"],
 }
-WRITES = {"edit", "full"}          # agents at these levels never run side by side in one folder
+WRITES = {"edit", "full", "all"}          # agents at these levels never run side by side in one folder
 LOOKS = {"read", "research", "edit"}   # levels that also get lithnode-shot, to look at pages and HTML they make or check
 EFFORTS = ("low", "medium", "high", "xhigh", "max")   # what `claude --effort` accepts
 

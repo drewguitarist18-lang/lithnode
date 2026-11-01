@@ -135,7 +135,7 @@ def all_status(force: bool = False) -> dict[str, dict[str, Any]]:
 # ------------------------------------------------------------------- one session
 
 CODEX_SANDBOX = {"none": "read-only", "read": "read-only", "web": "read-only", "research": "read-only",
-                 "edit": "workspace-write", "full": "danger-full-access"}
+                 "edit": "workspace-write", "full": "danger-full-access", "all": "danger-full-access"}
 
 
 def codex_sandbox(tools: str) -> str:
@@ -148,14 +148,14 @@ def codex_sandbox(tools: str) -> str:
 
 def build_args(engine: str, command: list[str], *, tools: str, model: str = "") -> list[str]:
     if engine == "codex":
-        search = ["--search"] if tools in ("web", "research") else []   # a top-level option: before `exec`
+        search = ["--search"] if tools in ("web", "research", "all") else []   # a top-level option: before `exec`
         args = [*command, *search, "exec", "--json", "--skip-git-repo-check", "--ephemeral", "--sandbox", codex_sandbox(tools)]
         if model:
             args += ["--model", model]
         return args + ["-"]          # the prompt comes on stdin
     if engine == "cursor":
         args = [*command, "-p", "--output-format", "stream-json", "--trust"]
-        if tools in ("edit", "full"):
+        if tools in ("edit", "full", "all"):
             args.append("--force")   # without it, file changes are only proposed
         if model:
             args += ["--model", model]

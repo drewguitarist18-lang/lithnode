@@ -4,7 +4,7 @@ It records how it was called, emits the documented `--output-format stream-json`
 (system/init, stream_event with raw API deltas, assistant, user tool_result, result), and replays
 the exact "Not logged in" output a real, signed-out CLI produced.
 
-Env: CLAWD_MOCK_STATE (json file: {"logged_in": bool}), CLAWD_MOCK_LOG (jsonl of calls),
+Env: CLAWD_MOCK_STATE (json file: {"logged_in": bool, "plan": "pro"|"max"}), CLAWD_MOCK_LOG (jsonl of calls),
      CLAWD_MOCK_SESSIONS (json list of known session ids).
 """
 import json
@@ -83,7 +83,8 @@ if argv[:2] == ["auth", "login"]:   # like the real one: print the fallback link
     sys.exit(1)
 if argv[:2] == ["auth", "status"]:
     ok = logged_in()
-    print(json.dumps({"loggedIn": ok, "authMethod": "claude.ai" if ok else "none", "apiProvider": "firstParty"}))
+    plan = json.loads(STATE.read_text()).get("plan", "max") if STATE.exists() else "max"
+    print(json.dumps({"loggedIn": ok, "authMethod": "claude.ai" if ok else "none", "apiProvider": "firstParty", "subscriptionType": plan}))
     sys.exit(0 if ok else 1)
 
 flags, prompt = parse(argv)

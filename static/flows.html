@@ -88,9 +88,10 @@
     <div class="team" id="runTeam"></div>
   </header>
   <div class="rbody">
-    <div class="field"><label for="taskIn">What should the team do?</label>
-      <textarea id="taskIn" rows="4" placeholder="Describe the job, e.g. Add a dark mode toggle to the settings page"></textarea>
-      <div class="ideas" id="taskIdeas"></div></div>
+    <div class="field"><label for="taskIn">What should the team do this run?</label>
+      <textarea id="taskIn" rows="4" placeholder="Write the job in your own words, e.g. Find bugs in the checkout code and list them with file and line"></textarea>
+      <div class="ideas" id="taskIdeas"></div>
+      <div class="sub" id="taskSub"></div></div>
     <div class="field"><label for="folderIn">Project folder</label><div class="folder"><input id="folderIn" list="recentFolders" placeholder="Pick your project folder (blank = a scratch folder)">
       <button type="button" data-browse="folderIn">Browse…</button></div>
       <div class="recent" id="recentChips"></div>
@@ -219,7 +220,7 @@ let run = null, runTimer = null; // run snapshot while the run view is open
 const els = {};                 // node id -> { el, cv, info }
 const TOOL_INFO = {
   none: "No tools (thinks only)", read: "Read files only", web: "Web search", research: "Read files + web",
-  edit: "Read and edit files", full: "Edit files and run commands",
+  edit: "Read and edit files", full: "Edit files and run commands", all: "Everything: files, commands and the web",
 };
 const TYPE_LABEL = { master: "Start", cluster: "Team", checkpoint: "Checkpoint", approval: "Approval", done: "Done" };
 // Stages take a role, and the flow says which model fills it (flows.py DEFAULT_MODELS)
@@ -227,7 +228,22 @@ const DEFAULT_MODELS = { think: "claude-opus-5-5", build: "claude-sonnet-5-5", r
 const ROLE_NAME = { think: "Composer", build: "Orchestrator", run: "Performer" };   // writes the idea, arranges it into something real, plays it out
 const ROLE_OF = { "claude-opus-5-5": "think", "claude-sonnet-5-5": "build", "claude-haiku-4-5": "run" };
 const roleModel = (role) => ((flow && flow.models) || DEFAULT_MODELS)[role] || DEFAULT_MODELS[role];
-const modelLabel = (id) => (meta.models.find((m) => m.id === id) || {}).label || ENGINE_NAME[id] || id;
+// on Codex and Cursor a role's model is "" until you pick one: that's the CLI's own default
+const roleModelOn = (engine, role) => engine === "claude" ? roleModel(role) : ((flow && flow.engine_models) || {})[engine]?.[role] || "";
+const engineModelLabel = (engine, id) => !id ? (engine === "codex" ? "Codex default" : "Cursor picks")
+  : ((engineInfo(engine).models || []).find((m) => m.id === id) || {}).label || id;
+const roleLabel = (engine, role) => engine === "claude" ? modelLabel(roleModel(role)) : engineModelLabel(engine, roleModelOn(engine, role));
+function setRoleModel(engine, role, id) {   // one pick changes every stage on that engine with that role
+  if (engine === "claude") flow.models = { ...(flow.models || DEFAULT_MODELS), [role]: id };
+  else flow.engine_models = { ...(flow.engine_models || {}), [engine]: { ...((flow.engine_models || {})[engine] || {}), [role]: id } };
+  flow.nodes.filter((x) => x.role === role && (x.type !== "cluster" ? engine === "claude" : engineOf(x) === engine))
+    .forEach((x) => { if (engine === "claude") x.model = id; else x.engine_model = id; });
+}
+const prettyId = (id) => {   // a model the plan hides still gets a name: "claude-fable-5-1" -> "Fable 5.1"
+  const m = /^claude-([a-z]+)-(\d+)(?:-(\d+))?/.exec(id || "");
+  return m ? `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}${m[3] ? "." + m[3] : ""}` : id;
+};
+const modelLabel = (id) => (meta.models.find((m) => m.id === id) || {}).label || ENGINE_NAME[id] || prettyId(id);
 const locked = () => !!run;
 const shown = () => (run ? run.flow : flow);     // the run view draws the flow as it was when it ran
 const nodeById = (id) => shown().nodes.find((n) => n.id === id);
@@ -255,7 +271,7 @@ async function boot() {
 
 async function openFlow(id) {
   const d = await api("/api/flows/" + id);
-  flow = d.flow; est = d.estimate; problems = d.problems; sel = null;
+  flow = d.flow; est = d.estimate; problems = d.problems; sel = null; draftTask = "";
   try { localStorage.setItem("hq-flow", id); } catch (e) {}
   if (flow.auto !== false) {   // open it neatly arranged, and save that if it moved anything
     const before = JSON.stringify(flow.nodes.map((n) => [n.x, n.y]));
@@ -309,7 +325,7 @@ async function save() {   // resolves once your latest edits are on the server; 
 // ------------------------------------------------------------------ palette
 // the built-in bots, grouped by the job they do on a team
 const BOT_GROUPS = [["Build", ["forge", "byte", "probe"]], ["Review", ["beetle", "sentinel", "launch"]], ["Plan and research", ["clawd", "atlas", "scout", "muse"]]];
-const CAN = { none: ["thinks", ""], read: ["reads", ""], web: ["web", "web"], research: ["reads + web", "web"], edit: ["edits", "edit"], full: ["runs code", "full"] };
+const CAN = { none: ["thinks", ""], read: ["reads", ""], web: ["web", "web"], research: ["reads + web", "web"], edit: ["edits", "edit"], full: ["runs code", "full"], all: ["does it all", "full"] };
 function renderBotPalette() {
   const q = ($("botFind").value || "").trim().toLowerCase(), all = teamBots();
   const list = all.filter((b) => !q || `${b.name} ${b.tagline || ""}`.toLowerCase().includes(q));
@@ -707,15 +723,15 @@ function toolIcons(n) {
   const out = [], t = n.tools;
   if (engineOf(n) !== "claude") out.push(`<img src="/static/engine-${engineOf(n)}.png" alt="" title="Runs on ${ENGINE_NAME[engineOf(n)]}" style="${engineOf(n) === "codex" ? "background:#161616;padding:2px" : ""}">`);
   if (t === "read" || t === "research") out.push(`<span title="Reads files">${ICON.read}</span>`);
-  if (t === "web" || t === "research") out.push(`<span title="Searches the web">${ICON.web}</span>`);
+  if (t === "web" || t === "research" || t === "all") out.push(`<span title="Searches the web">${ICON.web}</span>`);
   if (t === "edit") out.push(`<span title="Edits files">${ICON.edit}</span>`);
-  if (t === "full" || (n.clis || []).length) out.push(`<span title="${t === "full" ? "Runs any command" : "Runs " + n.clis.join(", ")}">${ICON.run}</span>`);
+  if (t === "full" || t === "all" || (n.clis || []).length) out.push(`<span title="${t === "full" || t === "all" ? "Runs any command" : "Runs " + n.clis.join(", ")}">${ICON.run}</span>`);
   if ((n.connectors || []).length) out.push(`<span title="${esc(n.connectors.map(connName).join(", "))}">${ICON.plug}</span>`);
   return out.length ? `<span class="tools">${out.join("")}</span>` : "";
 }
 function teamText(n) {   // [title html, footer html] for a team card, at rest or mid-run
   const st = nodeState(n.id), count = n.count || 1;
-  const how = count < 2 ? "1 agent" : n.split ? `${count} · split ${count} ways` : n.tools === "edit" || n.tools === "full" ? `${count} · take turns` : `${count} · side by side`;
+  const how = count < 2 ? "1 agent" : n.split ? `${count} · split ${count} ways` : WRITES.includes(n.tools) ? `${count} · take turns` : `${count} · side by side`;
   const model = `<span class="mdl">${esc(engineOf(n) === "claude" ? modelLabel(n.model).replace(/^Claude /, "") : (n.engine_model ? teamModel(n).split(" · ")[1] : ENGINE_NAME[engineOf(n)]))}</span>`;
   const sum = summaryOf(n);
   let job = sum ? `<div class="jb" title="${esc(sum)}">${esc(sum)}</div>` : `<div class="jb warn">Click to give this team a job</div>`;
@@ -1044,7 +1060,7 @@ const modelOpts = (v) => opt(meta.models.map((m) => [m.id, `${m.label} · ${m.bl
 const toolOpts = (v) => opt(meta.tools.map((t) => [t, TOOL_INFO[t] || t]), v);
 
 let moreOpen = false;   // remembered while you click between nodes
-function more(inner) { return `<details class="more"${moreOpen ? " open" : ""} data-more><summary>Advanced</summary>${inner}</details>`; }
+function more(inner) { return `<details class="more"${moreOpen ? " open" : ""} data-more><summary>Advanced <small>focus · turns · look</small></summary>${inner}</details>`; }
 let recentFolders = [];
 function folderField(id, value) {
   return `<div class="folder"><input id="${id}" list="recentFolders" value="${esc(value || "")}" placeholder="Pick or paste a folder">
@@ -1144,18 +1160,19 @@ function engineCards(n) {
   }).join("");
   const plan = { claude: "your Claude plan", codex: "your ChatGPT plan", cursor: "your Cursor plan" }[cur];
   const stat = !engines ? `<i class="bad"></i>Checking…` : !ready(info) ? `<i class="bad"></i>${esc(info.note || `${ENGINE_NAME[cur]} isn't ready on this computer`)}`
-    : info.note ? `<i class="bad"></i>${esc(info.note)}` : `<i></i>Ready · uses ${plan}`;
+    : info.sandbox === false ? `<i class="bad"></i><span title="${esc(info.note)}">Full access: Codex's sandbox is broken on Windows</span>`
+    : info.note ? `<i class="bad"></i>${esc(info.note)}` : `<i></i>Ready · ${plan.replace(/^your /, "")}`;
   return `<div class="eseg" role="group" aria-label="Runs on">${seg}</div><div class="estat">${stat}<a href="#" id="engRefresh">Check again</a></div>`;
 }
 
 // a team's command-line tools: it may run only commands that start with one of these
 // Commands: none, only the tools switched on, or anything. "Anything" is the Edit + run code access level.
-const cmdMode = (n) => (n.tools === "full" ? "any" : (n.clis || []).length || n._cmds === "some" ? "some" : "none");
+const cmdMode = (n) => (n.tools === "full" || n.tools === "all" ? "any" : (n.clis || []).length || n._cmds === "some" ? "some" : "none");
 function cliRows(n) {
   const mode = cmdMode(n);
   const pick = `<div class="seg" data-cmds>${[["none", "None"], ["some", "Only these"], ["any", "Anything"]]
     .map(([v, l]) => `<button type="button" data-v="${v}" class="${v === mode ? "on" : ""}">${l}</button>`).join("")}</div>`;
-  if (mode === "any") return pick + `<div class="sub">Runs any command on this computer, like you could in a terminal.</div>`;
+  if (mode === "any") return pick;
   if (mode === "none") return pick;
   if (!clis) return pick + `<p class="hint" style="margin:0">Checking which tools are installed…</p>`;
   const on = n.clis || [];
@@ -1232,37 +1249,49 @@ function renderInspector() {
   const ordered = MODEL_ORDER.map((id) => meta.models.find((m) => m.id === id)).filter(Boolean)
     .concat(meta.models.filter((m) => !MODEL_ORDER.includes(m.id)));
   const EFFORTS = [["low", "Low"], ["medium", "Medium"], ["high", "High"], ["xhigh", "Extra high"], ["max", "Max"]];
-  const models = (value) => {   // a slider from fast to smart, like Claude Code's model picker
-    const i = Math.max(0, ordered.findIndex((m) => m.id === value)), n = ordered.length;
-    return `<div class="mslider"><div class="ends"><span>Faster</span><span>Smarter</span></div>
-      <input type="range" id="mRange" min="0" max="${n - 1}" step="1" value="${i}" style="--fill:${(i / (n - 1)) * 100}%" aria-label="Model">
-      <div class="stops" style="--n:${n}">${ordered.map((m, k) => `<button type="button" data-model-i="${k}" class="${k === i ? "on" : ""}">${esc(m.label.split(" ")[0])}</button>`).join("")}</div></div>`;
-  };
   const effortBar = (node) => {   // how hard it thinks: a slider from quick to deep
     if (String(node.model || "").startsWith("claude-haiku")) return "";   // Haiku has no effort setting
     const k = Math.max(0, EFFORTS.findIndex(([v]) => v === node.effort));
     return slider("efRange", 0, EFFORTS.length - 1, k, { name: "Effort", val: EFFORTS[k][1], lo: "Quick", hi: "Deep", c: "#b48cf2" });
   };
   const ROLE_TIPS = { think: "Planning, design, writing, judgment", build: "Making and changing things", run: "Checks, tests, merges, deploys" };
-  const modelPick = (node) => {   // a role (the Run menu says which model fills it) or a model picked by hand
-    const role = node.role || "";
-    const cards = ["think", "build", "run"].map((r) => `<button type="button" data-v="${r}" class="${r === role ? "on" : ""}" title="${esc(ROLE_TIPS[r])}"><b>${ROLE_NAME[r]}</b><small>${esc(modelLabel(roleModel(r)))}</small></button>`).join("")
-      + `<button type="button" data-v="" class="${role ? "" : "on"}" title="Choose the model for this step yourself"><b>Pick a model</b><small>${role ? "Choose it yourself" : esc(modelLabel(node.model))}</small></button>`;
-    return `<div class="rolecards" data-seg="role">${cards}</div>`
-      + (role ? `<div class="sub">${esc(ROLE_TIPS[role])}. The Run menu sets which model each role uses.</div>` : models(node.model));
+  const short = (label) => String(label).replace(/^Claude /, "").replace(/ \d+(\.\d+)*$/, "")   // "Opus 5.5" -> "Opus"
+    .replace(/^GPT-/i, "").replace(/^(Codex|Cursor) /, "").replace(/^default$/, "Default").replace(/^picks$/, "Auto");   // "GPT-6-Luna" -> "6-Luna"
+  const modelPick = (node) => {   // a role (one model per role, for the whole flow) or a model picked by hand
+    const role = node.role || "", eng = node.type === "cluster" ? engineOf(node) : "claude", claude = eng === "claude";
+    const cards = ["think", "build", "run"].map((r) => `<button type="button" data-v="${r}" class="${r === role ? "on" : ""}" title="${esc(`${ROLE_NAME[r]}: ${ROLE_TIPS[r]}`)}" aria-label="${ROLE_NAME[r]}">${ROLE_ICON[r]}<span>${esc(short(roleLabel(eng, r)))}</span></button>`).join("")
+      + `<button type="button" data-v="" class="${role ? "" : "on"}" title="Custom: a model for just this team" aria-label="Custom model">${ROLE_ICON.own}<span>Custom</span></button>`;
+    const row = `<div class="rolecards" data-seg="role">${cards}</div>`;
+    const pills = (attr, cur) => `<div class="seg" ${attr}>${ordered.map((m) => `<button type="button" data-id="${esc(m.id)}" class="${m.id === cur ? "on" : ""}">${esc(short(m.label))}</button>`).join("")}</div>`;
+    if (!role) return row + `<div class="rolemodel"><span class="rname">${ROLE_ICON.own}Custom <small>just this team</small></span>
+      ${claude ? pills("data-ownmodel", node.model) : engineModels(node)}</div>`;
+    const cur = roleModelOn(eng, role);
+    const tip = `Sets the model for every ${ROLE_NAME[role]} in this flow`;
+    const head = `<span class="rname">${ROLE_ICON[role]}${ROLE_NAME[role]} <small>every ${ROLE_NAME[role]} in this flow</small></span>`;
+    if (claude) return row + `<div class="rolemodel" title="${esc(tip)}">${head}${pills("data-rolemodel", cur)}</div>`;
+    const list = [["", eng === "codex" ? "Default" : "Auto"], ...(engineInfo(eng).models || []).filter((m) => m.id !== "auto").map((m) => [m.id, m.label])];
+    if (!list.some(([id]) => id === cur)) list.push([cur, cur]);
+    return row + `<div class="rolemodel" title="${esc(tip)}">${head}
+      <select id="roleModelSel" aria-label="${ROLE_NAME[role]} model">${opt(list, cur)}</select></div>`;
   };
   const modelNote = () => "";   // the model's blurb was one line too many; the slider says enough
-  const ACCESS = [["none", "Think only"], ["read", "Read files"], ["web", "Web"], ["research", "Read + web"], ["edit", "Edit files"], ["full", "Edit + run code"]];
+  const ACCESS = [["none", "Think"], ["read", "Read"], ["web", "Web"], ["research", "Read + web"], ["edit", "Edit"], ["full", "Edit + run"], ["all", "All"]];
   const ACCESS_NOTE = { none: "No tools: works only from what it's given.", read: "Can read the project, can't change anything.", web: "Can search and read the web.",
-                        research: "Can read the project and the web.", edit: "Can change files. Editing agents take turns.", full: "Can change files and run commands on this computer." };
-  const ACCESS_COLOR = { none: "#8f96a3", read: "#4fb59a", web: "#5b8def", research: "#7a9cf0", edit: "#e0a23c", full: "#e5604b" };   // safe to powerful
+                        research: "Can read the project and the web.", edit: "Can change files. Editing agents take turns.", full: "Can change files and run commands on this computer.",
+                        all: "Everything: reads and changes files, runs commands on this computer and uses the web." };
+  const ACCESS_COLOR = { none: "#8f96a3", read: "#4fb59a", web: "#5b8def", research: "#7a9cf0", edit: "#e0a23c", full: "#e5604b", all: "#d6409f" };   // safe to powerful
   const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const ROLE_ICON = { think: svg('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>'),
+    build: svg('<path d="M12 3 3 8l9 5 9-5z"/><path d="m3 13 9 5 9-5"/>'),
+    run: svg('<path d="M7 4v16l13-8z"/>'),
+    own: svg('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>') };
   const ACCESS_ICON = { none: svg('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>'),
     read: svg('<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
     web: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
     research: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>'),
     edit: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/>'),
-    full: svg('<path d="m5 8 4 4-4 4M12 17h7"/>') };
+    full: svg('<path d="m5 8 4 4-4 4M12 17h7"/>'),
+    all: svg('<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>') };
 
   // a slider with its name and value on top: the panel's main control
   const slider = (id, min, max, v, { name, val, lo, hi, c, tip }) => `<div class="sl"${c ? ` style="--c:${esc(c)}"` : ""}${tip ? ` title="${esc(tip)}"` : ""}>
@@ -1286,24 +1315,22 @@ function renderInspector() {
     const claude = engineOf(n) === "claude";
     const ai = Math.max(0, ACCESS.findIndex(([v]) => v === n.tools));
     const how = n.count === 1 ? ["Works alone", "One agent does the whole job."] : n.split ? ["Split the job", `The job is cut into ${n.count} parts, one each.`]
-      : n.tools === "edit" || n.tools === "full" ? ["Take turns", "They edit the folder one at a time."] : ["Side by side", "Each one does the whole job, all at once."];
+      : WRITES.includes(n.tools) ? ["Take turns", "They edit the folder one at a time."] : ["Side by side", "Each one does the whole job, all at once."];
     html += `<div class="isec"><h4>Job</h4>
         <label class="bpick">Bot<select id="iBot" title="Start from a ready-made bot">${botOptions(n)}</select></label>
         <textarea data-k="instructions" rows="3" placeholder="${esc(builtinOf(n) ? `${builtinOf(n).name}'s built-in job. Write your own here.` : "Review the changes for bugs.")}">${esc(n.instructions || "")}</textarea></div>
       <div class="isec"><h4>Agents</h4>
         <div class="agents"><div class="stepper"><button type="button" data-step="-1" aria-label="One agent fewer"${n.count <= 1 ? " disabled" : ""}>−</button><output>${n.count}</output><button type="button" data-step="1" aria-label="One agent more"${n.count >= meta.max_agents ? " disabled" : ""}>+</button></div>
-          <div class="how"><b>${how[0]}</b>${esc(how[1])}</div></div>
+          <div class="how" title="${esc(how[1])}"><b>${how[0]}</b></div></div>
         <label class="switch mini"><span><b>Split the job</b></span><input type="checkbox" id="splitSw"${n.split ? " checked" : ""} title="${esc(n.split ? `One job, cut into ${n.count} parts` : n.count > 1 ? "Every agent does the whole job" : "Adds a second agent and cuts the job in two")}"></label></div>
       <div class="isec"><h4>Model</h4>${engineCards(n)}
-        ${claude ? `${modelPick(n)}${effortBar(n)}` : engineModels(n)}</div>
+        ${modelPick(n)}${claude ? effortBar(n) : ""}</div>
       <div class="isec"><h4>Access</h4>
         <div class="access">${ACCESS.map(([v, l], j) => `<button type="button" data-acc="${j}" class="${j === ai ? "on" : ""}" style="--c:${ACCESS_COLOR[v]}" title="${esc(ACCESS_NOTE[v])}">${ACCESS_ICON[v]}<span>${esc(l)}</span></button>`).join("")}</div>
-        <div class="sub">${esc(ACCESS_NOTE[n.tools] || "")}</div>
         ${claude ? `<div class="slabel">Commands</div>${cliRows(n)}
         <div class="slabel">Apps <a href="#" id="connRefresh">Refresh</a></div>${connectorRows(n)}` : ""}</div>
       <div class="isec">${more(`<div class="field"><label>On the card</label><input data-k="summary" maxlength="80" value="${esc(n.summary || "")}" placeholder="${esc(summaryOf({ ...n, summary: "" }) || "What this team does, in a few words")}"></div>
-        <div class="field"><label>Focus per agent</label><textarea data-k="focuses" rows="3" placeholder="One line per agent, e.g.&#10;Logic and edge cases&#10;Error handling">${esc(n.focuses || "")}</textarea>
-          <div class="sub">Agent 1 gets line 1, and so on, so they don't all check the same thing.</div></div>
+        <div class="field"><label>Focus per agent</label><textarea data-k="focuses" rows="3" placeholder="One line per agent, e.g.&#10;Logic and edge cases&#10;Error handling" title="Agent 1 gets line 1, and so on, so they don't all check the same thing">${esc(n.focuses || "")}</textarea></div>
         <div class="row2" style="margin-top:12px"><div class="field"><label>Max turns</label><input type="number" min="0" max="200" data-k="max_turns" data-num value="${n.max_turns || 0}"><div class="sub">0 = no limit</div></div>
           <div class="field"><label>Look</label><div class="inrow" style="gap:6px"><select data-k="shape">${opt(meta.shapes.map((x) => [x, x[0].toUpperCase() + x.slice(1)]), n.shape)}</select>
             <input type="color" data-k="color" value="${esc(n.color)}" style="width:40px;height:34px;padding:2px;flex:none" aria-label="Color"></div></div></div>`)}</div>`;
@@ -1338,20 +1365,12 @@ function renderInspector() {
   });
   box.querySelectorAll("[data-seg] button").forEach((b) => b.addEventListener("click", () => {
     n[b.parentElement.dataset.seg] = b.dataset.v;
-    if (b.parentElement.dataset.seg === "role" && b.dataset.v) n.model = roleModel(b.dataset.v);
+    if (b.parentElement.dataset.seg === "role" && b.dataset.v) {
+      n.model = roleModel(b.dataset.v);
+      if (n.type === "cluster" && engineOf(n) !== "claude") n.engine_model = roleModelOn(engineOf(n), b.dataset.v);
+    }
     changed(false); renderInspector();
   }));
-  const range = $("mRange");
-  if (range) {
-    range.addEventListener("input", () => {   // live while dragging; full redraw when let go
-      const m = ordered[Number(range.value)];
-      n.model = m.id; n.role = ""; range.style.setProperty("--fill", `${(Number(range.value) / (ordered.length - 1)) * 100}%`);
-      box.querySelectorAll("[data-model-i]").forEach((b) => b.classList.toggle("on", Number(b.dataset.modelI) === Number(range.value)));
-      changed(false);
-    });
-    range.addEventListener("change", () => renderInspector());
-  }
-  box.querySelectorAll("[data-model-i]").forEach((b) => b.addEventListener("click", () => { n.model = ordered[Number(b.dataset.modelI)].id; n.role = ""; changed(false); renderInspector(); }));
   box.querySelectorAll("[data-effort]").forEach((b) => b.addEventListener("click", () => { n.effort = b.dataset.effort; changed(false); renderInspector(); }));
   if ($("planSw")) $("planSw").onchange = (e) => { n.mode = e.target.checked ? "brief" : "pass"; changed(false); renderInspector(); };
   box.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => {
@@ -1377,13 +1396,24 @@ function renderInspector() {
   };
   if ($("cliNew")) { $("cliNew").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addCli(); } }; $("cliNew").onchange = () => { if ($("cliNew").value.trim()) addCli(); }; }
   drawEngineIcons(box);
-  box.querySelectorAll("[data-engine]").forEach((b) => b.addEventListener("click", () => { n.engine = b.dataset.engine; changed(false); renderInspector(); }));
+  box.querySelectorAll("[data-engine]").forEach((b) => b.addEventListener("click", () => {
+    n.engine = b.dataset.engine;
+    if (n.role && n.engine !== "claude") n.engine_model = roleModelOn(n.engine, n.role);   // keeps its role on the new engine
+    changed(false); renderInspector();
+  }));
+  if ($("roleModelSel")) $("roleModelSel").onchange = (e) => {
+    setRoleModel(n.type === "cluster" ? engineOf(n) : "claude", n.role, e.target.value); changed(false); renderInspector();
+  };
+  box.querySelectorAll("[data-ownmodel] button").forEach((b) => b.addEventListener("click", () => { n.model = b.dataset.id; n.role = ""; changed(false); renderInspector(); }));
+  box.querySelectorAll("[data-rolemodel] button").forEach((b) => b.addEventListener("click", () => {
+    setRoleModel("claude", n.role, b.dataset.id); changed(false); renderInspector();
+  }));
   if ($("engRefresh")) $("engRefresh").onclick = (e) => { e.preventDefault(); engines = null; renderInspector(); loadEngines(true); };
   box.querySelectorAll("[data-cmds] button").forEach((b) => b.addEventListener("click", () => {
     const v = b.dataset.v;
-    if (v === "any") { n.tools = "full"; delete n._cmds; }
+    if (v === "any") { if (n.tools !== "all") n.tools = "full"; delete n._cmds; }
     else {
-      if (n.tools === "full") n.tools = "edit";   // keep file editing, drop "anything"
+      if (n.tools === "full" || n.tools === "all") n.tools = "edit";   // keep file editing, drop "anything"
       if (v === "none") { n.clis = []; delete n._cmds; } else n._cmds = "some";
     }
     changed(false); renderInspector();
@@ -1412,21 +1442,22 @@ function renderInspector() {
 $("runBtn").onclick = () => {
   $("runName").textContent = flow.name;
   $("folderIn").value = flow.folder || "";
-  $("taskIn").value = flow.task || "";   // your description, or the last task you ran (each flow keeps its own)
+  $("taskIn").value = draftTask;   // only what you typed: never a guess the team might run by mistake
   wireFolder("folderIn", () => {});
   loadRecentFolders().then(() => {
     $("recentChips").innerHTML = recentFolders.slice(0, 4).map((f) => `<button type="button" data-folder="${esc(f)}" title="${esc(f)}">${esc(f.split(/[\\/]/).filter(Boolean).pop() || f)}</button>`).join("");
   });
-  const writers = flow.nodes.filter((n) => n.type === "cluster" && (n.tools === "edit" || n.tools === "full"));
+  const writers = flow.nodes.filter((n) => n.type === "cluster" && WRITES.includes(n.tools));
   $("runEst").innerHTML = usageLine(est);
   renderRunTeam();
-  $("taskIdeas").innerHTML = TASK_IDEAS.map((t) => `<button type="button" data-idea="${esc(t)}">${esc(t)}</button>`).join("");
+  const last = (flow.task || "").trim();   // offered, never filled in: you pick it on purpose
+  $("taskIdeas").innerHTML = last && last !== draftTask.trim() ? `<button type="button" data-idea="${esc(last)}" title="${esc(last)}">Use last run's task: ${esc(last.length > 60 ? last.slice(0, 60) + "…" : last)}</button>` : "";
   $("runWarn").textContent = problems.join(" ");
-  const runners = writers.filter((w) => w.tools === "full");
+  const runners = writers.filter((w) => w.tools === "full" || w.tools === "all");
   const actors = flow.nodes.filter((n) => n.type === "cluster" && (n.connectors || []).length);
-  const cliTeams = flow.nodes.filter((n) => n.type === "cluster" && n.tools !== "full" && (n.clis || []).length);
+  const cliTeams = flow.nodes.filter((n) => n.type === "cluster" && n.tools !== "full" && n.tools !== "all" && (n.clis || []).length);
   const apps = [...new Set(actors.flatMap((n) => n.connectors.map(connName)))];
-  const codexOpen = flow.nodes.filter((n) => n.type === "cluster" && engineOf(n) === "codex" && engineInfo("codex").sandbox === false && n.tools !== "full");
+  const codexOpen = flow.nodes.filter((n) => n.type === "cluster" && engineOf(n) === "codex" && engineInfo("codex").sandbox === false && n.tools !== "full" && n.tools !== "all");
   const careful = writers.length > 0 || actors.length > 0 || cliTeams.length > 0 || codexOpen.length > 0;
   $("riskBox").hidden = !careful; $("riskOk").checked = false;
   $("riskText").textContent = [
@@ -1437,7 +1468,12 @@ $("runBtn").onclick = () => {
     cliTeams.length ? cliTeams.map((n) => `${n.name} can run ${n.clis.join(", ")} on this computer.`).join(" ") : "",
     codexOpen.length ? `${codexOpen.map((n) => n.name).join(", ")} run${codexOpen.length === 1 ? "s" : ""} on Codex with full access, because Codex's sandbox doesn't work on this computer.` : "",
   ].filter(Boolean).join(" ");
-  const ready = () => { $("goBtn").disabled = problems.length > 0 || (careful && !$("riskOk").checked); };
+  ready = () => {
+    const task = realTask($("taskIn").value);
+    $("goBtn").disabled = !task || problems.length > 0 || (careful && !$("riskOk").checked);
+    $("taskSub").textContent = task ? "" : "Type the job first. The run can't start until it knows what to do.";
+    $("taskSub").classList.toggle("need", !task);
+  };
   $("riskOk").onchange = ready; ready();
   const lim = String(flow.limit ?? 1000000);
   if (![...$("limitIn").options].some((o) => o.value === lim)) $("limitIn").add(new Option(lim === "0" ? "No limit" : `${tokenWord(+lim)} tokens`, lim));
@@ -1449,12 +1485,12 @@ $("runBtn").onclick = () => {
   $("limitIn").onchange = limitNote; limitNote();
   const roleSelects = [...document.querySelectorAll("#runDlg [data-role]")];
   roleSelects.forEach((el) => { el.innerHTML = opt(meta.models.map((m) => [m.id, m.label]), roleModel(el.dataset.role)); el.value = roleModel(el.dataset.role); });
-  const roleCount = (r) => flow.nodes.filter((n) => n.role === r && !(n.type === "master" && n.mode === "pass") && !(n.type === "checkpoint" && n.mode !== "summarize")).length;
+  const roleCount = (r) => flow.nodes.filter((n) => n.role === r && !(n.type === "cluster" && engineOf(n) !== "claude") && !(n.type === "master" && n.mode === "pass") && !(n.type === "checkpoint" && n.mode !== "summarize")).length;
   const counts = ["think", "build", "run"].map((r) => [ROLE_NAME[r], roleCount(r)]).filter(([, c]) => c);
   $("rolesField").hidden = !counts.length;   // nothing to pick for yet
   $("rolesSub").textContent = `Stages in this flow: ${counts.map(([r, c]) => `${c} ${r}`).join(", ")}. `
     + "A stage with a model picked by hand keeps it. Each stage stays on one model, so nothing is paid for twice.";
-  $("runDlg").showModal(); $("taskIn").focus(); $("taskIn").select();
+  $("runDlg").showModal(); $("taskIn").focus();
 };
 // whose plan this run uses, so nobody is surprised by their usage
 const PLAN_NAME = { claude: "Claude", codex: "ChatGPT (Codex)", cursor: "Cursor" };
@@ -1467,8 +1503,10 @@ function usageLine(e) {
   return `<b>${e.sessions} agent session${e.sessions === 1 ? "" : "s"}</b>: ${esc(parts.join(", "))}.` +
     (big ? ` <span class="bigrun">This is a big run and can use a lot of your plan.</span>` : "");
 }
-const TASK_IDEAS = ["Review this project for bugs", "Fix the failing tests", "Clean up every row in data.csv", "Triage my open GitHub issues"];
-$("taskIdeas").addEventListener("click", (e) => { const b = e.target.closest("[data-idea]"); if (b) { $("taskIn").value = b.dataset.idea; $("taskIn").focus(); } });
+// a real job is a few words, not a stray letter: the same rule the server uses
+const realTask = (t) => (t.trim().match(/\p{L}{2,}/gu) || []).length >= 2;
+let draftTask = "", ready = () => {};
+$("taskIdeas").addEventListener("click", (e) => { const b = e.target.closest("[data-idea]"); if (b) { $("taskIn").value = draftTask = b.dataset.idea; $("taskIdeas").innerHTML = ""; ready(); $("taskIn").focus(); } });
 $("recentChips").addEventListener("click", (e) => { const b = e.target.closest("[data-folder]"); if (b) $("folderIn").value = b.dataset.folder; });
 // Nodes in the order a run reaches them: by how many steps from the start, then top to bottom. (Not by where they sit:
 // a long flow wraps onto rows, so a later step can sit further left.)
@@ -1488,7 +1526,7 @@ function agentFocus(n, i) {   // as flows.py's _cluster tells agent i
   if (n.split && c > 1) return `Part ${i} of ${c}` + (fs.length ? ` · ${fs[(i - 1) % fs.length]}` : "");
   return fs.length ? fs[(i - 1) % fs.length] : "";
 }
-const WRITES = ["edit", "full"];   // agents.py WRITES: these take turns in the folder unless the team splits the job
+const WRITES = ["edit", "full", "all"];   // agents.py WRITES: these take turns in the folder unless the team splits the job
 function teamHow(n) {
   const c = n.count || 1, fs = (n.focuses || "").trim();
   if (c < 2) return "";
@@ -1570,7 +1608,7 @@ function renderRunTeam() {   // the team in running order, as little avatars
     else drawBot(c, { shape: cv.dataset.shape, color: cv.dataset.color }, 6, 8, 7, { state: "idle", t: 0 });
   });
 }
-$("taskIn").addEventListener("input", () => { flow.task = $("taskIn").value.slice(0, 4000); });   // a draft survives closing the menu
+$("taskIn").addEventListener("input", () => { draftTask = $("taskIn").value.slice(0, 4000); ready(); });   // a draft survives closing the menu
 $("taskIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !$("goBtn").disabled) $("goBtn").click(); });
 let starting = false;   // a double-click must not start two runs
 $("goBtn").onclick = async () => {
@@ -1585,7 +1623,7 @@ $("goBtn").onclick = async () => {
     flow.limit = +$("limitIn").value;
     flow.folder = $("folderIn").value.trim().replace(/^"|"$/g, "");
     flow.task = $("taskIn").value.trim().slice(0, 4000);
-    $("runDlg").close(); $("taskIn").value = "";
+    $("runDlg").close(); $("taskIn").value = draftTask = "";
     openRun(d.run);
   } catch (e) { $("runWarn").textContent = e.message; } finally { starting = false; }
 };

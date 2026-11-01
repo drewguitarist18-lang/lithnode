@@ -101,9 +101,30 @@ STORE = Path(os.environ.get("CLAWD_BOT_HOME") or Path.home() / ".clawd-bot")
 MODELS = [
     {"id": "claude-opus-5-5", "label": "Opus 5.5", "blurb": "Most capable everyday model"},
     {"id": "claude-sonnet-5-5", "label": "Sonnet 5.5", "blurb": "Fast and capable"},
-    {"id": "claude-fable-5-1", "label": "Fable 5.1", "blurb": "Deepest reasoning, slower"},
+    {"id": "claude-fable-5-1", "label": "Fable 5.1", "blurb": "Deepest reasoning, slower", "not_on": ["free", "pro"]},
     {"id": "claude-haiku-4-5", "label": "Haiku 4.5", "blurb": "Fastest and cheapest"},
 ]
+
+
+
+def usable_models() -> list[dict[str, Any]]:
+    """The models this account's plan can run: Fable isn't on Free or Pro."""
+    plan = claude_code.auth_status().get("plan") or ""
+    return [m for m in MODELS if plan not in m.get("not_on", [])]
+
+
+def plan_problems(flow: dict[str, Any]) -> list[str]:
+    """Stages set to a Claude model this plan can't use, said plainly so the run never starts and fails."""
+    ok = {m["id"] for m in usable_models()}
+    names = {m["id"]: m["label"] for m in MODELS}
+    stuck = [n for n in flow.get("nodes", []) if n.get("model") in names and n["model"] not in ok
+             and not (n["type"] == "master" and n.get("mode") == "pass") and not (n["type"] == "checkpoint" and n.get("mode") != "summarize")
+             and not (n["type"] == "cluster" and n.get("engine", "claude") != "claude")]
+    if not stuck:
+        return []
+    model = names[stuck[0]["model"]].split(" ")[0]
+    return [f"{model} isn't on your Claude plan. Pick another model for {', '.join(n['name'] for n in stuck)}."]
+
 
 PERSONA = (
     "You are Claude, an all-round assistant. Be direct and concise: answer first, "
@@ -426,12 +447,12 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- flows -------------------------------------------------------------------
     def flow_payload(self, flow: dict[str, Any]) -> dict[str, Any]:
-        return {"flow": flow, "estimate": flows.estimate(flow), "problems": flows.check_runnable(flow)}
+        return {"flow": flow, "estimate": flows.estimate(flow), "problems": flows.check_runnable(flow) + plan_problems(flow)}
 
     def GET_api_flows(self) -> None:
         self.send_json({"flows": HQ_STORE.list_flows(),
                         "templates": [{"id": t["id"], "name": t["name"], "blurb": t["blurb"]} for t in flows.TEMPLATES],
-                        "models": MODELS, "tools": list(flows.agents.TOOLSETS), "shapes": list(flows.SHAPES),
+                        "models": usable_models(), "tools": list(flows.agents.TOOLSETS), "shapes": list(flows.SHAPES),
                         "max_agents": flows.MAX_AGENTS})
 
     def POST_api_flows(self) -> None:
@@ -454,7 +475,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"error": "Describe the team you want first."}, 400)
         bots = [public_bot(b) for b in load_bots()]
         agent = flows.agents.Agent(model=flows.DESIGNER_MODEL, effort="low", tools="none",
-                                   system=flows.designer_system(bots, MODELS), prompt=prompt,
+                                   system=flows.designer_system(bots, usable_models()), prompt=prompt,
                                    cwd=HQ_STORE.work_dir / "_designer", on_update=lambda: None)
         if not agent.run():
             return self.send_json({"error": agent.error or "The designer failed."}, 502)
@@ -463,7 +484,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, KeyError) as exc:
             return self.send_json({"error": str(exc)}, 422)
         flow["id"] = uuid.uuid4().hex[:12]
-        flow["task"] = prompt   # the Run menu opens with what you asked for
+        flow["task"] = ""   # what the team is, not a job for it: the Run menu asks for the job itself
         HQ_STORE.save_flow(flow)
         self.send_json({**self.flow_payload(flow), "cost": round(agent.cost, 4)})
 
@@ -495,9 +516,9 @@ class Handler(BaseHTTPRequestHandler):
         if method == "POST" and action == "run":
             body = self.read_json()
             task = str(body.get("task") or "").strip()
-            if not task:
-                return self.send_json({"error": "Type a task for the flow."}, 400)
-            problems = flows.check_runnable(flow)
+            if len(re.findall(r"[^\W\d_]{2,}", task)) < 2:   # a stray letter or "x" must never start a run
+                return self.send_json({"error": "Type what the team should do first, in a few words."}, 400)
+            problems = flows.check_runnable(flow) + plan_problems(flow)
             if problems:
                 return self.send_json({"error": " ".join(problems)}, 400)
             folder = str(body.get("folder") or flow.get("folder") or "").strip().strip('"')

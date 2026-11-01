@@ -341,6 +341,7 @@ def auth_status(force: bool = False) -> dict[str, Any]:
             value["logged_in"] = bool(data.get("loggedIn"))
             value["method"] = data.get("authMethod")
             value["email"] = data.get("email") or ""
+            value["plan"] = str(data.get("subscriptionType") or "").lower()   # pro, max, team, ...: some models need more than Pro
         except (OSError, ValueError, subprocess.TimeoutExpired):
             pass
     _status_cache.update(at=now, value=value)

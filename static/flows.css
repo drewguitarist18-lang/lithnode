@@ -457,14 +457,14 @@ main.running #floatRun { display: none; }
 .sl-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); }
 .sl-top b { color: var(--ink); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .sl-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); letter-spacing: .04em; opacity: .8; }
-.sl input[type=range], .mslider input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.sl input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .sl input[type=range]:focus { outline: none; }
-.sl input[type=range]::-webkit-slider-runnable-track, .mslider input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 999px;
+.sl input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 999px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--c, var(--accent)) 55%, transparent), var(--c, var(--accent)) var(--fill, 0%), color-mix(in srgb, var(--ink) 9%, transparent) var(--fill, 0%)); }
-.sl input[type=range]::-webkit-slider-thumb, .mslider input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -7px; border-radius: 50%;
+.sl input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -7px; border-radius: 50%;
   background: #fff; border: 0; box-shadow: 0 0 0 5px color-mix(in srgb, var(--c, var(--accent)) 35%, transparent), 0 3px 12px color-mix(in srgb, var(--c, var(--accent)) 60%, transparent);
   transition: box-shadow .15s; }
-.sl input[type=range]:hover::-webkit-slider-thumb, .mslider input[type=range]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 8px color-mix(in srgb, var(--c, var(--accent)) 30%, transparent), 0 3px 14px color-mix(in srgb, var(--c, var(--accent)) 70%, transparent); }
+.sl input[type=range]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 8px color-mix(in srgb, var(--c, var(--accent)) 30%, transparent), 0 3px 14px color-mix(in srgb, var(--c, var(--accent)) 70%, transparent); }
 .sl input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--c); outline-offset: 3px; }
 /* the bot a team starts from */
 .bpick { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
@@ -474,17 +474,18 @@ main.running #floatRun { display: none; }
 .agents .how { min-width: 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
 .agents .how b { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); }
 .stepper button:disabled { opacity: .35; }
-/* which model: a role (the Run menu says which model fills it) or one picked by hand */
-.rolecards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.rolecards button { display: grid; gap: 1px; min-width: 0; padding: 7px 10px; border-radius: 10px; text-align: left; }
-.rolecards b { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rolecards small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rolecards button.on { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); background: color-mix(in srgb, var(--accent) 10%, var(--pad));
-                       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
-.rolecards button.on small { color: color-mix(in srgb, var(--accent) 65%, var(--ink)); }
+/* which model: a role (one model per role, for the whole flow) or one picked by hand */
+.rolecards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.rolecards button { display: grid; justify-items: center; gap: 4px; min-width: 0; padding: 8px 4px 7px; border-radius: 10px; font-size: 11.5px; color: var(--muted); }
+.rolecards button svg { width: 17px; height: 17px; }
+.rolecards span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rolecards button.on { color: var(--ink); font-weight: 600; border-color: color-mix(in srgb, var(--done) 60%, var(--line));
+                       background: color-mix(in srgb, var(--done) 12%, var(--pad)); }
+.rolecards button.on svg { color: var(--done); }
 /* what a team may touch, safe to powerful: each level named, in its own color */
 .access { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .access button { --c: var(--muted); display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 9px; border-radius: 10px; font-size: 12.5px; text-align: left; }
+.access button:last-child:nth-child(odd) { grid-column: 1 / -1; }   /* All, on its own row */
 .access button svg { flex: none; width: 16px; height: 16px; color: var(--c); }
 .access button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .access button.on { border-color: color-mix(in srgb, var(--c) 60%, var(--line)); background: color-mix(in srgb, var(--c) 12%, var(--pad)); font-weight: 600;
@@ -578,25 +579,12 @@ main.running #floatRun { display: none; }
 .switch input { appearance: none; -webkit-appearance: none; flex: none; width: 40px; height: 23px; padding: 0; border: 0; border-radius: 999px;
                 background: var(--line); position: relative; cursor: pointer; transition: background .15s; }
 .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 17px; height: 17px; border-radius: 50%; background: var(--ink); transition: transform .15s; }
-.switch input:checked { background: var(--accent); }
-.switch input:checked::after { transform: translateX(17px); }
+.switch input:checked { background: var(--done); }   /* green: the accent is the text colour, so on it read white on white */
+.switch input:checked::after { transform: translateX(17px); background: #fff; }
 .switch input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .switch.conn { padding: 8px 12px; }
 .switch.conn + .switch.conn { margin-top: 6px; }
-/* model slider and effort bar, like Claude Code's */
-.mslider { display: grid; gap: 6px; }
-.mslider .ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
-.mslider input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; }
-.mslider input[type=range]:focus { outline: none; }
-.mslider input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px;
-  background: linear-gradient(90deg, var(--accent) var(--fill, 0%), var(--line) var(--fill, 0%)); }
-.mslider input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%;
-  background: var(--ink); border: 4px solid var(--accent); box-shadow: 0 2px 8px var(--shadow); }
-.mslider input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
-.mslider .stops { display: grid; grid-template-columns: repeat(var(--n), 1fr); font-size: 11.5px; color: var(--muted); }
-.mslider .stops button { border: 0; background: none; padding: 0; color: inherit; font-size: inherit; text-align: center; }
-.mslider .stops button:first-child { text-align: left; } .mslider .stops button:last-child { text-align: right; }
-.mslider .stops button.on { color: var(--ink); font-weight: 600; }
+/* effort bar, like Claude Code's */
 .effort { display: grid; gap: 6px; }
 .effort .bars { display: flex; align-items: flex-end; gap: 5px; height: 34px; }
 .effort .bars button { flex: 1; padding: 0; border-radius: 4px 4px 2px 2px; border: 1px solid var(--line); background: var(--pad); }
@@ -698,6 +686,7 @@ dialog.usagedlg { width: min(460px, 94vw); padding: 22px 22px 18px; }
 .steps strong { color: var(--ink); }
 details.more { margin: 4px 0 12px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; background: var(--pad); }
 details.more > summary { cursor: pointer; padding: 9px 0; font-weight: 600; font-size: 12.5px; color: var(--muted); list-style: none; }
+details.more > summary small { font-weight: 400; font-size: 11px; opacity: .75; margin-left: 4px; }
 details.more > summary::before { content: "▸ "; }
 details.more[open] > summary::before { content: "▾ "; }
 details.more[open] { padding-bottom: 4px; }
@@ -887,3 +876,16 @@ html body .rp-bottom p { font-family: var(--sans); }
 #wires .vis { stroke: color-mix(in srgb, var(--wc, var(--wire)) 50%, var(--wire)); }
 #wires .wire.live .vis { stroke: var(--wc, var(--running)); filter: drop-shadow(0 0 4px var(--wc, var(--running))); }
 #wires .wire.ok .vis { stroke: color-mix(in srgb, var(--done) 75%, var(--wire)); }
+#taskSub.need { color: var(--failed); }
+.rolemodel { display: grid; gap: 6px; margin-top: 10px; min-width: 0; }
+.rolemodel .rname { display: flex; align-items: center; gap: 5px; flex: none; font-size: 12px; font-weight: 600; color: var(--ink); }
+.rolemodel .rname svg { width: 14px; height: 14px; color: var(--done); }
+.rolemodel .rname small { font-weight: 400; font-size: 11px; color: var(--muted); }
+.rolemodel select[data-k] { width: 100%; }
+.rolemodel .seg { min-width: 0; }
+.rolemodel .seg button { padding: 5px 2px; font-size: 12px; }
+.rolemodel select { width: 100%; min-width: 0; appearance: none; -webkit-appearance: none; padding: 7px 30px 7px 11px;
+  border-radius: 10px; border: 1px solid var(--line); background-color: var(--bg); color: var(--ink); font-size: 12.5px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 14px; }
+.rolemodel select:hover { border-color: color-mix(in srgb, var(--done) 50%, var(--line)); }

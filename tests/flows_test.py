@@ -270,8 +270,8 @@ try:
     raw["nodes"].append({"id": "y", "type": "approval", "webhook": "file:///etc/passwd"})
     hpath.write_text(json.dumps(raw), encoding="utf-8")
     check("a hand-edited flow file with a bad webhook won't load or run",
-          call(f"/api/flows/{hid}")[0] == 400 and call(f"/api/flows/{hid}/run", {"task": "x"}, "POST")[0] == 400)
-    s, r = call(f"/api/flows/{fid}/run", {"task": "x"}, "POST")
+          call(f"/api/flows/{hid}")[0] == 400 and call(f"/api/flows/{hid}/run", {"task": "Check the code"}, "POST")[0] == 400)
+    s, r = call(f"/api/flows/{fid}/run", {"task": "Check the code"}, "POST")
     check("an unrunnable flow refuses to start, saying why", s == 400 and r["error"].startswith("Add a team"), r)
 
     # ---- run: quick review (parallel read-only reviewers -> summary) ---------------------------
@@ -282,6 +282,8 @@ try:
     check("a folder that doesn't exist is refused", s == 400 and "doesn't exist" in r["error"], r)
     s, r = call(f"/api/flows/{review['id']}/run", {"task": "  "}, "POST")
     check("an empty task is refused", s == 400)
+    for junk in ("x", "go", "a b c", "12345 678"):
+        check(f"a task that isn't a real job is refused: {junk!r}", call(f"/api/flows/{review['id']}/run", {"task": junk}, "POST")[0] == 400)
     n0 = len(cli_calls())
     s, r = call(f"/api/flows/{review['id']}/run", {"task": "Review the app", "folder": str(project)}, "POST")
     run = wait_run(r["run"])
@@ -408,7 +410,7 @@ try:
             nd.update(tools="full", clis=["gh"])
     call(f"/api/flows/{tf['id']}", tf, "POST")
     n0 = len(cli_calls())
-    wait_run(call(f"/api/flows/{tf['id']}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    wait_run(call(f"/api/flows/{tf['id']}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"])
     f = [c for c in agent_calls(n0) if "Reviewers" in c["flags"]["--append-system-prompt"]][0]["flags"]
     check("a team that can run anything isn't narrowed by its CLI list", f.get("--allowedTools") == "Read,Glob,Grep,Edit,Write,Bash"
           and "Command-line tools" not in f["--append-system-prompt"], f)
@@ -455,7 +457,7 @@ try:
         if nd["id"] == "cx":
             nd["instructions"] = "LIMITME"
     call(f"/api/flows/{made['flow']['id']}", mixed, "POST")
-    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"])
     check("a plan that hit its limit says so in plain words", run["status"] == "failed"
           and "Codex plan has hit its usage limit" in run["nodes"]["cx"]["error"], run["nodes"]["cx"].get("error"))
 
@@ -564,7 +566,7 @@ try:
     check("final result comes from the production check", "Production check report" in run["final"], run["final"])
 
     # ---- reject ------------------------------------------------------------------------------
-    s, r = call(f"/api/flows/{ship['id']}/run", {"task": "Again", "folder": str(project)}, "POST")
+    s, r = call(f"/api/flows/{ship['id']}/run", {"task": "Again please", "folder": str(project)}, "POST")
     run = wait_run(r["run"], until=("waiting", "failed"))
     call(f"/api/runs/{run['id']}/decide", {"node": "ok", "approved": False, "note": "not now"}, "POST")
     run = wait_run(run["id"])
@@ -598,11 +600,11 @@ try:
           and sc and "Atlas report from" in sc[0]["prompt"], (run["status"], {k: v["status"] for k, v in run["nodes"].items()}))
 
     f = simple_flow({"name": "FAILSTAGE", "count": 2, "model": "claude-haiku-4-5"})
-    run = wait_run(call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{f}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"])
     check("a cluster where every agent fails fails the run", run["status"] == "failed" and run["nodes"]["c"]["status"] == "failed"
           and "blew up" in run["nodes"]["c"]["error"] and run["nodes"]["done"]["status"] == "skipped", run["nodes"]["c"])
     f = simple_flow({"name": "Mixed", "count": 3, "model": "claude-haiku-4-5", "focuses": "fine\nFAILME\nfine"})
-    run = wait_run(call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{f}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"])
     check("one failed agent out of three: the stage carries on", run["status"] == "done" and "1 of 3 agents failed" in run["nodes"]["c"]["note"]
           and run["nodes"]["c"]["output"].count("report from") == 2, run["nodes"]["c"])
 
@@ -612,7 +614,7 @@ try:
     _, got = call(f"/api/flows/{f}")
     check("a stage with a role gets the role's model, not the one it was saved with",
           got["flow"]["nodes"][1]["model"] == flows.DEFAULT_MODELS["build"] and got["flow"]["models"] == flows.DEFAULT_MODELS, got["flow"]["nodes"][1])
-    run = wait_run(call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project), "models": {"build": "claude-haiku-4-5"}}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{f}/run", {"task": "Go do it", "folder": str(project), "models": {"build": "claude-haiku-4-5"}}, "POST")[1]["run"])
     _, got = call(f"/api/flows/{f}")
     rc = agent_calls(n0)
     check("switching the Build model in the Run menu runs that stage on it, and is remembered",
@@ -629,7 +631,7 @@ try:
                                     {"id": "done", "type": "done", "x": 0, "y": 0}],
            "edges": [{"from": "master", "to": "a"}, {"from": "a", "to": "b"}, {"from": "b", "to": "done"}]}
     call(f"/api/flows/{made['flow']['id']}", dry, "POST")
-    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"])
     said = " ".join(e.get("text", "") for e in run.get("log", []))
     check("out of usage stops the run, says why, and starts nothing after it",
           run["status"] == "stopped" and "out of usage" in said and run["nodes"]["b"]["status"] != "done"
@@ -639,7 +641,7 @@ try:
     # ---- writers take turns --------------------------------------------------------------------
     n0 = len(cli_calls())
     f = simple_flow({"name": "Writers", "count": 2, "model": "claude-haiku-4-5", "tools": "edit"})
-    run = wait_run(call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{f}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"])
     w = agent_calls(n0)
     check("agents that edit files take turns", len(w) == 2 and w[1]["t"] >= ends()[w[0]["flags"]["--session-id"]], w)
     check("the second writer sees the first one's report", "Teammates who went before you" in w[1]["prompt"]
@@ -652,7 +654,7 @@ try:
                                        {"id": "done", "type": "done", "x": 0, "y": 0}],
                 "edges": [{"from": "master", "to": "l"}, {"from": "master", "to": "r"}, {"from": "l", "to": "done"}, {"from": "r", "to": "done"}]}
     call(f"/api/flows/{made['flow']['id']}", branches, "POST")
-    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{made['flow']['id']}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"])
     w = sorted(agent_calls(n0), key=lambda c: c["t"])
     check("writers in parallel branches take turns in the folder too", run["status"] == "done" and len(w) == 2
           and w[1]["t"] >= ends()[w[0]["flags"]["--session-id"]], w)
@@ -661,13 +663,13 @@ try:
     f = simple_flow({"name": "Nowhere", "count": 1, "model": "claude-haiku-4-5"})
     (hq_home / "workspaces").mkdir(parents=True, exist_ok=True)
     (hq_home / "workspaces" / f).write_text("a file where the workspace folder should be")
-    run = wait_run(call(f"/api/flows/{f}/run", {"task": "go"}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{f}/run", {"task": "Go do it"}, "POST")[1]["run"])
     a = run["nodes"]["c"]["agents"]
     check("an agent whose folder can't be made fails cleanly (not stuck running)", run["status"] == "failed"
           and a and a[0]["status"] == "failed" and "folder" in a[0]["error"], a)
     f = simple_flow({"name": "HANGSTAGE", "count": 1, "model": "claude-haiku-4-5"})
     t0 = time.time()
-    run = wait_run(call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"], timeout=AGENT_TIMEOUT + 60)
+    run = wait_run(call(f"/api/flows/{f}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"], timeout=AGENT_TIMEOUT + 60)
     a = run["nodes"]["c"]["agents"]
     check("a hung agent is stopped after the time limit", run["status"] == "failed" and a and "Timed out" in a[0]["error"]
           and time.time() - t0 < AGENT_TIMEOUT + 30, (run["status"], a[:1]))
@@ -675,7 +677,7 @@ try:
     # ---- built-in bots: a cluster based on one runs with its hidden role ------------------------
     n0 = len(cli_calls())
     f = simple_flow({"name": "Bugs", "count": 1, "model": "claude-haiku-4-5", "bot": "beetle"})
-    run = wait_run(call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{f}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"])
     sysp = agent_calls(n0)[0]["flags"]["--append-system-prompt"]
     check("a cluster made from a built-in bot uses its hidden role", run["status"] == "done" and "You are Beetle" in sysp, sysp[:160])
     check("the hidden role isn't stored in the flow", call(f"/api/flows/{f}")[1]["flow"]["nodes"][1]["instructions"] == "")
@@ -684,7 +686,7 @@ try:
 
     # ---- the office shows flow agents, and Stop kills them -------------------------------------
     f = simple_flow({"name": "SLOWSTAGE crew", "count": 2, "model": "claude-haiku-4-5", "shape": "byte", "color": "#5b8def"})
-    rid = call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"]
+    rid = call(f"/api/flows/{f}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"]
     seen = []
     for _ in range(30):
         seen = [s for s in call("/api/sessions")[1]["sessions"] if s.get("flow")]
@@ -760,7 +762,7 @@ try:
     check("designed flows are laid out left to right", d["flow"]["dir"] == "lr"
           and nodes["master"]["x"] < nodes["bug-hunters"]["x"] < nodes["merge"]["x"] < nodes["done"]["x"])
     check("the designed flow is ready to run", d["problems"] == [], d["problems"])
-    check("the Run menu opens with what you asked for", d["flow"]["task"] == "Two bug hunters review my code, then summarize")
+    check("a designed flow has no task yet: the Run menu asks for one", d["flow"]["task"] == "")
     dc = agent_calls(n0)
     designed = d["flow"]
     s, r = call(f"/api/flows/{designed['id']}/run", {"task": "Check the login code", "folder": str(project)}, "POST")
@@ -779,16 +781,29 @@ try:
     check("folders you ran flows in are suggested, once each", call("/api/folders")[1]["folders"].count(str(project)) == 1)
 
 
+    # ---- a Pro plan has no Fable ----------------------------------------------------------------
+    Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True, "plan": "pro"}))
+    call("/api/hq?fresh=1")
+    check("Fable isn't offered on a Pro plan", "claude-fable-5-1" not in [m["id"] for m in call("/api/flows")[1]["models"]])
+    f = simple_flow({"name": "Deep", "count": 1, "role": "think"}, models={"think": "claude-fable-5-1"})
+    s, r = call(f"/api/flows/{f}")
+    check("a flow set to Fable on Pro says so before you run", any("Fable isn't on your Claude plan" in p for p in r["problems"]), r["problems"])
+    s, r = call(f"/api/flows/{f}/run", {"task": "Think it through", "folder": str(project)}, "POST")
+    check("and won't start", s == 400 and "Fable" in r["error"], r)
+    Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True}))
+    call("/api/hq?fresh=1")
+    check("Fable is back on Max", "claude-fable-5-1" in [m["id"] for m in call("/api/flows")[1]["models"]])
+
     # ---- signed out ------------------------------------------------------------------------------
     Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": False}))
     f = simple_flow({"name": "Anyone", "count": 1, "model": "claude-haiku-4-5"})
-    run = wait_run(call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"])
+    run = wait_run(call(f"/api/flows/{f}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"])
     check("signed-out Claude Code gives a clear message", run["status"] == "failed"
           and "claude auth login" in run["nodes"]["c"]["agents"][0]["error"], run["nodes"]["c"]["agents"][0]["error"])
     Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True}))
 
     # ---- a run waiting when HQ closes is marked interrupted --------------------------------------
-    rid = call(f"/api/flows/{ship['id']}/run", {"task": "late", "folder": str(project)}, "POST")[1]["run"]
+    rid = call(f"/api/flows/{ship['id']}/run", {"task": "Run late", "folder": str(project)}, "POST")[1]["run"]
     wait_run(rid, until=("waiting",))
     # opening Lithnode again while it runs just focuses the window: it must not touch the live server's runs
     subprocess.run([sys.executable, str(ROOT / "hq.py"), "--no-open"], env=server_env(), timeout=60)
@@ -807,7 +822,7 @@ try:
 
     # ---- Quit stops the agents that are still working ----------------------------------------------
     f = simple_flow({"name": "SLOWSTAGE crew", "count": 2, "model": "claude-haiku-4-5"})
-    rid = call(f"/api/flows/{f}/run", {"task": "go", "folder": str(project)}, "POST")[1]["run"]
+    rid = call(f"/api/flows/{f}/run", {"task": "Go do it", "folder": str(project)}, "POST")[1]["run"]
     working = []
     for _ in range(30):
         working = [a["session_id"] for a in call(f"/api/runs/{rid}")[1]["nodes"]["c"]["agents"]]

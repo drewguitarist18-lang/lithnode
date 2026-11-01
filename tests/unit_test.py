@@ -51,6 +51,16 @@ check("a straight line isn't a loop", not flows._has_cycle(["a", "b"], [{"from":
 ship = flows.from_template("ship-it")
 check("the ship-it template is ready to run", ship and len(ship["nodes"]) == 9 and flows.check_runnable(ship) == [], ship and flows.check_runnable(ship))
 check("an unknown template is None", flows.from_template("nope") is None)
+_teams = {"nodes": [{"id": "s", "type": "master", "mode": "pass"},
+                    {"id": "c", "type": "cluster", "role": "think", "engine": "codex", "engine_model": "old"},
+                    {"id": "k", "type": "cluster", "role": "run", "engine": "cursor"},
+                    {"id": "h", "type": "cluster", "role": "", "engine": "codex", "engine_model": "gpt-hand"}],
+          "engine_models": {"codex": {"think": "gpt-5.5", "build": "bad model!"}}}
+_cf = {n["id"]: n for n in flows.clean_flow(_teams)["nodes"]}
+check("a Codex role takes the flow's pick for that role", _cf["c"]["engine_model"] == "gpt-5.5", _cf["c"])
+check("a role with no pick uses the CLI's own default", _cf["k"]["engine_model"] == "", _cf["k"])
+check("a model picked by hand is kept", _cf["h"]["engine_model"] == "gpt-hand", _cf["h"])
+check("a bad role model is dropped", flows.clean_flow(_teams)["engine_models"]["codex"]["build"] == "")
 check("every template is ready to run", all(flows.check_runnable(flows.from_template(t["id"])) == [] for t in flows.TEMPLATES),
       [t["id"] for t in flows.TEMPLATES if flows.check_runnable(flows.from_template(t["id"]))])
 check("an unknown node type is refused", raises(lambda: flows.clean_node({"id": "a", "type": "bogus"})))
