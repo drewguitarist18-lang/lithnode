@@ -11,7 +11,7 @@
   const D = 26;   // the camera's distance, in Schwarzschild radii
   const FS = `
     precision highp float;
-    uniform vec2 uC; uniform float uK, uP, uN, uT; uniform vec3 uCam;
+    uniform vec2 uC; uniform float uK, uP, uN, uT; uniform vec3 uCam; uniform vec4 uM;
     const float D = ${D}., RIN = 1.6, ROUT = 14.5, BC = 2.598;
     float hash3(vec3 p){ p = fract(p * .3183099 + .1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
     float noise3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
@@ -58,7 +58,11 @@
       return clamp(.55 + s / sqrt(k * k + (1. - k) * (1. - k)), 0., 1.);   // two blended copies lose contrast: give it back
     }
     void main(){
-      vec2 q = (gl_FragCoord.xy - uC) * uK;
+      // the cursor is a small second mass: the picture under it bends (uM: where, in pixels; how much, 0..1; frame height)
+      vec2 fc = gl_FragCoord.xy, dm = (fc - uM.xy) / uM.w;
+      float m2 = dot(dm, dm);
+      fc -= dm * uM.w * uM.z * .0042 / (m2 + .0064) * exp(-m2 / .08);
+      vec2 q = (fc - uC) * uK;
       float cr = cos(uCam.z), sr = sin(uCam.z);
       q = vec2(cr * q.x - sr * q.y, sr * q.x + cr * q.y);
       float ca = cos(uCam.x), sa = sin(uCam.x), ce = cos(uCam.y), se = sin(uCam.y);
@@ -120,7 +124,7 @@
   gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr); gl.useProgram(pr);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = (n) => gl.getUniformLocation(pr, n), uC = U("uC"), uK = U("uK"), uP = U("uP"), uN = U("uN"), uT = U("uT"), uCam = U("uCam");
+  const U = (n) => gl.getUniformLocation(pr, n), uC = U("uC"), uK = U("uK"), uP = U("uP"), uN = U("uN"), uT = U("uT"), uCam = U("uCam"), uM = U("uM");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const TS = Math.tan(Math.asin(3 * Math.sqrt(3) / 2 / D * Math.sqrt(1 - 1 / D)));   // the shadow's radius, as the tangent of its angle
 
@@ -140,14 +144,27 @@
     gl.uniform1f(uN, hw / (11 * TS));   // star cells about 22px across
   }
   // the camera eases toward the cursor: up lays the disk flat, nearly edge-on; down tips it toward you. Left and right
-  // roll it a little. With no cursor (a phone) it rests in the middle
-  let tx = 0, ty = 0, mx = 0, my = 0;
-  if (!reduce) addEventListener("pointermove", (e) => { if (e.pointerType !== "touch") { tx = e.clientX / innerWidth * 2 - 1; ty = e.clientY / innerHeight * 2 - 1; } }, { passive: true });
+  // roll it a little. With no cursor (a phone) it rests in the middle. Over the hole, the cursor also bends the picture
+  // under it like a small lens that trails a little behind and swells in and out
+  let tx = 0, ty = 0, mx = 0, my = 0, px = 0, py = 0, over = false, hx = .5, hy = .5, warp = 0;
+  if (!reduce) {
+    addEventListener("pointermove", (e) => {
+      over = e.pointerType !== "touch";
+      if (over) { tx = e.clientX / innerWidth * 2 - 1; ty = e.clientY / innerHeight * 2 - 1; px = e.clientX; py = e.clientY; }
+    }, { passive: true });
+    document.documentElement.addEventListener("pointerleave", () => { over = false; });
+  }
   const deg = Math.PI / 180, t0 = performance.now();
   let on = true, last = 0, slow = 0;
   function draw(now) {
-    const dt = last ? Math.min(.1, (now - last) / 1000) : 0, e = 1 - Math.exp(-dt * 1.3);
+    const dt = last ? Math.min(.1, (now - last) / 1000) : 0, e = 1 - Math.exp(-dt * 3);
     mx += (tx - mx) * e; my += (ty - my) * e;
+    const r = cv.getBoundingClientRect(), u = (px - r.left) / r.width, v = (py - r.top) / r.height;
+    const inside = over && u >= 0 && u <= 1 && v >= 0 && v <= 1;
+    if (inside && warp < .01) { hx = u; hy = v; }
+    else if (inside) { const f = 1 - Math.exp(-dt * 21); hx += (u - hx) * f; hy += (v - hy) * f; }
+    warp += (+inside - warp) * (1 - Math.exp(-dt * 5));
+    gl.uniform4f(uM, hx * cv.width, (1 - hy) * cv.height, warp, cv.height);
     const t = reduce ? 0 : (now - t0) / 1000;
     gl.uniform1f(uT, t + 40);
     gl.uniform3f(uCam, -.0025 * t, (5.5 + 4.5 * my) * deg, (11.5 - 2.2 * mx + 1.5 * my) * deg);
