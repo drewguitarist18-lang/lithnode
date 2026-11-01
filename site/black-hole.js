@@ -14,17 +14,19 @@
       return mix(mix(mix(hash3(i), hash3(i + vec3(1,0,0)), f.x), mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x), f.y),
                  mix(mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x), mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x), f.y), f.z); }
     float shash(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
-    // the sky, looked up by direction, so the lensing has no seam to bend into a ring
+    // the sky, looked up by direction, so the lensing has no seam to bend into a ring. A star is never drawn smaller
+    // than a pixel: one that is would blink on and off as the camera drifts. It spreads to a pixel and dims to match,
+    // and sits inside its own cell so the cell's edge never clips it
     vec3 sky(vec3 d){
       vec3 c = vec3(0.);
       for (int L = 0; L < 3; L++) {
-        float sc = 90. + float(L) * 120.;
+        float sc = 70. + float(L) * 35.;
         vec3 g = d * sc, id = floor(g);
         float h = shash(id + float(L) * 13.1);
-        if (h > .86) {
-          vec3 o = vec3(shash(id + 1.3), shash(id + 5.9), shash(id + 9.4));
-          float r = length(d - normalize(id + o)) * sc;
-          c += vec3(smoothstep(.14 - float(L) * .03, .0, r) * (.25 + (h - .86) * 6.));
+        if (h > .25) {
+          vec3 o = .3 + .4 * vec3(shash(id + 1.3), shash(id + 5.9), shash(id + 9.4));
+          float r = length(g - id - o), core = .12 - float(L) * .025, R = min(max(core, uPix * sc * 1.4), .3);
+          c += vec3(smoothstep(R, 0., r) * (core * core) / (R * R) * (.7 + (h - .25) / .75 * 2.));
         }
       }
       return c;

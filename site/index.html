@@ -19,6 +19,18 @@
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#08080a">
+<meta name="robots" content="index, follow">
+<meta name="twitter:title" content="Lithnode">
+<meta name="twitter:description" content="Your AI team, managed. Hand any job to a team of AI agents that check each other's work. Free and open source.">
+<meta name="twitter:image" content="https://lithnode.com/media/film-poster.jpg">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Lithnode","url":"https://lithnode.com/",
+ "description":"Hand any job to a team of AI agents: research, ads, content, checks. They split the work, check each other, and wait for your go.",
+ "applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux",
+ "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
+ "downloadUrl":"https://github.com/drewguitarist18-lang/lithnode/releases/latest",
+ "image":"https://lithnode.com/media/film-poster.jpg","license":"https://github.com/drewguitarist18-lang/lithnode"}
+</script>
 <script>
 // a phone or tablet can't run Lithnode, so it gets "Send me the link" in place of a download (set here, before the first paint)
 if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) || (navigator.userAgentData && navigator.userAgentData.mobile)) document.documentElement.classList.add("phone");
@@ -112,10 +124,32 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   /* sections */
   section { padding: 130px 0; }
   /* a real run, drawn the way the app draws it, as the background of its own section */
-  .live { position: relative; padding: 0; height: min(440px, 70svh); overflow: hidden; }
+  .live { position: relative; padding: 0; height: max(520px, min(560px, 80svh)); overflow: hidden; }
   .live .lead { margin-inline: auto; }
-  @media (max-width: 1180px) { .live { height: 600px; } }   /* two rows of steps */
-  @media (max-width: 600px) { .live { height: 520px; } }
+  @media (max-width: 1180px) { .live { height: 680px; } }   /* two rows of steps */
+  @media (max-width: 600px) { .live { height: 600px; } }
+  /* try it: a fixed prompt, Enter runs a replay of a real run, and it stops for your approval */
+  .try { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); width: min(620px, calc(100% - 32px)); z-index: 1; }
+  .try .tbar { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 999px; background: rgba(18, 18, 21, .82);
+               border: 1px solid var(--edge); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .try .tbar > svg { width: 16px; height: 16px; flex: none; color: var(--faint); }
+  .try .tprompt { flex: 1; min-width: 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .try .tprompt::after { content: ""; display: inline-block; width: 7px; height: 15px; margin-left: 3px; vertical-align: -2px; background: var(--ink); animation: blink 1s steps(1) infinite; }
+  .try[data-s="run"] .tprompt::after, .try[data-s="ask"] .tprompt::after, .try[data-s="done"] .tprompt::after { display: none; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .try button { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 999px; cursor: pointer;
+                font: 600 13px var(--mono); background: var(--ink); color: var(--void); border: 1px solid var(--ink); transition: background .2s, transform .1s; }
+  .try button:hover { background: #fff; }
+  .try button:active { transform: scale(.97); }
+  .try button:disabled { background: transparent; color: var(--soft); border-color: var(--edge); cursor: default; }
+  .try button kbd { font: inherit; opacity: .55; }
+  .try[data-s="ask"] button { background: #e0b25c; border-color: #e0b25c; animation: nudge 1.4s ease-in-out infinite; }
+  @keyframes nudge { 50% { box-shadow: 0 0 0 6px rgba(224, 178, 92, .18); } }
+  .try .tlog { display: flex; justify-content: center; gap: 14px; margin: 10px 0 0; font-size: 12.5px; color: var(--soft); text-align: center; min-height: 1.6em; }
+  .try .tlog b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .try[data-s="ask"] .tlog { color: #e0b25c; }
+  .try[data-s="done"] .tlog { color: #7fc98a; }
+  @media (max-width: 600px) { .try .tprompt { font-size: 12px; } .try button kbd { display: none; } }
   .live canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
                  -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 55%, #000 55%, transparent);
                  mask-image: radial-gradient(ellipse 75% 70% at 50% 55%, #000 55%, transparent); }
@@ -426,6 +460,12 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   <canvas id="flowCanvas" aria-hidden="true"></canvas>
   <div class="wrap"><h2 class="rv">One job. A whole team on it.</h2>
     <p class="lead rv">Three agents split the job, a checker verifies every part, and it waits for you before it ships.</p></div>
+  <div class="try" id="try" data-s="idle">
+    <div class="tbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 17 6-5-6-5M12 19h8"/></svg>
+      <span class="tprompt" id="tPrompt">Clean the 100,000-row sales export, check it, then publish the report</span>
+      <button type="button" id="tGo">Run <kbd>↵</kbd></button></div>
+    <p class="tlog" id="tLog" aria-live="polite">Press Enter to try it. A replay of a real run, sped up. No sign-in, no credits.</p>
+  </div>
 </section>
 
 <section id="film"><div class="wrap center">
@@ -801,7 +841,7 @@ const OS_ICON = {"win": "<svg class=\"os-i\" viewBox=\"0 0 24 24\" fill=\"curren
     { kind: "team", name: "Publisher", job: "Ships it with gh", step: "gh release create", shape: "rocket", color: "#b79cf2", count: 1, model: "Haiku 4.5", how: "1 agent" },
     { kind: "done", name: "Done" },
   ];
-  const PH = [0, .6, 3.0, 5.2, 6.8, 8.6, 9.0], LOOP = 11.5;
+  const PH = [0, .6, 3.0, 5.2, 6.8, 8.6, 9.0];
   const pillW = (g, n) => { g.font = `600 10px ${MONO}`; return Math.ceil(g.measureText(n.name).width + (n.kind === "approval" ? 86 : 40)); };
   const nodeW = (g, n) => (n.kind === "team" ? W : pillW(g, n));
   function node(g, x, y, n, st, t) {
@@ -854,8 +894,45 @@ const OS_ICON = {"win": "<svg class=\"os-i\" viewBox=\"0 0 24 24\" fill=\"curren
   }
   size(); addEventListener("resize", size);
   addEventListener("pointermove", (e) => { tmx = e.clientX / innerWidth - .5; tmy = e.clientY / innerHeight - .5; }, { passive: true });
+  // try it: Enter starts the replay, it stops at "You" until Approve, then ships. The clock leaves out the wait for you
+  const box = document.getElementById("try"), go = document.getElementById("tGo"), log = document.getElementById("tLog");
+  let S = "idle", t0 = 0, approved = false, shown = "", raf = 0;
+  if (document.documentElement.classList.contains("phone")) log.textContent = log.textContent.replace("Press Enter", "Tap Run");
+  const work = (L) => (L < PH[3] ? L : L < PH[4] ? PH[3] : L - (PH[4] - PH[3]));
+  const setS = (s, label) => { S = s; box.dataset.s = s; go.disabled = s === "run"; go.innerHTML = label; };
+  function clock(now) {
+    if (S === "idle") return -1;
+    if (S === "done") return PH[6] + 1;
+    if (S === "ask") return PH[3] + .05;
+    const L = (now - t0) / 1000;
+    if (!approved && L >= PH[3]) { setS("ask", "Approve <kbd>↵</kbd>"); return PH[3] + .05; }
+    if (L >= PH[6]) { setS("done", "Run again <kbd>↵</kbd>"); return PH[6] + 1; }
+    return L;
+  }
+  function say(L) {
+    const secs = `<b>${work(Math.max(0, Math.min(L, PH[6]))).toFixed(1)}s</b>`;
+    const html = S === "idle" ? log.innerHTML
+      : S === "ask" ? `<span>Paused at You. Nothing ships until you approve.</span>${secs}`
+      : S === "done" ? `<span>Done: 5 agents, one approval from you.</span>${secs}`
+      : `<span>${L < PH[1] ? "Start: the job goes in" : L < PH[2] ? "3 Workers split the rows, side by side · Haiku" : L < PH[3] ? "Checker verifies every part · Sonnet" : L < PH[5] ? "Approved. Publisher ships it · Haiku" : "Wrapping up"}</span>${secs}`;
+    if (html !== shown) { log.innerHTML = shown = html; }
+  }
+  function press() {
+    if (S === "run") return;
+    if (S === "ask") { approved = true; t0 = performance.now() - PH[4] * 1000; setS("run", "Running…"); }
+    else { approved = false; t0 = performance.now(); setS("run", "Running…"); }
+    kick();
+  }
+  go.onclick = press;
+  addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.repeat || !on || e.target.closest("input, textarea, select, button, a, [contenteditable]")) return;
+    e.preventDefault(); press();
+  });
+  const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
   function frame(now) {
-    const t = now / 1000, L = reduce ? 6 : t % LOOP;
+    raf = 0;
+    const t = now / 1000, L = clock(now);
+    say(L);
     mx += (tmx - mx) * .05; my += (tmy - my) * .05;
     g.clearRect(0, 0, w, h);
     g.fillStyle = "#1a1a1e";   // the canvas grid
@@ -877,10 +954,10 @@ const OS_ICON = {"win": "<svg class=\"os-i\" viewBox=\"0 0 24 24\" fill=\"curren
     });
     N.forEach((n, i) => node(g, P[i][0], P[i][1], n, st(i), t));
     g.restore();
-    if (on && !reduce) requestAnimationFrame(frame);
+    if (on && (!reduce || S === "run")) kick();
   }
-  new IntersectionObserver(([e]) => { const was = on; on = e.isIntersecting; if (on && !was) requestAnimationFrame(frame); }).observe(cv);
-  document.fonts.ready.then(() => requestAnimationFrame(frame));
+  new IntersectionObserver(([e]) => { const was = on; on = e.isIntersecting; if (on && !was) kick(); }).observe(cv);
+  document.fonts.ready.then(kick);
 })();
 
 // ---------------------------------------------------------------- film and reveals
