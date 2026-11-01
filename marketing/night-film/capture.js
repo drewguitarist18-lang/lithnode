@@ -2,7 +2,7 @@
 // cost nothing) and the site served on 8797 (`python -m http.server 8797 -d site`). Writes footage/<clip>.mp4 (30 fps)
 // and footage/<clip>.json (every mouse move, click and key with its time in the clip, so the film can draw the cursor).
 // Frames come from Chrome's screencast with their own timestamps, on the same clock as the log, so they line up exactly.
-// Usage: node capture.js [clip ...]   clips: describe, run, site, phone, ads, jobs   (run, ads and jobs also record the Office alongside)
+// Usage: node capture.js [clip ...]   clips: describe, run, site, phone, ads, jobs, hero   (run, ads, jobs and hero also record the Office alongside)
 const puppeteer = require("puppeteer-core");
 const fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const FF = process.env.FFMPEG || "ffmpeg";
@@ -162,6 +162,11 @@ const clips = {
     const r = await record(p, "phone", [1080, 1920]);
     await sleep(8000);
     await r.stop(); await p.close();
+  },
+  // the hero film's footage (hero.html): the redesigned app's describe, run and Office
+  async hero(b) {
+    await clips.describe(b, { name: "hero-describe" });
+    await clips.run(b, { name: "hero-run", office: "hero-office" });
   },
   // the site: the hero's live black hole, tipping as the pointer drifts, then a glide to the download button
   async site(b) {

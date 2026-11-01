@@ -44,3 +44,9 @@ Both scripts use `puppeteer-core` (set `NODE_PATH`) with installed Edge, and ffm
   - the rack with the 35s back in their spot.
 
   It then ends on the desk with `phone.html`'s `gym` set (`phone.html?set=gym`). The gym is path traced like the desk and developed by the same phone. Its shots and their text are the `SHOTS` list in `gym.html`; a shot's `racked` flag puts the 35s back on the rack. `PASSES=8` gives a quick look; the default is 96.
+
+## Hero film (the site's 30-second film, in the new look)
+
+- `node capture.js hero` records the redesigned app (needs the demo Lithnode on 8795): `footage/hero-describe`, `hero-run` and `hero-office`.
+- `hero.html` composites it: the site's own black hole shader and crab, Geist type, the app in a panel with lifted close-ups, and its own score. `hero.html?t=12.5` shows a still.
+- `node render.js --hero` writes `../lithnode-hero.mp4`. For the site, re-encode it to `site/media/lithnode-film.mp4` and take `site/media/film-poster.jpg` from about 2.5 s.

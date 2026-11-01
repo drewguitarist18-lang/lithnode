@@ -9,12 +9,13 @@
 //        --phone --jobs films the job hunt instead (default ../lithnode-phone-jobs-vertical.mp4)
 //        --phone --photos writes its TikTok carousel, the slides in phone.html's PHOTOS, to ../carousel/ (with --jobs, ../carousel-jobs/)
 //        --gym writes the gym carousel to ../carousel-gym/: gym.html's SHOTS, then phone.html's gym set (PASSES=8 for a quick look)
+//        --hero renders hero.html, the 30-second film for the site in its new look (default ../lithnode-hero.mp4)
 // Needs puppeteer-core (NODE_PATH) and ffmpeg (FFMPEG or on PATH). Serves the repo itself, so it needs nothing else running.
 const puppeteer = require("puppeteer-core");
 const http = require("http"), fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const HOOK = process.argv.includes("--hook"), T0 = HOOK ? 8 : 0;   // the hook cut is film 8–30
 const VERSUS = process.argv.includes("--versus"), ADS = process.argv.includes("--ads"), PHONE = process.argv.includes("--phone"), GYM = process.argv.includes("--gym");
-const JOBS = process.argv.includes("--jobs");
+const JOBS = process.argv.includes("--jobs"), HERO = process.argv.includes("--hero");
 const FF = process.env.FFMPEG || "ffmpeg", ROOT = path.resolve(__dirname, "../.."), FPS = 30;
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".mp4": "video/mp4", ".webm": "video/webm" };
 
@@ -33,7 +34,7 @@ const server = http.createServer((req, res) => {
 const VERT = VERSUS || PHONE || GYM || process.argv.includes("--vertical"), [VW, VH] = VERT ? [1080, 1920] : [1920, 1080];
 (async () => {
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  const page = GYM ? "gym.html" : PHONE ? `phone.html${JOBS ? "?job=jobs" : ""}` : VERSUS ? `versus.html?${ADS ? "job=ads" : ""}` : `film.html?${VERT ? "v=1&" : ""}${HOOK ? "hook=1" : ""}`;
+  const page = HERO ? "hero.html" : GYM ? "gym.html" : PHONE ? `phone.html${JOBS ? "?job=jobs" : ""}` : VERSUS ? `versus.html?${ADS ? "job=ads" : ""}` : `film.html?${VERT ? "v=1&" : ""}${HOOK ? "hook=1" : ""}`;
   const url = `http://127.0.0.1:${server.address().port}/marketing/night-film/${page}`;
   const b = await puppeteer.launch({ executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", headless: "new", protocolTimeout: 600000,
     args: ["--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"] });
@@ -44,8 +45,8 @@ const VERT = VERSUS || PHONE || GYM || process.argv.includes("--vertical"), [VW,
   await p.evaluate(() => window.ready);
   const LENGTH = GYM ? 0 : PHONE ? await p.evaluate(() => window.LENGTH) : VERSUS ? 14 : 30 - T0;   // the phone cut's length is its clips'
   const grab = (t, type, q) => p.evaluate(async (t, type, q) => { await renderFrame(t); return document.getElementById("cv").toDataURL(type, q).split(",")[1]; }, t, type, q);
-  const args = process.argv.slice(2).filter((a) => !["--vertical", "--hook", "--versus", "--ads", "--phone", "--gym", "--jobs"].includes(a)),
-    DEF = path.join(__dirname, VERSUS ? `../lithnode-versus${ADS ? "-ads" : ""}.mp4` : `../lithnode-${PHONE ? (JOBS ? "phone-jobs" : "phone") : HOOK ? "hook" : "night"}${VERT ? "-vertical" : ""}.mp4`);
+  const args = process.argv.slice(2).filter((a) => !["--vertical", "--hook", "--versus", "--ads", "--phone", "--gym", "--jobs", "--hero"].includes(a)),
+    DEF = path.join(__dirname, HERO ? "../lithnode-hero.mp4" : VERSUS ? `../lithnode-versus${ADS ? "-ads" : ""}.mp4` : `../lithnode-${PHONE ? (JOBS ? "phone-jobs" : "phone") : HOOK ? "hook" : "night"}${VERT ? "-vertical" : ""}.mp4`);
 
   if (GYM) {   // the gym's photos, then the desk's to end the story
     const dir = path.join(__dirname, "../carousel-gym"), passes = +(process.env.PASSES || 96), jpgs = [];
