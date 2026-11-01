@@ -8,7 +8,7 @@ installer/lithnode.ico
 site/.vercel
 site/.env*
 site/download/
-installer/*.bmp
+installer/oneclick/
 installer/app/node_modules/
 installer/app/lithnode.ico
 

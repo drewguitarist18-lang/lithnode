@@ -1,5 +1,5 @@
-"""Draw the installer's art from the app's pixel sprites:
-lithnode.ico (16 to 256 px), wizard.bmp (welcome/finish side panel) and wizard-small.bmp (corner logo), at 1x and 2x.
+"""Draw the installer's art from the app's pixel crab:
+lithnode.ico (16 to 256 px), and the one-click installer's crab and Install button (oneclick/, one per display scale).
 """
 import math
 import struct
@@ -7,22 +7,12 @@ import zlib
 from pathlib import Path
 
 HERE = Path(__file__).parent
-SPRITES = {
-    "crab":   ("#D97757", ["..########..", "..#e####e#..", "############", "############", "..########..", "..########..", "..#.#..#.#..", "..#.#..#.#.."]),
-    "scout":  ("#2fb5a0", ["...#....#...", "....#..#....", "..########..", ".#e######e#.", ".##########.", "..########..", "...#.##.#...", "..##....##.."]),
-    "bug":    ("#6cc070", ["..k......k..", "...k....k...", "..########..", ".#e##kk##e#.", "#####kk#####", ".####kk####.", "#.########.#", "#..#....#..#"]),
-    "rocket": ("#bb9af7", [".....##.....", "....####....", "...######...", "...#e##e#...", "...######...", "..########..", ".##.####.##.", "....k..k...."]),
-}
 ONYX = (10, 10, 10)
 WHITE = (236, 235, 230)
 # Lithnode's crab: the logo
 LOGO = [".##..........##.", "#.#..........#.#", "###..........###", ".#............#.", ".#............#.", ".##.########.##.",
         "..############..", "..##.######.##..", "..############..", "...##########...", "...#.#....#.#...", "...#.#....#.#...",
         "..##.##..##.##.."]
-
-
-def rgb(h):
-    return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
 
 
 class Canvas:
@@ -33,20 +23,6 @@ class Canvas:
     def put(self, x, y, c):
         if 0 <= x < self.w and 0 <= y < self.h:
             self.px[y][x] = (*c, 255)
-
-    def sprite(self, name, x0, y0, cell, mono=False):
-        color, rows = SPRITES[name]
-        body, dark = rgb(color), tuple(int(v * .6) for v in rgb(color))
-        if mono:   # black and white, like everything else
-            body, dark = WHITE, (140, 140, 136)
-        for ry, row in enumerate(rows):
-            for rx, ch in enumerate(row):
-                if ch == ".":
-                    continue
-                c = (8, 8, 10) if ch == "e" else dark if ch == "k" else body
-                for y in range(int(y0 + ry * cell), int(y0 + (ry + 1) * cell)):
-                    for x in range(int(x0 + rx * cell), int(x0 + (rx + 1) * cell)):
-                        self.put(x, y, c)
 
     def logo(self, x0, y0, cell, color=WHITE):
         for ry, row in enumerate(LOGO):
@@ -64,12 +40,6 @@ class Canvas:
         return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", self.w, self.h, 8, 6, 0, 0, 0))
                 + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
-    def bmp(self):
-        pad = (4 - self.w * 3 % 4) % 4
-        body = b"".join(b"".join(bytes((b, g, r)) for r, g, b, _ in row) + b"\0" * pad for row in reversed(self.px))
-        return (b"BM" + struct.pack("<IHHI", 54 + len(body), 0, 0, 54)
-                + struct.pack("<IiiHHIIiiII", 40, self.w, self.h, 1, 24, 0, len(body), 2835, 2835, 0, 0) + body)
-
 
 def icon_png(size):
     c, r = Canvas(size, size, (20, 20, 20), 0), size * .22
@@ -83,46 +53,30 @@ def icon_png(size):
     return c.png()
 
 
-def side_panel(scale):
-    """Welcome/finish side panel: onyx, a warm glow, a dot grid, the crab big and its crew under it."""
-    w, h = 240 * scale, 459 * scale
-    c = Canvas(w, h)
-    gx, gy, rad = w * .5, h * .42, h * .55
-    for y in range(h):
-        for x in range(w):
-            d = math.hypot(x - gx, (y - gy) * .9) / rad
-            glow = max(0.0, 1 - d) ** 2 * .55
-            v = int(10 + 60 * glow * .5)
-            c.px[y][x] = (v, v, v, 255)
-    step = 12 * scale
-    for y in range(step // 2, h, step):
-        for x in range(step // 2, w, step):
-            for dy in range(scale):
-                for dx in range(scale):
-                    r, g, b, _ = c.px[y + dy][x + dx]
-                    c.px[y + dy][x + dx] = (min(255, r + 14), min(255, g + 14), min(255, b + 14), 255)
-    cell = 12 * scale
-    cell = 9 * scale
-    c.logo(w / 2 - 8 * cell, h * .27, cell)
-    small = 4 * scale
-    crew = ["scout", "bug", "rocket"]
-    span = len(crew) * 12 * small + (len(crew) - 1) * 10 * scale
-    for i, name in enumerate(crew):
-        c.sprite(name, w / 2 - span / 2 + i * (12 * small + 10 * scale), h * .62, small, mono=True)
-    # an orange rule near the bottom, like the site's accent bars
-    for y in range(int(h * .86), int(h * .86) + 2 * scale):
-        for x in range(int(w * .3), int(w * .7)):
-            c.put(x, y, WHITE)
-    return c.bmp()
+def oneclick_crab(scale):
+    """The crab alone on a clear background, for the one-click window: whole-pixel cells so it stays crisp."""
+    cell = round(5 * scale)
+    c = Canvas(16 * cell, 13 * cell, (0, 0, 0), 0)
+    c.logo(0, 0, cell)
+    return c.png()
 
 
-def corner(scale):
-    size = 58 * scale
-    c = Canvas(size, size, (14, 14, 14))
-    cell = size / 18
-    c.logo(cell, (size - 13 * cell) / 2, cell)
-    return c.bmp()
+def oneclick_pill(scale, w=132, h=40):
+    """The Install button: a white pill with soft (anti-aliased) ends on a clear background."""
+    W, H = round(w * scale), round(h * scale)
+    r = H / 2
+    c = Canvas(W, H, (0, 0, 0), 0)
+    for y in range(H):
+        for x in range(W):
+            cx = min(max(x + .5, r), W - r)
+            d = math.hypot(x + .5 - cx, y + .5 - r) - r   # < 0 inside
+            a = max(0.0, min(1.0, .5 - d))
+            if a:
+                c.px[y][x] = (*WHITE, round(a * 255))
+    return c.png()
 
+
+ONECLICK_SCALES = {100: 1, 125: 1.25, 150: 1.5, 175: 1.75, 200: 2, 250: 2.5, 300: 3}
 
 sizes = (256, 64, 48, 32, 16)
 images = [icon_png(s) for s in sizes]
@@ -133,7 +87,9 @@ for img, s in zip(images, sizes, strict=True):
 (HERE / "lithnode.ico").write_bytes(struct.pack("<HHH", 0, 1, len(images)) + entries + b"".join(images))
 (HERE / "lithnode.png").write_bytes(icon_png(512))
 (HERE.parent / "static" / "logo-512.png").write_bytes(icon_png(512))   # Mac and Linux
-for scale in (1, 2):
-    (HERE / f"wizard-{scale}x.bmp").write_bytes(side_panel(scale))
-    (HERE / f"wizard-small-{scale}x.bmp").write_bytes(corner(scale))
+art = HERE / "oneclick"
+art.mkdir(exist_ok=True)
+for pct, scale in ONECLICK_SCALES.items():
+    (art / f"crab-{pct}.png").write_bytes(oneclick_crab(scale))
+    (art / f"pill-{pct}.png").write_bytes(oneclick_pill(scale))
 print("installer art written")
