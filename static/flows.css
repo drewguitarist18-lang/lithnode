@@ -330,6 +330,8 @@ a.item:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
 .switch.conn .cico { width: 22px; height: 22px; border-radius: 6px; font-size: 11px; }
 .cico.cli { background: #1d1f24; color: #9ece6a; font-family: var(--mono); box-shadow: inset 0 0 0 1px #3a3d45; }
 .cico svg { width: 72%; height: 72%; display: block; }
+.cico.logo { background: #1d1f24; box-shadow: inset 0 0 0 1px #3a3d45; }   /* a brand's own mark, on a dark tile */
+.cico.logo img { width: 72%; height: 72%; display: block; }
 /* toggle chips: connectors and command-line tools, many to a row */
 .tchips { display: flex; flex-wrap: wrap; gap: 6px; }
 .tchip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border-radius: 999px; cursor: pointer;
@@ -474,16 +476,27 @@ main.running #floatRun { display: none; }
 .agents .how { min-width: 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
 .agents .how b { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); }
 .stepper button:disabled { opacity: .35; }
-/* which model: a role (one model per role, for the whole flow) or one picked by hand */
-.rolecards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.rolecards button { display: grid; justify-items: center; gap: 4px; min-width: 0; padding: 8px 4px 7px; border-radius: 10px; font-size: 11.5px; color: var(--muted); }
-.rolecards button svg { width: 17px; height: 17px; }
-.rolecards span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rolecards button.on { color: var(--ink); font-weight: 600; border-color: color-mix(in srgb, var(--done) 60%, var(--line));
-                       background: color-mix(in srgb, var(--done) 12%, var(--pad)); }
-.rolecards button.on svg { color: var(--done); }
+/* a team's role: Composer, Orchestrator or Performer, each with the model it plays on */
+.mpick { margin-top: 10px; }
+.seg.mpick { display: grid; grid-template-columns: repeat(3, auto); }
+.mcard { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 2px 5px 7px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+.mcard b { font-size: 11.5px; letter-spacing: -.1px; overflow: visible; }
+.switch.rolesw { padding: 0; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.switch.rolesw input { width: 32px; height: 19px; }
+.switch.rolesw input::after { top: 3px; left: 3px; width: 13px; height: 13px; }
+.switch.rolesw input:checked::after { transform: translateX(13px); }
+.mcard:hover { color: var(--ink); }
+.mcard.on { background: var(--pad); color: var(--ink); box-shadow: 0 1px 4px var(--shadow); outline: 1px solid var(--line); }
+.mcard b { flex: none; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mcard select { appearance: none; -webkit-appearance: none; flex: 0 1 auto; width: auto; min-width: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px;
+  padding: 1px 12px 1px 4px; border-radius: 6px; cursor: pointer; text-align: center;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 1px center; background-size: 10px; }
+.mcard select:hover { background-color: var(--bg); color: var(--ink); }
+.mcard select option { background: var(--pad); color: var(--ink); }
 /* what a team may touch, safe to powerful: each level named, in its own color */
-.access { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.access { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.seg.accmode button { flex: 1; }
 .access button { --c: var(--muted); display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 9px; border-radius: 10px; font-size: 12.5px; text-align: left; }
 .access button:last-child:nth-child(odd) { grid-column: 1 / -1; }   /* All, on its own row */
 .access button svg { flex: none; width: 16px; height: 16px; color: var(--c); }
@@ -878,9 +891,6 @@ html body .rp-bottom p { font-family: var(--sans); }
 #wires .wire.ok .vis { stroke: color-mix(in srgb, var(--done) 75%, var(--wire)); }
 #taskSub.need { color: var(--failed); }
 .rolemodel { display: grid; gap: 6px; margin-top: 10px; min-width: 0; }
-.rolemodel .rname { display: flex; align-items: center; gap: 5px; flex: none; font-size: 12px; font-weight: 600; color: var(--ink); }
-.rolemodel .rname svg { width: 14px; height: 14px; color: var(--done); }
-.rolemodel .rname small { font-weight: 400; font-size: 11px; color: var(--muted); }
 .rolemodel select[data-k] { width: 100%; }
 .rolemodel .seg { min-width: 0; }
 .rolemodel .seg button { padding: 5px 2px; font-size: 12px; }

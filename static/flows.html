@@ -186,7 +186,21 @@ function connLook(id) {   // a connector's little icon: its first letter on its 
 // icons, not letters: a plug for a connector, a terminal prompt for a command-line tool
 const PLUG_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v3M10 2v3M4 5h8v2.5a4 4 0 0 1-8 0V5zM8 11.5V14"/></svg>';
 const PROMPT_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5l3 3-3 3M8.5 11.5h4"/></svg>';
-const connIcon = (id) => `<i class="cico" style="--c:${connLook(id).color}">${PLUG_SVG}</i>`;
+// the real marks for the connectors people use most; anything else gets the plug on its color
+const CONN_LOGOS = {
+  "claude docs": '<img src="/static/engine-claude.svg" alt="">',
+  vercel: '<svg viewBox="0 0 16 16"><path d="M8 2.5l6.5 11h-13z" fill="#fff"/></svg>',
+  notion: '<svg viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" fill="#fff"/><path d="M5.3 11.2V4.8l5.4 6.4V4.8" fill="none" stroke="#111" stroke-width="1.7" stroke-linejoin="round"/></svg>',
+  gmail: '<svg viewBox="0 -5 52 52"><path fill="#4285f4" d="M3.6 42h8.4V21.6L0 12.6v25.8C0 40.4 1.6 42 3.6 42z"/><path fill="#34a853" d="M40 42h8.4c2 0 3.6-1.6 3.6-3.6V12.6l-12 9z"/>'
+    + '<path fill="#fbbc04" d="M40 6v15.6l12-9V7.8c0-4.4-5-7-8.6-4.3z"/><path fill="#ea4335" d="M12 21.6V6l14 10.5L40 6v15.6L26 32.1z"/><path fill="#c5221f" d="M0 7.8v4.8l12 9V6L8.6 3.5C5 .8 0 3.4 0 7.8z"/></svg>',
+  "google drive": '<svg viewBox="0 -4 87.3 86"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>'
+    + '<path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>'
+    + '<path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>',
+};
+const connIcon = (id) => {
+  const logo = CONN_LOGOS[connName(id).toLowerCase()];
+  return logo ? `<i class="cico logo">${logo}</i>` : `<i class="cico" style="--c:${connLook(id).color}">${PLUG_SVG}</i>`;
+};
 async function loadConnectors(force) {
   if (force) { connectors = null; renderInspector(); }
   connectors = await api("/api/connectors" + (force ? "?refresh=1" : "")).catch((e) => ({ ok: false, connectors: [], error: e.message }));
@@ -229,16 +243,11 @@ const ROLE_NAME = { think: "Composer", build: "Orchestrator", run: "Performer" }
 const ROLE_OF = { "claude-opus-5-5": "think", "claude-sonnet-5-5": "build", "claude-haiku-4-5": "run" };
 const roleModel = (role) => ((flow && flow.models) || DEFAULT_MODELS)[role] || DEFAULT_MODELS[role];
 // on Codex and Cursor a role's model is "" until you pick one: that's the CLI's own default
-const roleModelOn = (engine, role) => engine === "claude" ? roleModel(role) : ((flow && flow.engine_models) || {})[engine]?.[role] || "";
-const engineModelLabel = (engine, id) => !id ? (engine === "codex" ? "Codex default" : "Cursor picks")
-  : ((engineInfo(engine).models || []).find((m) => m.id === id) || {}).label || id;
-const roleLabel = (engine, role) => engine === "claude" ? modelLabel(roleModel(role)) : engineModelLabel(engine, roleModelOn(engine, role));
-function setRoleModel(engine, role, id) {   // one pick changes every stage on that engine with that role
-  if (engine === "claude") flow.models = { ...(flow.models || DEFAULT_MODELS), [role]: id };
-  else flow.engine_models = { ...(flow.engine_models || {}), [engine]: { ...((flow.engine_models || {})[engine] || {}), [role]: id } };
-  flow.nodes.filter((x) => x.role === role && (x.type !== "cluster" ? engine === "claude" : engineOf(x) === engine))
-    .forEach((x) => { if (engine === "claude") x.model = id; else x.engine_model = id; });
+function setRoleModel(role, id) {   // one pick changes every Claude stage with that role
+  flow.models = { ...(flow.models || DEFAULT_MODELS), [role]: id };
+  flow.nodes.filter((x) => x.role === role && !(x.type === "cluster" && engineOf(x) !== "claude")).forEach((x) => { x.model = id; });
 }
+const roleModelOn = (engine, role) => engine === "claude" ? roleModel(role) : ((flow && flow.engine_models) || {})[engine]?.[role] || "";
 const prettyId = (id) => {   // a model the plan hides still gets a name: "claude-fable-5-1" -> "Fable 5.1"
   const m = /^claude-([a-z]+)-(\d+)(?:-(\d+))?/.exec(id || "");
   return m ? `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}${m[3] ? "." + m[3] : ""}` : id;
@@ -460,6 +469,7 @@ function addNode(type, x, y, botId) {
   }
   if (type === "checkpoint") Object.assign(n, { mode: "pass", role: "run", model: roleModel("run"), on_error: "stop" });
   if (type === "approval") Object.assign(n, { message: "", webhook: "" });
+  if (flow.roles === false && n.role) n.role = "";   // roles are off: it keeps the model it was given
   // the first team in a flow with no wires yet fills the slot between Start and Done, wired in and ready to run
   const s = flow.nodes.find((x) => x.type === "master"), d = flow.nodes.find((x) => x.type === "done");
   if (type === "cluster" && s && !flow.edges.length && !flow.nodes.some((x) => x.type === "cluster")) {
@@ -1123,16 +1133,8 @@ function connectorRows(n) {
   return `<div class="tchips">${list.map((c) => `<label class="tchip${c.missing ? " missing" : ""}" title="${esc(c.missing ? `${c.name} isn't available to Claude Code right now` : `${c.name}: loads only when this team needs it`)}"><input type="checkbox" data-conn="${esc(c.id)}"${on.includes(c.id) ? " checked" : ""}>${connIcon(c.id)}<span>${esc(c.name)}</span>${TICK}</label>`).join("")}</div>`;
 }
 
-// each engine's mark: Claude Code's pixel crab (drawn by drawEngineIcons), Codex's and Cursor's app icons
-const engineIcon = (id) => id === "claude"
-  ? `<i class="eico claude"><canvas width="24" height="18" data-engine-crab></canvas></i>`
-  : `<i class="eico ${id}"><img src="/static/engine-${id}.png" alt=""></i>`;
-function drawEngineIcons(root) {
-  root.querySelectorAll("canvas[data-engine-crab]").forEach((cv) => {
-    const g = cv.getContext("2d"); g.clearRect(0, 0, cv.width, cv.height);
-    drawBot(g, { shape: "crab", color: "#ecebe6" }, 0, 1, 2, { state: "idle", t: 0 });
-  });
-}
+// each engine's own mark: Claude's orange spark, Codex's and Cursor's app icons
+const engineIcon = (id) => `<i class="eico ${id}"><img src="/static/engine-${id}.${id === "claude" ? "svg" : "png"}" alt=""></i>`;
 
 // the models an engine offers this account, grouped by family (Cursor alone has hundreds)
 function modelFamily(m) {
@@ -1254,25 +1256,18 @@ function renderInspector() {
     const k = Math.max(0, EFFORTS.findIndex(([v]) => v === node.effort));
     return slider("efRange", 0, EFFORTS.length - 1, k, { name: "Effort", val: EFFORTS[k][1], lo: "Quick", hi: "Deep", c: "#b48cf2" });
   };
-  const ROLE_TIPS = { think: "Planning, design, writing, judgment", build: "Making and changing things", run: "Checks, tests, merges, deploys" };
   const short = (label) => String(label).replace(/^Claude /, "").replace(/ \d+(\.\d+)*$/, "")   // "Opus 5.5" -> "Opus"
     .replace(/^GPT-/i, "").replace(/^(Codex|Cursor) /, "").replace(/^default$/, "Default").replace(/^picks$/, "Auto");   // "GPT-6-Luna" -> "6-Luna"
-  const modelPick = (node) => {   // a role (one model per role, for the whole flow) or a model picked by hand
-    const role = node.role || "", eng = node.type === "cluster" ? engineOf(node) : "claude", claude = eng === "claude";
-    const cards = ["think", "build", "run"].map((r) => `<button type="button" data-v="${r}" class="${r === role ? "on" : ""}" title="${esc(`${ROLE_NAME[r]}: ${ROLE_TIPS[r]}`)}" aria-label="${ROLE_NAME[r]}">${ROLE_ICON[r]}<span>${esc(short(roleLabel(eng, r)))}</span></button>`).join("")
-      + `<button type="button" data-v="" class="${role ? "" : "on"}" title="Custom: a model for just this team" aria-label="Custom model">${ROLE_ICON.own}<span>Custom</span></button>`;
-    const row = `<div class="rolecards" data-seg="role">${cards}</div>`;
-    const pills = (attr, cur) => `<div class="seg" ${attr}>${ordered.map((m) => `<button type="button" data-id="${esc(m.id)}" class="${m.id === cur ? "on" : ""}">${esc(short(m.label))}</button>`).join("")}</div>`;
-    if (!role) return row + `<div class="rolemodel"><span class="rname">${ROLE_ICON.own}Custom <small>just this team</small></span>
-      ${claude ? pills("data-ownmodel", node.model) : engineModels(node)}</div>`;
-    const cur = roleModelOn(eng, role);
-    const tip = `Sets the model for every ${ROLE_NAME[role]} in this flow`;
-    const head = `<span class="rname">${ROLE_ICON[role]}${ROLE_NAME[role]} <small>every ${ROLE_NAME[role]} in this flow</small></span>`;
-    if (claude) return row + `<div class="rolemodel" title="${esc(tip)}">${head}${pills("data-rolemodel", cur)}</div>`;
-    const list = [["", eng === "codex" ? "Default" : "Auto"], ...(engineInfo(eng).models || []).filter((m) => m.id !== "auto").map((m) => [m.id, m.label])];
-    if (!list.some(([id]) => id === cur)) list.push([cur, cur]);
-    return row + `<div class="rolemodel" title="${esc(tip)}">${head}
-      <select id="roleModelSel" aria-label="${ROLE_NAME[role]} model">${opt(list, cur)}</select></div>`;
+  const modelPick = (node) => {   // with roles on: the team's role, each showing the model it plays on; off: just a model
+    const eng = node.type === "cluster" ? engineOf(node) : "claude";
+    const rolesOn = flow.roles !== false;
+    const sw = `<label class="switch rolesw" title="On: each team is a Composer, Orchestrator or Performer, and one pick sets the model for all of that role. Off: every team just has its own model."><span>Use roles</span><input type="checkbox" id="rolesSw"${rolesOn ? " checked" : ""}></label>`;
+    if (eng !== "claude") return `${sw}<div class="rolemodel">${engineModels(node)}</div>`;
+    const pick = (attr, cur) => `<select ${attr} aria-label="Model">${ordered.map((m) => `<option value="${esc(m.id)}"${m.id === cur ? " selected" : ""}>${esc(short(m.label))}</option>`).join("")}</select>`;
+    if (!rolesOn) return `${sw}<div class="rolemodel">${pick("data-ownmodel", node.model)}</div>`;
+    const role = node.role || "build";
+    const card = (v, name, sel, tip) => `<div class="mcard${v === role ? " on" : ""}" data-v="${v}" role="button" tabindex="0" title="${esc(tip)}"><b>${name}</b>${sel}</div>`;
+    return `${sw}<div class="seg mpick" data-pickrole>${["think", "build", "run"].map((r) => card(r, ROLE_NAME[r], pick(`data-rolemodel="${r}"`, roleModel(r)), `${ROLE_NAME[r]}: its model is shared by every ${ROLE_NAME[r]} in this flow`)).join("")}</div>`;
   };
   const modelNote = () => "";   // the model's blurb was one line too many; the slider says enough
   const ACCESS = [["none", "Think"], ["read", "Read"], ["web", "Web"], ["research", "Read + web"], ["edit", "Edit"], ["full", "Edit + run"], ["all", "All"]];
@@ -1281,10 +1276,6 @@ function renderInspector() {
                         all: "Everything: reads and changes files, runs commands on this computer and uses the web." };
   const ACCESS_COLOR = { none: "#8f96a3", read: "#4fb59a", web: "#5b8def", research: "#7a9cf0", edit: "#e0a23c", full: "#e5604b", all: "#d6409f" };   // safe to powerful
   const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-  const ROLE_ICON = { think: svg('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>'),
-    build: svg('<path d="M12 3 3 8l9 5 9-5z"/><path d="m3 13 9 5 9-5"/>'),
-    run: svg('<path d="M7 4v16l13-8z"/>'),
-    own: svg('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>') };
   const ACCESS_ICON = { none: svg('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>'),
     read: svg('<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
     web: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
@@ -1326,7 +1317,8 @@ function renderInspector() {
       <div class="isec"><h4>Model</h4>${engineCards(n)}
         ${modelPick(n)}${claude ? effortBar(n) : ""}</div>
       <div class="isec"><h4>Access</h4>
-        <div class="access">${ACCESS.map(([v, l], j) => `<button type="button" data-acc="${j}" class="${j === ai ? "on" : ""}" style="--c:${ACCESS_COLOR[v]}" title="${esc(ACCESS_NOTE[v])}">${ACCESS_ICON[v]}<span>${esc(l)}</span></button>`).join("")}</div>
+        <div class="seg accmode"><button type="button" data-accmode="all" class="${n.tools === "all" ? "on" : ""}" title="${esc(ACCESS_NOTE.all)}">All</button><button type="button" data-accmode="pick" class="${n.tools === "all" ? "" : "on"}" title="Choose what this team can do">Select</button></div>
+        ${n.tools === "all" ? "" : `<div class="access">${ACCESS.map(([v, l], j) => v === "all" ? "" : `<button type="button" data-acc="${j}" class="${j === ai ? "on" : ""}" style="--c:${ACCESS_COLOR[v]}" title="${esc(ACCESS_NOTE[v])}">${ACCESS_ICON[v]}<span>${esc(l)}</span></button>`).join("")}</div>`}
         ${claude ? `<div class="slabel">Commands</div>${cliRows(n)}
         <div class="slabel">Apps <a href="#" id="connRefresh">Refresh</a></div>${connectorRows(n)}` : ""}</div>
       <div class="isec">${more(`<div class="field"><label>On the card</label><input data-k="summary" maxlength="80" value="${esc(n.summary || "")}" placeholder="${esc(summaryOf({ ...n, summary: "" }) || "What this team does, in a few words")}"></div>
@@ -1359,16 +1351,13 @@ function renderInspector() {
     inp.addEventListener("input", () => {
       const k = inp.dataset.k;
       n[k] = inp.dataset.num !== undefined ? Math.max(0, parseInt(inp.value || "0", 10) || 0) : inp.value;
+      if (k === "engine_model") n.role = "";   // picked by hand: this team keeps it
       changed(false);
       if (k === "shape" || k === "color") renderInspector();
     });
   });
   box.querySelectorAll("[data-seg] button").forEach((b) => b.addEventListener("click", () => {
     n[b.parentElement.dataset.seg] = b.dataset.v;
-    if (b.parentElement.dataset.seg === "role" && b.dataset.v) {
-      n.model = roleModel(b.dataset.v);
-      if (n.type === "cluster" && engineOf(n) !== "claude") n.engine_model = roleModelOn(engineOf(n), b.dataset.v);
-    }
     changed(false); renderInspector();
   }));
   box.querySelectorAll("[data-effort]").forEach((b) => b.addEventListener("click", () => { n.effort = b.dataset.effort; changed(false); renderInspector(); }));
@@ -1395,19 +1384,28 @@ function renderInspector() {
     n.clis = [...(n.clis || []).filter((x) => x !== id), id]; changed(false); renderInspector();
   };
   if ($("cliNew")) { $("cliNew").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addCli(); } }; $("cliNew").onchange = () => { if ($("cliNew").value.trim()) addCli(); }; }
-  drawEngineIcons(box);
   box.querySelectorAll("[data-engine]").forEach((b) => b.addEventListener("click", () => {
     n.engine = b.dataset.engine;
     if (n.role && n.engine !== "claude") n.engine_model = roleModelOn(n.engine, n.role);   // keeps its role on the new engine
     changed(false); renderInspector();
   }));
-  if ($("roleModelSel")) $("roleModelSel").onchange = (e) => {
-    setRoleModel(n.type === "cluster" ? engineOf(n) : "claude", n.role, e.target.value); changed(false); renderInspector();
-  };
-  box.querySelectorAll("[data-ownmodel] button").forEach((b) => b.addEventListener("click", () => { n.model = b.dataset.id; n.role = ""; changed(false); renderInspector(); }));
-  box.querySelectorAll("[data-rolemodel] button").forEach((b) => b.addEventListener("click", () => {
-    setRoleModel("claude", n.role, b.dataset.id); changed(false); renderInspector();
-  }));
+  const takeRole = (c) => { n.role = c.dataset.v; if (n.role) n.model = roleModel(n.role); changed(false); renderInspector(); };
+  box.querySelectorAll("[data-pickrole] .mcard").forEach((c) => {
+    c.addEventListener("click", (e) => { if (!e.target.closest("select")) takeRole(c); });
+    c.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === c) { e.preventDefault(); takeRole(c); } });
+  });
+  box.querySelectorAll("[data-rolemodel]").forEach((s) => s.addEventListener("change", () => { setRoleModel(s.dataset.rolemodel, s.value); changed(false); renderInspector(); }));
+  $("rolesSw")?.addEventListener("change", (e) => {   // for the whole flow: off keeps every model as it is
+    flow.roles = e.target.checked;
+    flow.nodes.filter((x) => ["master", "cluster", "checkpoint"].includes(x.type)).forEach((x) => {
+      if (!flow.roles) { x.role = ""; return; }
+      x.role = ROLE_OF[x.model] || (x.type === "checkpoint" ? "run" : "build");
+      if (x.type === "cluster" && engineOf(x) !== "claude") x.engine_model = roleModelOn(engineOf(x), x.role);
+      else x.model = roleModel(x.role);
+    });
+    changed(false); renderInspector();
+  });
+  box.querySelectorAll("[data-ownmodel]").forEach((s) => s.addEventListener("change", () => { n.role = ""; n.model = s.value; changed(false); renderInspector(); }));
   if ($("engRefresh")) $("engRefresh").onclick = (e) => { e.preventDefault(); engines = null; renderInspector(); loadEngines(true); };
   box.querySelectorAll("[data-cmds] button").forEach((b) => b.addEventListener("click", () => {
     const v = b.dataset.v;
@@ -1435,6 +1433,11 @@ function renderInspector() {
     r.addEventListener("change", () => renderInspector());
   };
   live("efRange", (v) => { n.effort = EFFORTS[v][0]; return EFFORTS[v][1]; });
+  box.querySelectorAll("[data-accmode]").forEach((b) => b.addEventListener("click", () => {   // Select starts from read-only, the safe end
+    const all = b.dataset.accmode === "all";
+    if (all === (n.tools === "all")) return;
+    n.tools = all ? "all" : "read"; changed(false); renderInspector();
+  }));
   box.querySelectorAll("[data-acc]").forEach((d) => d.addEventListener("click", () => { n.tools = ACCESS[Number(d.dataset.acc)][0]; changed(false); renderInspector(); }));
 }
 
@@ -1488,8 +1491,7 @@ $("runBtn").onclick = () => {
   const roleCount = (r) => flow.nodes.filter((n) => n.role === r && !(n.type === "cluster" && engineOf(n) !== "claude") && !(n.type === "master" && n.mode === "pass") && !(n.type === "checkpoint" && n.mode !== "summarize")).length;
   const counts = ["think", "build", "run"].map((r) => [ROLE_NAME[r], roleCount(r)]).filter(([, c]) => c);
   $("rolesField").hidden = !counts.length;   // nothing to pick for yet
-  $("rolesSub").textContent = `Stages in this flow: ${counts.map(([r, c]) => `${c} ${r}`).join(", ")}. `
-    + "A stage with a model picked by hand keeps it. Each stage stays on one model, so nothing is paid for twice.";
+  $("rolesSub").textContent = `The model each role uses, for every team in this flow (${counts.map(([r, c]) => `${c} ${r}${c === 1 ? "" : "s"}`).join(", ")}).`;
   $("runDlg").showModal(); $("taskIn").focus();
 };
 // whose plan this run uses, so nobody is surprised by their usage

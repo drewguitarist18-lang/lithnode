@@ -61,6 +61,10 @@ check("a Codex role takes the flow's pick for that role", _cf["c"]["engine_model
 check("a role with no pick uses the CLI's own default", _cf["k"]["engine_model"] == "", _cf["k"])
 check("a model picked by hand is kept", _cf["h"]["engine_model"] == "gpt-hand", _cf["h"])
 check("a bad role model is dropped", flows.clean_flow(_teams)["engine_models"]["codex"]["build"] == "")
+_off = flows.clean_flow({"roles": False, "nodes": [{"id": "t", "type": "cluster", "role": "think", "model": "claude-haiku-4-5"}]})
+check("with roles off a team keeps its own model and has no role", _off["roles"] is False
+      and (_off["nodes"][0]["role"], _off["nodes"][0]["model"]) == ("", "claude-haiku-4-5"), _off["nodes"][0])
+check("roles are on by default", flows.clean_flow({"nodes": []})["roles"] is True)
 check("every template is ready to run", all(flows.check_runnable(flows.from_template(t["id"])) == [] for t in flows.TEMPLATES),
       [t["id"] for t in flows.TEMPLATES if flows.check_runnable(flows.from_template(t["id"]))])
 check("an unknown node type is refused", raises(lambda: flows.clean_node({"id": "a", "type": "bogus"})))

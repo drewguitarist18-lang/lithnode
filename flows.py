@@ -274,7 +274,10 @@ def clean_flow(raw: Any) -> dict[str, Any]:
         raise ValueError("the flow has a loop; connections must go one way")
     models = clean_models(raw.get("models"))
     engine_models = clean_engine_models(raw.get("engine_models"))
+    use_roles = raw.get("roles") is not False   # off: every stage keeps the model picked for it
     for n in nodes:
+        if not use_roles:
+            n["role"] = ""
         if n.get("role"):
             n["model"] = models[n["role"]]
             if n.get("engine", "claude") != "claude":   # a Codex or Cursor team: the role picks its model there too
@@ -287,7 +290,7 @@ def clean_flow(raw: Any) -> dict[str, Any]:
             "task": _text(raw, "task", 4000),   # what the Run menu opens with: your description, or the last task run
             "dir": raw.get("dir") if raw.get("dir") in ("tb", "lr") else "lr",
             "auto": raw.get("auto") is not False,   # auto-arrange: re-lay out the nodes on every change
-            "limit": clean_limit(raw.get("limit", DEFAULT_LIMIT)), "models": models,
+            "limit": clean_limit(raw.get("limit", DEFAULT_LIMIT)), "models": models, "roles": use_roles,
             "engine_models": engine_models}
 
 
