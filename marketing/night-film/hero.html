@@ -336,7 +336,7 @@ window.ready = (async () => {
 // shaker come in under the app, and a marimba plays the tune. The run waiting for you (18–20) holds a chord over a
 // ticking clock; your approval brings the beat back. It ends Bbmaj9 to F. The app's clicks and keys tick with the picture.
 let ac, out, bus, duck, revIn, dlyIn, noiseBuf;
-const MASTER = .9, BEAT = .5, BAR = 2;
+const MASTER = 1.45, BEAT = .5, BAR = 2;
 const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 function noise() {
   if (noiseBuf) return noiseBuf;
