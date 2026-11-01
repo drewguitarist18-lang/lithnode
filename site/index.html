@@ -59,10 +59,12 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .sky { position: absolute; top: 0; left: 0; width: 100%; height: 100svh; z-index: 0; overflow: hidden; background: var(--void);
          -webkit-mask-image: linear-gradient(#000 72%, transparent); mask-image: linear-gradient(#000 72%, transparent); }
   .sky .layer { position: absolute; inset: 0; }
-  .sky .layer.still { background: url(media/black-hole-wide.webp) center 30% / cover no-repeat; }
-  @media (max-aspect-ratio: 4/5) { .sky .layer.still { background-image: url(media/black-hole-tall.webp); } }
+  .sky .layer.still { background: url(media/black-hole-wide.webp) center 42% / cover no-repeat; }
+  @media (max-aspect-ratio: 4/5) { .sky .layer.still { background-image: url(media/black-hole-tall.webp); background-position: center 29%; } }
+  /* the lower half darkens so the words read over the disk */
+  .sky::after { content: ""; position: absolute; inset: 45% 0 0; pointer-events: none; background: linear-gradient(rgba(5,5,6,0), rgba(5,5,6,.92)); }
   .sky canvas { width: 100%; height: 100%; display: block; opacity: 0; }
-  .sky canvas.on { opacity: 1; animation: hole-in 2.4s cubic-bezier(.16,1,.3,1); }
+  .sky canvas.on { opacity: 1; animation: hole-in 2.4s cubic-bezier(.22,1,.36,1) both; }
   @keyframes hole-in { from { opacity: 0; transform: scale(1.12); } }
   main, nav, footer { position: relative; z-index: 1; }
   .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
@@ -99,14 +101,11 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .btn svg { width: 18px; height: 18px; flex: none; }
   .btn:focus-visible, a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
-  /* hero: centered, the black hole sits behind it */
-  .hero { min-height: 100svh; display: grid; place-items: center; text-align: center; padding: 76px 0 20vh; }   /* sits a little above the middle */
-  /* a soft dark pool right behind the words, so they read over the bright disk */
+  /* hero: the black hole up top, the words at the bottom over its lower half */
+  .hero { min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; text-align: center;
+          padding: 128px 0 max(24px, calc(12svh - 44px)); }
   .hero .wrap { position: relative; }
-  .hero .wrap::before { content: ""; position: absolute; z-index: -1; left: 50%; top: 50%; width: min(980px, 120%); height: 115%;
-                        transform: translate(-50%, -50%); pointer-events: none;
-                        background: radial-gradient(closest-side, rgba(8,8,10,.6), rgba(8,8,10,.35) 55%, rgba(8,8,10,0)); }   /* readable over the bright disk */
-  #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 26px; display: block; }
+  #crab { width: 64px; height: 64px; image-rendering: pixelated; margin: 0 auto 18px; display: block; }
   h1 { font: 700 clamp(40px, 7.4vw, 92px)/1.02 var(--sans); letter-spacing: -.045em; margin: 0; text-wrap: balance; }
   h1 .dim { color: var(--ink); font-weight: 700; }
   .sub { font-family: var(--sans); color: #c4c3bd; max-width: 46ch; margin: 24px auto 32px; font-size: clamp(15.4px, 1.55vw, 17.5px); }
@@ -423,7 +422,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .rv.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) {
     .rv { opacity: 1; transform: none; transition: none; }
-    .cell.wide .part i, .nd, .wires path, .term .tl, .ptr, .ask .bs span.ok, .ask .done, .ring { animation: none; }
+    .sky canvas.on, .cell.wide .part i, .nd, .wires path, .term .tl, .ptr, .ask .bs span.ok, .ask .done, .ring { animation: none; }
     .nd, .term .tl { opacity: 1; } .wires path { stroke-dashoffset: 0; }
   }
 </style>
