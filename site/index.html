@@ -387,10 +387,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
           opacity: 0; transform: translateY(-10px) scale(.98); transform-origin: top right; pointer-events: none;
           transition: opacity .35s cubic-bezier(.16,1,.3,1), transform .45s cubic-bezier(.16,1,.3,1); }
   .help.show { opacity: 1; transform: none; pointer-events: auto; }
-  .help .x { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--soft);
-             cursor: pointer; font: 500 15px var(--mono); }
-  .help .x:hover { background: var(--glass-hi); color: var(--ink); }
-  .help h3 { font: 700 15px var(--pixel); margin: 2px 40px 2px 0; }
+  .help h3 { font: 700 15px var(--pixel); margin: 2px 0; }
   .help .file { color: var(--soft); font-size: 12.5px; margin: 0 0 14px; overflow-wrap: anywhere; }
   .help .busy { height: 2px; border-radius: 2px; background: rgba(236,235,230,.12); overflow: hidden; margin-bottom: 16px; position: relative; }
   .help .busy::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%; background: var(--ink); animation: busy 1.3s cubic-bezier(.4,0,.2,1) infinite; }
@@ -419,6 +416,8 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .help .tipme b { display: block; color: var(--ink); font-size: 13px; font-weight: 600; }
   .help .tipme em { font: 600 12px var(--mono); font-style: normal; color: var(--c); white-space: nowrap; }
   .help .tipme:hover em { text-decoration: underline; }
+  .help .notip { display: block; width: 100%; margin-top: 8px; height: 34px; border: 1px solid var(--edge); border-radius: 10px; background: transparent; color: var(--soft); font: inherit; font-size: 12.5px; cursor: pointer; transition: background .2s, color .2s; }
+  .help .notip:hover { background: var(--glass-hi); color: var(--ink, var(--nink)); }
   .help .again { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--edge); color: var(--faint); font-size: 12px; }
   .help .again a { color: var(--soft); }
   @media (max-width: 600px) { .help { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 78svh; transform: translateY(16px); transform-origin: bottom center; } }
@@ -613,12 +612,12 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
 </div></footer>
 
 <aside class="help" id="help" role="dialog" aria-labelledby="helpTitle" aria-hidden="true">
-  <button class="x" type="button" id="helpX" aria-label="Close">✕</button>
   <h3 id="helpTitle">Downloading</h3>
   <p class="file" id="helpFile"></p>
   <div class="busy" aria-hidden="true"></div>
   <ol id="helpSteps"></ol>
   <a class="tipme" href="https://ko-fi.com/lithnode" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M5 1h1v2H5zM8 1h1v2H8zM2 4h10v1H2zM2 5h1v6H2zM11 5h1v6h-1zM3 11h8v1H3zM4 12h6v1H4zM12 6h2v1h-2zM14 7h1v2h-1zM12 9h2v1h-2zM3 5h8v6H3z" opacity=".25"/><path d="M5 1h1v2H5zM8 1h1v2H8zM2 4h10v1H2zM2 5h1v6H2zM11 5h1v6h-1zM3 11h8v1H3zM4 12h6v1H4zM12 6h2v1h-2zM14 7h1v2h-1zM12 9h2v1h-2zM6 7h1v1H6zM8 7h1v1H8zM5 6h1v1H5zM7 6h1v1H7zM9 6h1v1H9zM6 8h3v1H6zM7 9h1v1H7z"/></svg><span><b>Leave a tip</b>Lithnode is free. If it saves you time, a coffee keeps the agents working.</span><em>Tip →</em></a>
+  <button class="notip" type="button" id="helpX">No tip</button>
   <p class="again">Didn't start? <a id="helpAgain" href="#">Download again</a>. Need an engine first? <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>, <a href="https://developers.openai.com/codex" target="_blank" rel="noopener">Codex</a> or <a href="https://cursor.com/cli" target="_blank" rel="noopener">Cursor</a>.</p>
 </aside>
 
@@ -799,7 +798,7 @@ const OS_ICON = {"win": "<svg class=\"os-i\" viewBox=\"0 0 24 24\" fill=\"curren
     }
   });
   $("helpX").onclick = hide;
-  addEventListener("keydown", (e) => { if (e.key === "Escape") hide(); });
+  help.querySelector(".tipme").addEventListener("click", hide);
 })();
 
 // ---------------------------------------------------------------- on a phone: send yourself the link, and download it on your computer
