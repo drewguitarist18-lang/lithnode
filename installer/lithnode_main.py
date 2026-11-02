@@ -16,6 +16,7 @@ from pathlib import Path
 
 PET_EVENTS = ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Notification",
               "Stop", "SubagentStart", "SubagentStop", "SessionEnd")
+PET_ASYNC = set(PET_EVENTS) - {"SessionStart", "SessionEnd"}   # Claude doesn't wait on these; the ends stay in step
 SETTINGS = Path.home() / ".claude" / "settings.json"
 
 
@@ -67,7 +68,10 @@ def install_pet():
     _strip(hooks, source_too=True)   # one pet only: the installed copy replaces a from-source one
     cli = _cli().as_posix()
     for event in PET_EVENTS:
-        hooks.setdefault(event, []).append({"hooks": [{"type": "command", "command": f'"{cli}" hook {event}'}]})
+        hook = {"type": "command", "command": f'"{cli}" hook {event}'}
+        if event in PET_ASYNC:
+            hook["async"] = True
+        hooks.setdefault(event, []).append({"hooks": [hook]})
     _save(data)
 
 
