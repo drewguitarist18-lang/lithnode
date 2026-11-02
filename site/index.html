@@ -377,6 +377,8 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .getpet em { font: 600 12.5px var(--mono); font-style: normal; color: var(--c); white-space: nowrap; }
   .getpet:hover em { text-decoration: underline; }
   @media (max-width: 620px) { .getpet { grid-template-columns: auto minmax(0, 1fr); } .getpet em { grid-column: 2; } }
+  .getpet.tip { --c: #e6b450; }
+  .getpet .cup { width: 48px; height: 48px; margin-inline: 3px; color: var(--c); filter: drop-shadow(0 0 14px color-mix(in srgb, var(--c) 45%, transparent)); }
 
   /* after you press Download: the steps for your computer, next to where the browser shows its downloads */
   .help { position: fixed; top: 84px; right: 20px; z-index: 20; width: min(400px, calc(100% - 32px)); max-height: calc(100svh - 104px); overflow: auto;
@@ -580,6 +582,8 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   </div>
   <a class="getpet glass rv" href="https://pet.lithnode.com" target="_blank" rel="noopener"><canvas width="12" height="10" data-sprite="clawd" data-color="#d97757" title="Pet me"></canvas>
     <p><b>Get Claude Pet</b>A tiny pixel pet for your desktop: Windows, Mac or Linux. He types while Claude works, waves when it needs you, and turns into the crab while Lithnode is open. Free.</p><em>Get Claude Pet →</em></a>
+  <a class="getpet tip glass rv" href="https://ko-fi.com/lithnode" target="_blank" rel="noopener"><svg class="cup" viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M5 1h1v2H5zM8 1h1v2H8zM2 4h10v1H2zM2 5h1v6H2zM11 5h1v6h-1zM3 11h8v1H3zM4 12h6v1H4zM12 6h2v1h-2zM14 7h1v2h-1zM12 9h2v1h-2zM3 5h8v6H3z" opacity=".25"/><path d="M5 1h1v2H5zM8 1h1v2H8zM2 4h10v1H2zM2 5h1v6H2zM11 5h1v6h-1zM3 11h8v1H3zM4 12h6v1H4zM12 6h2v1h-2zM14 7h1v2h-1zM12 9h2v1h-2zM6 7h1v1H6zM8 7h1v1H8zM5 6h1v1H5zM7 6h1v1H7zM9 6h1v1H9zM6 8h3v1H6zM7 9h1v1H7z"/></svg>
+    <p><b>Tip jar</b>Lithnode is free and always will be. If it saves you time, a coffee keeps the agents working.</p><em>Leave a tip →</em></a>
 </div></section>
 </main>
 
@@ -590,7 +594,8 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
     <div class="flinks"><a href="#live">Flow</a><a href="#film">Film</a><a href="#how">How it works</a><a href="#download">Download</a>
       <a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a>
       <a href="https://github.com/drewguitarist18-lang/lithnode/releases" target="_blank" rel="noopener">Releases</a>
-      <a href="https://pet.lithnode.com" target="_blank" rel="noopener">Claude Pet</a></div>
+      <a href="https://pet.lithnode.com" target="_blank" rel="noopener">Claude Pet</a>
+      <a href="https://ko-fi.com/lithnode" target="_blank" rel="noopener">Tip jar</a></div>
   </div>
   <div class="frow">
     <span>Lithnode is an independent project. Not made or endorsed by Anthropic, OpenAI or Cursor.</span>
@@ -1052,6 +1057,16 @@ aimPointer(); addEventListener("resize", aimPointer);
 
 const io = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } }), { threshold: .12 });
 document.querySelectorAll(".rv").forEach((el, i) => { el.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(el); });
+</script>
+<!-- Ko-fi tip button, bottom corner -->
+<script src="https://storage.ko-fi.com/cdn/scripts/overlay-widget.js"></script>
+<script>
+  kofiWidgetOverlay.draw('lithnode', {
+    'type': 'floating-chat',
+    'floating-chat.donateButton.text': 'Support me',
+    'floating-chat.donateButton.background-color': '#323842',
+    'floating-chat.donateButton.text-color': '#fff'
+  });
 </script>
 </body>
 </html>
