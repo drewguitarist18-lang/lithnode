@@ -410,6 +410,15 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .help .cmd code { flex: 1; min-width: 0; font: 500 12px var(--mono); color: var(--ink); white-space: nowrap; overflow-x: auto; user-select: all; }
   .help .cmd button { flex: none; height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: var(--ink); color: var(--void);
                       font: 600 11.5px var(--mono); cursor: pointer; }
+  /* after the steps: a tip, for anyone glad they downloaded it */
+  .help .tipme { --c: #e6b450; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; margin-top: 16px; padding: 12px 14px 12px 12px;
+                 border-radius: 10px; border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); background: color-mix(in srgb, var(--c) 8%, transparent);
+                 text-decoration: none; color: var(--soft); font-size: 12.5px; line-height: 1.5; transition: background .25s; }
+  .help .tipme:hover { background: color-mix(in srgb, var(--c) 15%, transparent); }
+  .help .tipme svg { width: 30px; height: 30px; color: var(--c); filter: drop-shadow(0 0 10px color-mix(in srgb, var(--c) 40%, transparent)); }
+  .help .tipme b { display: block; color: var(--ink); font-size: 13px; font-weight: 600; }
+  .help .tipme em { font: 600 12px var(--mono); font-style: normal; color: var(--c); white-space: nowrap; }
+  .help .tipme:hover em { text-decoration: underline; }
   .help .again { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--edge); color: var(--faint); font-size: 12px; }
   .help .again a { color: var(--soft); }
   @media (max-width: 600px) { .help { top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 78svh; transform: translateY(16px); transform-origin: bottom center; } }
@@ -609,6 +618,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   <p class="file" id="helpFile"></p>
   <div class="busy" aria-hidden="true"></div>
   <ol id="helpSteps"></ol>
+  <a class="tipme" href="https://ko-fi.com/lithnode" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M5 1h1v2H5zM8 1h1v2H8zM2 4h10v1H2zM2 5h1v6H2zM11 5h1v6h-1zM3 11h8v1H3zM4 12h6v1H4zM12 6h2v1h-2zM14 7h1v2h-1zM12 9h2v1h-2zM3 5h8v6H3z" opacity=".25"/><path d="M5 1h1v2H5zM8 1h1v2H8zM2 4h10v1H2zM2 5h1v6H2zM11 5h1v6h-1zM3 11h8v1H3zM4 12h6v1H4zM12 6h2v1h-2zM14 7h1v2h-1zM12 9h2v1h-2zM6 7h1v1H6zM8 7h1v1H8zM5 6h1v1H5zM7 6h1v1H7zM9 6h1v1H9zM6 8h3v1H6zM7 9h1v1H7z"/></svg><span><b>Leave a tip</b>Lithnode is free. If it saves you time, a coffee keeps the agents working.</span><em>Tip →</em></a>
   <p class="again">Didn't start? <a id="helpAgain" href="#">Download again</a>. Need an engine first? <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>, <a href="https://developers.openai.com/codex" target="_blank" rel="noopener">Codex</a> or <a href="https://cursor.com/cli" target="_blank" rel="noopener">Cursor</a>.</p>
 </aside>
 
