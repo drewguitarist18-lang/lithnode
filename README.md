@@ -33,6 +33,11 @@ Nothing goes through anyone else's server.
 - **Editing:** drag nodes in from the left. Wire them from a node's right dot to another node's left dot.
   Hover a node or wire and click its **✕** to remove it, drag a wire's end off to disconnect it, or
   right-click anything for more (duplicate, disconnect all, add a node here).
+- **Team files:** *Export team file* in the flow menu saves a flow as a `.lithnode.json` to share, without
+  your folder, your last task or any webhook URLs. *Import team file…* opens one as a new flow, and first says what
+  the team can do on your computer (run commands, change files, use the web).
+- **Welcome tour:** a few pop-ups on first launch walk through the Flows page. *Take the tour* in the flow menu
+  shows it again.
 - **Order:** every node waits for all of its inputs, so stages run in order and branches run side by side.
 - **Editing agents take turns:** agents that can edit files work one after another, so they never overwrite each
   other. Read-only agents run at the same time.

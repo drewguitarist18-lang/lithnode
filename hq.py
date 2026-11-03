@@ -488,6 +488,19 @@ class Handler(BaseHTTPRequestHandler):
         HQ_STORE.save_flow(flow)
         self.send_json({**self.flow_payload(flow), "cost": round(agent.cost, 4)})
 
+    def POST_api_flows_import(self) -> None:
+        """A team file someone shared. With check, says what the team can do; otherwise saves it as a new flow."""
+        body = self.read_json()
+        try:
+            flow = flows.import_team(body.get("team"))
+        except (ValueError, TypeError) as exc:
+            return self.send_json({"error": f"That file isn't a team Lithnode can open: {exc}."}, 400)
+        if body.get("check"):
+            return self.send_json({"name": flow["name"], "access": flows.team_access(flow)})
+        flow["id"] = uuid.uuid4().hex[:12]
+        HQ_STORE.save_flow(flow)
+        self.send_json(self.flow_payload(flow))
+
     def flow_item(self, method: str, parts: list[str]) -> None:
         if not parts or not FLOW_ID_RE.match(parts[0]):
             return self.send_json({"error": "bad id"}, 400)
@@ -513,6 +526,17 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"error": f"This flow's file is damaged: {exc}"}, 400)
         if method == "GET" and not action:
             return self.send_json(self.flow_payload(flow))
+        if method == "GET" and action == "export":   # the team as a file to share (see flows.export_team)
+            own = {b["id"]: b.get("instructions", "") for b in load_bots() if not b.get("builtin")}
+            body = json.dumps(flows.export_team(flow, own), indent=2).encode()
+            name = re.sub(r"[^a-z0-9]+", "-", flow["name"].lower()).strip("-") or "team"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Disposition", f'attachment; filename="{name}.lithnode.json"')
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return self.wfile.write(body)
         if method == "POST" and action == "run":
             body = self.read_json()
             task = str(body.get("task") or "").strip()

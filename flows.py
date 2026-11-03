@@ -496,6 +496,61 @@ ITEMS_NOTE = ('Only if your stage produces or judges a list of things (parts of 
               'most important first.')
 
 
+# ----------------------------------------------------------------- team files
+
+TEAM_KIND = "lithnode-team"
+
+
+def export_team(flow: dict[str, Any], bot_instructions: dict[str, str]) -> dict[str, Any]:
+    """A flow as a file to share: the team itself, without this computer's folder, the last task or webhook URLs.
+    A stage built from one of your own bots carries that bot's instructions, since the other computer won't have it."""
+    nodes = []
+    for n in flow["nodes"]:
+        n = dict(n)
+        if n["type"] == "cluster" and not n.get("instructions") and n.get("bot") in bot_instructions:
+            n["instructions"] = bot_instructions[n["bot"]]
+        if n["type"] == "approval":
+            n["webhook"] = ""
+        nodes.append(n)
+    team = {k: v for k, v in flow.items() if k not in ("id", "folder", "task")}
+    return {"kind": TEAM_KIND, "version": 1, "flow": {**team, "nodes": nodes}}
+
+
+def import_team(raw: Any) -> dict[str, Any]:
+    """A shared team file as a new flow (no id yet): the same checks as page input, and nothing that points at
+    someone else's computer or server (no folder, no task, no webhooks). Raises ValueError with a readable reason."""
+    if isinstance(raw, dict) and raw.get("kind") == TEAM_KIND:
+        raw = raw.get("flow")
+    if not isinstance(raw, dict) or not raw.get("nodes"):
+        raise ValueError("there's no team in it")
+    flow = clean_flow({**raw, "folder": "", "task": ""})
+    for n in flow["nodes"]:
+        if n["type"] == "approval":
+            n["webhook"] = ""
+    return flow
+
+
+def team_access(flow: dict[str, Any]) -> list[str]:
+    """What a team can do on this computer, in plain sentences, the riskiest first (empty: it only reads)."""
+    stages = [n for n in flow["nodes"] if n["type"] in ("master", "cluster")]
+
+    def who(test: Any) -> str:
+        return ", ".join(n["name"] for n in stages if test(n))
+
+    out = []
+    if names := who(lambda n: n.get("tools") in ("full", "all")):
+        out.append(f"{names} can run any command on this computer.")
+    if names := who(lambda n: n.get("clis") and n.get("tools") not in ("full", "all")):
+        out.append(f"{names} can run some command-line tools.")
+    if names := who(lambda n: n.get("tools") in ("edit", "full", "all")):
+        out.append(f"{names} can change files in the folder you run it on.")
+    if names := who(lambda n: n.get("connectors")):
+        out.append(f"{names} can use your connectors.")
+    if names := who(lambda n: n.get("tools") in ("web", "research", "all")):
+        out.append(f"{names} can search the web.")
+    return out
+
+
 # ----------------------------------------------------------------- templates
 
 ROLE_OF = {"claude-opus-5-5": "think", "claude-sonnet-5-5": "build", "claude-haiku-4-5": "run"}

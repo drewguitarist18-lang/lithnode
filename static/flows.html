@@ -14,7 +14,7 @@
   <aside class="palette" id="palette">
     <div class="phead">
       <div class="ftitle">
-        <div class="fname"><input id="flowName" maxlength="60" aria-label="Flow name" title="Rename this flow" spellcheck="false"><button class="ib" id="flowMenu" title="Switch flow, duplicate or delete" aria-label="Flow menu" aria-haspopup="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button></div>
+        <div class="fname"><input id="flowName" maxlength="60" aria-label="Flow name" title="Rename this flow" spellcheck="false"><button class="ib" id="flowMenu" title="Switch flow" aria-label="Flow menu" aria-haspopup="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button></div>
         <div class="pmeta"><span id="estChip" title="How many agents this flow will start."></span><span id="saved"></span></div>
       </div>
       <button class="ib" id="newBtn" title="New blank flow" aria-label="New blank flow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -145,9 +145,11 @@
   <div class="acts"><button class="danger" id="bDelete" style="margin-right:auto">Delete</button><button data-close>Cancel</button><button class="primary" id="bSave">Save bot</button></div>
 </dialog>
 <div id="toast"></div>
+<input type="file" id="importIn" accept=".json,application/json" hidden>
 
 <script src="/static/sprites.js"></script>
 <script src="/static/ui.js"></script>
+<script src="/static/tour.js"></script>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -1058,10 +1060,14 @@ function deleteSelected() {
   deleteNode(sel.id);
 }
 document.addEventListener("keydown", (e) => {
-  const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName), ctrl = e.ctrlKey || e.metaKey;
   if ((e.key === "Delete" || e.key === "Backspace") && !typing) { e.preventDefault(); deleteSelected(); }
   if (e.key === "Escape" && !typing) select(null);
-  if (e.key === "s" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
+  if (e.key === "s" && ctrl) { e.preventDefault(); save(); }
+  if (e.key === "o" && ctrl) { e.preventDefault(); flowsApi.importTeam(); }
+  if (e.key === "e" && ctrl) { e.preventDefault(); flowsApi.exportTeam(); }
+  if (e.key === "d" && ctrl && !typing) { e.preventDefault(); flowsApi.duplicateSel(); }
+  if (e.key === "F2") { e.preventDefault(); flowsApi.rename(); }
 });
 
 // ------------------------------------------------------------------ inspector
@@ -2044,21 +2050,14 @@ $("newDlg").addEventListener("click", async (e) => {
   const t = e.target.closest("[data-tpl]"); if (!t) return;
   $("newDlg").close(); if (!(await leaveFlow())) return; dirty = false; await createFlow(t.dataset.tpl || null);
 });
-// The flow menu, from the arrow by the flow's name: switch to another flow, make one, tidy this one up or delete it.
+// The flow menu, from the arrow by the flow's name: just your flows, to switch between them.
+// Everything else (new, export, import, tidy, delete, the tour) lives in the File / Edit / View / Help bar at the top.
 function flowMenu(r) {
   ui.menu(r.left, r.bottom + 6, [
     { head: "Your flows" },
     ...flows.map((f) => ({ icon: f.id === flow.id ? "✓" : "", label: f.name, on: f.id === flow.id, action: () => switchFlow(f.id) })),
     { sep: true },
-    { icon: "＋", label: "New blank flow", action: () => $("newBtn").click() },
-    { icon: "▦", label: "New from a template…", action: () => $("newDlg").showModal() },
-    { icon: "⧉", label: "Duplicate flow", action: duplicateFlow },
-    { sep: true },
-    { icon: "⇅", label: "Tidy up top to bottom", action: () => tidy("tb") },
-    { icon: "⇄", label: "Tidy up left to right", hint: "wraps long flows", action: () => tidy("lr") },
-    { icon: "⤢", label: "Fit to screen", action: () => { autoFit = true; fit(); } },
-    { sep: true },
-    { icon: "✕", label: "Delete flow", danger: true, action: deleteFlow },
+    { icon: "＋", label: "New flow", action: () => $("newBtn").click() },
   ]);
 }
 $("flowMenu").onclick = (e) => flowMenu(e.currentTarget.closest(".fname").getBoundingClientRect());
@@ -2071,6 +2070,44 @@ async function duplicateFlow() {
   await refreshFlows(); await openFlow(copy.id);
   toast(`Made "${copy.name}".`);
 }
+// What the top bar's File / Edit / View menus (shell.html) do on this page.
+const panes = () => [$("paneL").getAttribute("aria-pressed") === "true", $("paneR").getAttribute("aria-pressed") === "true"];
+const zoomBy = (k) => { autoFit = false; const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, k ? view.k * k : 1); };
+window.flowsApi = {
+  newFlow: () => $("newBtn").click(), newFromTemplate: () => $("newDlg").showModal(), duplicate: () => duplicateFlow(),
+  importTeam: () => $("importIn").click(), exportTeam: () => exportFlow(), deleteFlow: () => deleteFlow(),
+  run: () => $("runBtn").click(), runs: () => $("runsBtn").click(),
+  rename: () => { $("flowName").focus(); $("flowName").select(); },
+  hasSel: () => !!sel && !locked(), selIsNode: () => !!sel && sel.kind === "node" && !locked(),
+  duplicateSel: () => { if (sel && sel.kind === "node" && !locked()) duplicateNode(sel.id); },
+  deleteSel: () => deleteSelected(), tidy: (d) => tidy(d),
+  zoomIn: () => zoomBy(1.2), zoomOut: () => zoomBy(1 / 1.2), zoomReset: () => zoomBy(0), fit: () => { autoFit = true; fit(); },
+  panes, toggleLeft: () => setPanes(!panes()[0], panes()[1]), toggleRight: () => setPanes(panes()[0], !panes()[1]),
+  tour: () => welcomeTour(),
+};
+// Team files: a flow saved as a .lithnode.json to share, and one someone shared opened as a new flow.
+async function exportFlow() {
+  if (!(await save())) return;
+  const a = document.createElement("a");
+  a.href = `/api/flows/${flow.id}/export`; a.download = "";
+  a.click();
+  toast(`Exported "${flow.name}". It doesn't include your folder or your last task.`);
+}
+$("importIn").onchange = async (e) => {
+  const file = e.target.files[0]; e.target.value = "";
+  if (!file) return;
+  let team;
+  try { team = JSON.parse(await file.text()); } catch (err) { return toast("That file isn't a Lithnode team file."); }
+  try {
+    const d = await api("/api/flows/import", { method: "POST", body: { team, check: true } });
+    if (d.access.length && !(await ui.confirm({ title: `Import "${d.name}"?`, text: d.access.join(" ") + " Only import teams from people you trust.", ok: "Import" }))) return;
+    if (!(await leaveFlow())) return;
+    dirty = false;
+    const made = await api("/api/flows/import", { method: "POST", body: { team } });
+    await refreshFlows(); await openFlow(made.flow.id);
+    toast(`Imported "${made.flow.name}". Press Run and tell it what to do.`);
+  } catch (err) { toast(err.message); }
+};
 async function deleteFlow() {
   if (!(await ui.confirm({ title: `Delete "${flow.name}"?`, text: "The flow is removed. Its past runs stay in the Runs list.", ok: "Delete flow", danger: true }))) return;
   clearTimeout(saveTimer); while (saving) await saving; dirty = false;   // no pending save may bring it back
@@ -2079,11 +2116,35 @@ async function deleteFlow() {
   if (flows.length) openFlow(flows[0].id); else createFlow("ship-it");
 };
 document.querySelectorAll("dialog [data-close]").forEach((b) => b.onclick = () => b.closest("dialog").close());
-// once, on first launch: agents use the person's own plan
+// The welcome tour, from the flow menu and once on first launch: what each part of the page is for.
+const TOUR = [
+  { title: "Welcome to Lithnode", ok: "Show me",
+    text: "Lithnode runs teams of AI agents on your own Claude Code. Each team has one job, and they pass their work along like a relay. Here's a quick look around." },
+  { at: "#ask", title: "Describe a team",
+    text: "Type what you want done, like \"find me a cheaper phone plan and cut any with hidden fees\". Lithnode builds the team for you." },
+  { at: "#palette", title: "Or build it yourself",
+    text: "Click or drag a bot onto the canvas, then connect a node's right dot to the next one's left dot. Approval steps pause until you say go." },
+  { at: "#world .node.nd-team", title: "A team",
+    text: "Each box is a team of agents with one job. Click one to pick its model, how many agents it has and what it can touch." },
+  { at: "#runBtn, #floatRun", title: "Run it",
+    text: "Press Run, write the job in your own words and pick a folder. The Run menu shows how many agents it will start before anything happens." },
+  { at: "#rside", title: "Results",
+    text: "Reports and the things your agents found land here as they finish. Runs, top right, lists every past run." },
+  { at: ".fname", title: "Your flows",
+    text: "Switch flows, start from a template, or export a team file to share. You can take this tour again from this menu." },
+  { title: "Meet the Office",
+    text: "The Office tab at the top shows every agent at its desk while it works, plus your open Claude Code sessions. That's it. Have fun!" },
+];
+function welcomeTour() {
+  tour.start(TOUR, () => { try { localStorage.setItem("hq-tour-1", "1"); } catch (e) {} });
+}
+// once, on first launch: agents use the person's own plan, then the tour
 (() => {
-  let seen = false; try { seen = localStorage.getItem("hq-usage-ok-2") === "1"; } catch (e) {}
-  if (seen) return;
-  $("usageOk").onclick = () => { try { localStorage.setItem("hq-usage-ok-2", "1"); } catch (e) {} $("usageDlg").close(); };
+  let seen = false, toured = true;
+  try { seen = localStorage.getItem("hq-usage-ok-2") === "1"; toured = localStorage.getItem("hq-tour-1") === "1"; } catch (e) {}
+  const tourSoon = () => { if (!toured) setTimeout(() => flow ? welcomeTour() : tourSoon(), 700); };   // once the flow is drawn
+  if (seen) return tourSoon();
+  $("usageOk").onclick = () => { try { localStorage.setItem("hq-usage-ok-2", "1"); } catch (e) {} $("usageDlg").close(); tourSoon(); };
   $("usageDlg").showModal();
 })();
 window.addEventListener("pagehide", () => {   // last edits survive closing the window mid-debounce

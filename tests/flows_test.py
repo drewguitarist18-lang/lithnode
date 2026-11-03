@@ -271,6 +271,39 @@ try:
     hpath.write_text(json.dumps(raw), encoding="utf-8")
     check("a hand-edited flow file with a bad webhook won't load or run",
           call(f"/api/flows/{hid}")[0] == 400 and call(f"/api/flows/{hid}/run", {"task": "Check the code"}, "POST")[0] == 400)
+
+    # ---- team files: export a flow to share, import one as a new flow ------------------------
+    _, made = call("/api/flows", {"template": "ship-it"}, "POST")
+    shared = {**made["flow"], "name": "Ship it: v2!", "folder": str(project), "task": "Ship the login page"}
+    for n in shared["nodes"]:
+        if n["type"] == "approval":
+            n["webhook"] = "https://ntfy.sh/my-secret-topic"
+    call(f"/api/flows/{shared['id']}", shared, "POST")
+    with request.urlopen(URL + f"/api/flows/{shared['id']}/export", timeout=15) as r:
+        disposition, team = r.headers.get("Content-Disposition", ""), json.loads(r.read())
+    check("export downloads a named team file", 'filename="ship-it-v2.lithnode.json"' in disposition and team["kind"] == "lithnode-team", disposition)
+    check("an exported team leaves out the folder, task, webhooks and id",
+          "folder" not in team["flow"] and "task" not in team["flow"] and "id" not in team["flow"]
+          and all(not n.get("webhook") for n in team["flow"]["nodes"]) and str(project) not in json.dumps(team), team["flow"].keys())
+    before = len(call("/api/flows")[1]["flows"])
+    s, d = call("/api/flows/import", {"team": team, "check": True}, "POST")
+    check("checking an import says what the team can do, and saves nothing",
+          s == 200 and d["name"] == "Ship it: v2!" and d["access"] == ["Builders can change files in the folder you run it on."]
+          and len(call("/api/flows")[1]["flows"]) == before, d)
+    s, d = call("/api/flows/import", {"team": {**team, "flow": {**team["flow"], "folder": "C:\\elsewhere", "task": "rm -rf"}}}, "POST")
+    got = d.get("flow", {})
+    check("import saves a new flow with no folder, task or webhook from the file",
+          s == 200 and got["id"] != shared["id"] and got["folder"] == "" and got["task"] == "" and got["name"] == "Ship it: v2!"
+          and [n["id"] for n in got["nodes"]] == [n["id"] for n in made["flow"]["nodes"]] and all(not n.get("webhook") for n in got["nodes"]), got)
+    bare = {k: v for k, v in made["flow"].items() if k != "id"}
+    check("a bare flow file imports too", call("/api/flows/import", {"team": bare}, "POST")[0] == 200)
+    for bad, why in [(None, "no file"), ({"kind": "lithnode-team", "flow": {"nodes": []}}, "empty team"), ({"hello": 1}, "not a team"),
+                     ({"nodes": [{"id": "a", "type": "cluster"}, {"id": "a", "type": "cluster"}]}, "duplicate ids")]:
+        s, d = call("/api/flows/import", {"team": bad}, "POST")
+        check(f"import refuses a bad file ({why})", s == 400 and d["error"].startswith("That file isn't a team"), (s, d))
+    check("a read-only team imports with nothing to warn about",
+          call("/api/flows/import", {"team": {"nodes": [{"id": "r", "type": "cluster", "tools": "read"}]}, "check": True}, "POST")[1]["access"] == [])
+
     s, r = call(f"/api/flows/{fid}/run", {"task": "Check the code"}, "POST")
     check("an unrunnable flow refuses to start, saying why", s == 400 and r["error"].startswith("Add a team"), r)
 

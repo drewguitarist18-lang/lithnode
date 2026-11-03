@@ -89,6 +89,11 @@
   .icon:hover { color: var(--ink); background: var(--hover); }
   .icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .quit:hover { color: var(--warn); }
+  /* File / Edit / View / Help, like any desktop app */
+  .menubar { display: flex; gap: 1px; margin-right: 6px; }
+  .menubar button { height: 28px; padding: 0 9px; border-radius: 7px; border: 0; background: transparent; color: var(--muted);
+                    font: inherit; font-size: 12.5px; cursor: pointer; }
+  .menubar button:hover, .menubar button.on { color: var(--ink); background: var(--hover); }
   .frames { position: relative; min-height: 0; }
   iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; background: var(--bg); }
   iframe.on { display: block; }
@@ -106,6 +111,9 @@
 <body>
 <header>
   <div class="brand" title="Lithnode · teams of agents on Claude Code, Codex and Cursor"><canvas id="logo" width="96" height="72"></canvas><span class="word">Lithnode</span></div>
+  <div class="menubar" id="menubar" role="menubar">
+    <button data-menu="file" role="menuitem" aria-haspopup="menu">File</button><button data-menu="edit" role="menuitem" aria-haspopup="menu">Edit</button><button data-menu="view" role="menuitem" aria-haspopup="menu">View</button><button data-menu="help" role="menuitem" aria-haspopup="menu">Help</button>
+  </div>
   <nav>
     <a href="#flows" data-tab="flows" title="Draw a team of agents and run it">Flows <b class="badge" id="b-flows"></b></a>
     <a href="#office" data-tab="office" title="Every agent at work right now">Office <b class="badge" id="b-office"></b></a>
@@ -283,6 +291,85 @@ $("acct").addEventListener("click", (e) => {
 });
 document.addEventListener("mousedown", (e) => { if (!$("acct").hidden && !e.target.closest("#acct, #status")) toggleAcct(false); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("acct").hidden) toggleAcct(false); });
+const onTab = () => (frames.office && frames.office.classList.contains("on") ? "office" : "flows");
+const goTab = (t) => { history.replaceState(null, "", "#" + t); show(t); };
+// ---- the menu bar: most of it acts on the Flows page (flows.html's flowsApi), switching to it first
+const flowsDo = (fn) => () => {
+  if (onTab() !== "flows") goTab("flows");
+  const go = () => { const api = frames.flows.contentWindow.flowsApi; if (api) fn(api); else setTimeout(go, 150); };
+  go();
+};
+const fapi = () => (frames.flows && frames.flows.contentWindow.flowsApi) || null;
+
+const MENUS = {
+  file: () => [
+    { icon: "＋", label: "New flow", action: flowsDo((a) => a.newFlow()) },
+    { icon: "▦", label: "New from a template…", action: flowsDo((a) => a.newFromTemplate()) },
+    { icon: "⧉", label: "Duplicate flow", action: flowsDo((a) => a.duplicate()) },
+    { sep: true },
+    { icon: "⤒", label: "Import team file…", hint: "Ctrl+O", action: flowsDo((a) => a.importTeam()) },
+    { icon: "⤓", label: "Export team file", hint: "Ctrl+E", action: flowsDo((a) => a.exportTeam()) },
+    { sep: true },
+    { icon: "▶", label: "Run flow…", action: flowsDo((a) => a.run()) },
+    { icon: "↺", label: "Past runs", action: flowsDo((a) => a.runs()) },
+    { sep: true },
+    { icon: "✕", label: "Delete flow", danger: true, action: flowsDo((a) => a.deleteFlow()) },
+    { icon: "⏻", label: "Quit Lithnode", action: () => $("quitBtn").click() },
+  ],
+  edit: () => {
+    const a = onTab() === "flows" ? fapi() : null;
+    return [
+      { icon: "✎", label: "Rename flow", hint: "F2", action: flowsDo((x) => x.rename()) },
+      { sep: true },
+      { icon: "⧉", label: "Duplicate selected", hint: "Ctrl+D", disabled: !(a && a.selIsNode()), action: flowsDo((x) => x.duplicateSel()) },
+      { icon: "✕", label: "Delete selected", hint: "Del", disabled: !(a && a.hasSel()), action: flowsDo((x) => x.deleteSel()) },
+      { sep: true },
+      { icon: "⇅", label: "Tidy up top to bottom", action: flowsDo((x) => x.tidy("tb")) },
+      { icon: "⇄", label: "Tidy up left to right", action: flowsDo((x) => x.tidy("lr")) },
+    ];
+  },
+  view: () => {
+    const a = fapi(), [l, r] = a ? a.panes() : [true, true], flowsOn = onTab() === "flows";
+    return [
+      { icon: flowsOn ? "✓" : "", label: "Flows", on: flowsOn, action: () => goTab("flows") },
+      { icon: flowsOn ? "" : "✓", label: "Office", on: !flowsOn, action: () => goTab("office") },
+      { sep: true },
+      { icon: l ? "✓" : "", label: "Building blocks", action: flowsDo((x) => x.toggleLeft()) },
+      { icon: r ? "✓" : "", label: "Side panel", action: flowsDo((x) => x.toggleRight()) },
+      { sep: true },
+      { icon: "＋", label: "Zoom in", action: flowsDo((x) => x.zoomIn()) },
+      { icon: "－", label: "Zoom out", action: flowsDo((x) => x.zoomOut()) },
+      { icon: "1", label: "Actual size", action: flowsDo((x) => x.zoomReset()) },
+      { icon: "⤢", label: "Fit to screen", action: flowsDo((x) => x.fit()) },
+      { sep: true },
+      ...Object.entries(THEMES).map(([k, [, name]]) => ({ icon: themeMode === k ? "✓" : "", label: name === "Same as your computer" ? "Theme: same as your computer" : `Theme: ${name.toLowerCase()}`,
+        action: () => { themeMode = k; try { localStorage.setItem("hq-theme", k); } catch (e) {} applyAll(); } })),
+    ];
+  },
+  help: () => [
+    { icon: "?", label: "Take the tour", action: flowsDo((a) => a.tour()) },
+    { sep: true },
+    { icon: "↗", label: "Lithnode website", action: () => window.open("https://lithnode.com", "_blank", "noopener") },
+    { icon: "↗", label: "Report a problem", action: () => window.open("https://github.com/drewguitarist18-lang/lithnode/issues", "_blank", "noopener") },
+    { icon: "↗", label: "Source code on GitHub", hint: "MIT", action: () => window.open("https://github.com/drewguitarist18-lang/lithnode", "_blank", "noopener") },
+  ],
+};
+let openMenu = null;
+function showMenu(btn) {
+  const r = btn.getBoundingClientRect();
+  document.querySelectorAll(".menubar button").forEach((b) => b.classList.toggle("on", b === btn));
+  ui.menu(r.left, r.bottom + 4, MENUS[btn.dataset.menu]());
+  openMenu = btn.dataset.menu;
+  // the menu closes on any click or Escape: un-highlight its button then
+  const watch = setInterval(() => { if (!document.querySelector(".ui-menu")) { clearInterval(watch); if (openMenu === btn.dataset.menu) { openMenu = null; btn.classList.remove("on"); } } }, 100);
+}
+document.querySelectorAll(".menubar button").forEach((b) => {
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (openMenu === b.dataset.menu) { ui.closeMenu(); openMenu = null; b.classList.remove("on"); } else showMenu(b);
+  });
+  b.addEventListener("mouseenter", () => { if (openMenu && openMenu !== b.dataset.menu) showMenu(b); });   // slide across, like a desktop menu bar
+});
 $("quitBtn").onclick = async () => {
   const ok = await ui.confirm({ title: "Quit Lithnode?", text: "This closes the app and stops any running flows.", ok: "Quit", danger: true });
   if (!ok) return;
