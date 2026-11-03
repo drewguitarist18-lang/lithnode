@@ -1,8 +1,44 @@
 {
-  "redirects": [
-    { "source": "/(.*)", "has": [{ "type": "host", "value": "www.lithnode.com" }], "destination": "https://lithnode.com/$1", "permanent": true }
-  ],
-  "rewrites": [
-    { "source": "/tiktok", "destination": "/index.html" }
+  "routes": [
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.lithnode.com"
+        }
+      ],
+      "status": 308,
+      "headers": {
+        "Location": "https://lithnode.com/$1"
+      }
+    },
+    {
+      "src": "/shop/?",
+      "has": [
+        {
+          "type": "host",
+          "value": "lithnode.com"
+        }
+      ],
+      "status": 307,
+      "headers": {
+        "Location": "https://shop.lithnode.com/"
+      }
+    },
+    {
+      "src": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "shop.lithnode.com"
+        }
+      ],
+      "dest": "/shop/index.html"
+    },
+    {
+      "src": "/tiktok",
+      "dest": "/index.html"
+    }
   ]
 }
