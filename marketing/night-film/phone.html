@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Lithnode Phone Shot</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=TikTok+Sans:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=TikTok+Sans:wght@600&family=Geist+Mono:wght@400&display=swap">
 <style>html,body{margin:0;background:#000}canvas{display:block;width:100vw;height:auto}</style></head>
 <body><canvas id="cv" width="1080" height="1920"></canvas>
 <script src="phonecam.js"></script>
@@ -8,8 +8,9 @@
 // A phone filming the monitor: a recorded run (FOOTAGE below) plays on a 27-inch monitor in a dark room at night, shot handheld at 2x.
 // The picture is ray traced in WebGL (the panel's pixel grid, IPS glow and coating, the stand, desk, keyboard and wall),
 // then given the phone's look: shake, rolling shutter, motion blur, focus, sharpening, bloom and noise.
-// There are two rooms. "desk": the desk against a wall, a snake plant behind the monitor and a lamp at the desk's left end.
+// There are three rooms. "desk": the desk against a wall, a snake plant behind the monitor and a lamp at the desk's left end.
 // "city": the desk under a big window, the city outside at night, a white keyboard on light oak and the lamp off to the right.
+// "night": another room: a deep green wall, no plant, and a small warm lamp low at the right end of the desk.
 // render.js --phone calls renderFrame(t) for every frame and renderAudio() for the room, the keys and the clicks.
 // Open phone.html?t=5 through any local server for a still (&room=city for the window).
 const Q = new URLSearchParams(location.search);
@@ -20,6 +21,7 @@ const MON = { c: [0, SCREEN_Y, 0], r: [1, 0, 0], u: [0, Math.cos(TILT), -Math.si
 const ROOMS = {
   desk: { lamp: [-72, 58, 6], lampCol: [1.0, 0.62, 0.34].map((c) => c * 1200), ap: 0.14 },
   city: { lamp: [80, 52, 34], lampCol: [1.0, 0.6, 0.32].map((c) => c * 800), ap: 0.2 },
+  night: { lamp: [78, 46, 2], lampCol: [1.0, 0.7, 0.45].map((c) => c * 1500), ap: 0.16 },   // a small lamp low at the right end
 };
 const SHUT = 1 / 45, READ = 1 / 50;                     // exposure and the rolling shutter's sweep, seconds
 
@@ -32,8 +34,8 @@ const SHUT = 1 / 45, READ = 1 / 50;                     // exposure and the roll
 // after its key goes down, on the frame of the footage where it first appeared (shown: found by diffing the task box frame to frame;
 // letters typed close together can land on one frame).
 // folder: from then until Start run the run dialog's project folder box (box, footage pixels) shows a temp path with the username
-// in it, so it keeps the empty box from blankAt.
-const JOB = Q.get("job") || "products";
+// in it, so it keeps the empty box from blankAt, or with patch, the box filled in with that path instead.
+const JOB = Q.get("job") || (Q.get("set") === "commute" ? "hero" : "products");
 const FOOTAGE = {
   products: { file: "run", folder: [7.9, 10.58], box: [664, 551, 1166, 579], blankAt: 7.6,
     typed: "Find home gadgets worth selling this month",
@@ -42,11 +44,11 @@ const FOOTAGE = {
     clips: [
       { from: 4.62, to: 8.1, typist: true, seed: 11, roll: -1.1,   // typing the job, at a person's pace
         keys: [[0, 975, 445, 58, -8, 13], [6.8, 950, 415, 52, -6, 12]] },
-      { from: 16.3, to: 19.3, seed: 23, roll: 0.7,    // the scout at work: push in on it
+      { from: 16.3, to: 19.3, seed: 23, roll: .7,    // the scout at work: push in on it
         keys: [[0, 470, 575, 59, 7, 12], [2.5, 375, 550, 50, 5, 11], [3, 372, 550, 49.5, 5, 11]] },
-      { from: 26.2, to: 30.8, seed: 37, roll: -0.5,   // the checker's verdicts land on the six finds, then a look along the rest
+      { from: 26.2, to: 30.8, seed: 37, roll: -.5,   // the checker's verdicts land on the six finds, then a look along the rest
         keys: [[0, 385, 740, 60, -5, 12], [2.9, 380, 735, 57, -5, 12], [4.1, 880, 740, 54, 2, 12], [4.6, 888, 740, 54, 2, 12]] },
-      { from: 36.0, to: 40.0, seed: 41, roll: 0.9,    // the uploader lists the three as drafts; the run's done: up to the result
+      { from: 36.0, to: 40.0, seed: 41, roll: .9,    // the uploader lists the three as drafts; the run's done: up to the result
         keys: [[0, 382, 850, 59, -4, 11], [1.9, 380, 845, 57, -4, 11], [2.75, 432, 330, 55, -4, 14], [4, 428, 325, 53.5, -4, 14]] },
     ] },
   jobs: { file: "jobs-run", folder: [7.9, 10.966], box: [661, 535, 1170, 568], blankAt: 7.6,   // the Gmail checkbox makes its dialog taller
@@ -56,15 +58,17 @@ const FOOTAGE = {
     clips: [
       { from: 4.45, to: 8.25, typist: true, seed: 13, roll: 1.0,   // typing the job, from the other side this time
         keys: [[0, 975, 445, 58, 8, 13], [6.8, 950, 415, 52, 6, 12]] },
-      { from: 16.2, to: 19.6, seed: 29, roll: -0.8,   // the scout reads LinkedIn, then its six finds drop in below
+      { from: 16.2, to: 19.6, seed: 29, roll: -.8,   // the scout reads LinkedIn, then its six finds drop in below
         keys: [[0, 520, 560, 60, -6, 12], [2.6, 420, 545, 51, -4, 11], [3.4, 418, 545, 50.5, -4, 11]] },
-      { from: 25.9, to: 31.0, seed: 31, roll: 0.6,    // the checkers' verdicts land (faded in by 28.2), then across to the cut ones
+      { from: 25.9, to: 31.0, seed: 31, roll: .6,    // the checkers' verdicts land (faded in by 28.2), then across to the cut ones
         keys: [[0, 400, 760, 60, 5, 12], [3.2, 395, 755, 57, 5, 12], [4.1, 1090, 760, 56, -3, 12], [5.1, 1096, 760, 55.5, -3, 12]] },
-      { from: 31.0, to: 33.6, seed: 43, roll: -0.7,   // it waits for you: the pointer comes in and hits Approve
+      { from: 31.0, to: 33.6, seed: 43, roll: -.7,   // it waits for you: the pointer comes in and hits Approve
         keys: [[0, 1690, 360, 56, 4, 12], [2.6, 1700, 350, 53, 4, 12]] },
-      { from: 39.9, to: 44.2, seed: 47, roll: 0.8,    // the result, then Details: the three jobs, a cover letter for each
+      { from: 39.9, to: 44.2, seed: 47, roll: .8,    // the result, then Details: the three jobs, a cover letter for each
         keys: [[0, 960, 330, 60, -4, 13], [1.4, 960, 330, 58.5, -4, 13], [2.4, 958, 390, 56, -4, 13], [4.3, 956, 395, 55, -4, 13]] },
     ] },
+  hero: { file: "hero-run", folder: [229 / 30, 323 / 30], box: [662, 528, 1166, 560], patch: "C:/Users/you/Projects/shop",   // the new app's run, as in hero.html;
+    clips: [] },                                                                                                                 // only photos of it (set=commute)
 }[JOB];
 const CLIPS = FOOTAGE.clips, TYPED = FOOTAGE.typed, SHOWN = FOOTAGE.shown;
 function typist(c) {   // c.strokes: when each key goes down, in take time; c.knots: the take's clock, [take time, footage time]
@@ -104,8 +108,12 @@ const LENGTH = window.LENGTH = acc;
 // (gym and research are of run.mp4, jobs of the job hunt's); key is [x, y, cm, yaw, pitch] as in the clips; wide is the main camera
 // instead of the 2x. say is the slide's text: a line and a smaller one, the line 62 px unless size says otherwise. The text sits at the
 // top, so each photo keeps what matters below it. The jobs set is shot by the window, so it doesn't look like the last post.
+// commute is the new app's other screens (describe a team, the Office, then hero-run's drafts), in the night room.
+// cards shows a still instead of footage (img, from cards.html: render.js --cards makes them): the agents as trading cards, by the window,
+// then the app itself with a team built, before the card back.
+// hustle, trip and phoneplan (render.js --hustle, --trip, --phoneplan) are the real app by the same window, each with its own team.
 const SET = Q.get("set") || (JOB === "jobs" ? "jobs" : "research");
-const PHOTO_ROOM = Q.get("room") || (SET === "jobs" ? "city" : "desk");
+const PHOTO_ROOM = Q.get("room") || { jobs: "city", commute: "night", cards: "city", hustle: "city", trip: "city", phoneplan: "city" }[SET] || "desk";
 const PHOTOS = {
   gym: [   // the desk end of the gym carousel (gym.html has its start)
     { src: 10.4, key: [955, 335, 50, 6, 11], roll: -.7, seed: 73, say: ["back home. typed one line"] },
@@ -130,6 +138,57 @@ const PHOTOS = {
   { src: 32, key: [1745, 250, 50, -8, 12], roll: -.6, seed: 109, say: ["then it stops and waits for me", "nothing gets written till i hit approve"] },
   { src: 43.5, key: [960, 430, 57, 6, 12], roll: .8, seed: 113, say: ["agent 4 wrote a cover letter for each one", "they're already in my gmail drafts"] },
   { src: 1, key: [400, 260, 62, -5, 12], roll: -.5, seed: 127, say: ["it's called lithnode", "free, and it runs on the Claude plan you already have"] },
+  ],
+  cards: [
+  { img: 1, key: [960, -380, 135, -7, 6], roll: -1, seed: 171, size: 72, say: ["i turned my AI employees into trading cards", "which one are you?"] },
+  { img: 2, key: [960, 480, 84, 6, 11], roll: .8, seed: 173, say: ["scout does the research", "has never once said \"trust me bro\""] },
+  { img: 3, key: [960, 480, 84, -6, 11], roll: -.7, seed: 179, say: ["forge writes the code", "the only coworker who doesn't touch your stuff"] },
+  { img: 4, key: [960, 480, 84, 7, 12], roll: .6, seed: 181, say: ["beetle hunts bugs", "skips the nitpicks, goes for the throat"] },
+  { img: 5, key: [960, 480, 84, -8, 11], roll: -.9, seed: 191, say: ["sentinel does security", "100 paranoia. no notes"] },
+  { img: 6, key: [960, 480, 84, 5, 12], roll: .7, seed: 193, say: ["launch decides if it ships", "ruins every friday deploy. correctly"] },
+  { img: 7, key: [960, 480, 84, -6, 11], roll: -.6, seed: 197, say: ["and then there's me", "my only move is pressing approve"] },
+  { img: 8, key: [960, 480, 84, 8, 12], roll: .9, seed: 199, say: ["and the rare pull", "the crab. does a bit of everything"] },
+  { file: "hero-describe", src: 16.5, key: [960, 380, 100, 4, 11], roll: .6, seed: 223, wide: true, say: ["and here they all are, in one app", "pick your team, wire them up, press run"] },
+  { img: 9, key: [960, 480, 84, -5, 11], roll: -.5, seed: 211, say: ["it's called lithnode", "build your own team. free, runs on the Claude plan you already have"] },
+  ],
+  trip: [   // the real app running the Weekend trip team (capture.js trip): 6 options, 3 over budget cut, the weekend planned
+  { file: "trip-run", src: 25, key: [600, 1030, 52, -6, 10], roll: -1, seed: 337, size: 72, say: ["i had AI agents plan a weekend trip for $300", "they cut everything over budget"] },
+  { file: "trip-describe", src: 8, key: [915, 1030, 46, 5, 12], roll: .8, seed: 347, say: ["all i typed was this"] },
+  { file: "trip-describe", src: 13.5, key: [910, 500, 70, -7, 11], roll: -.7, seed: 349, say: ["it built the team", "a scout, a budget checker and a planner"] },
+  { file: "trip-run", src: 19, key: [520, 1030, 54, 7, 11], roll: .6, seed: 353, say: ["the scout found 6 options"] },
+  { file: "trip-run", src: 25, key: [385, 1000, 60, -8, 12], roll: -.9, seed: 359, say: ["the checker cut 3", "the flight alone was $280"] },
+  { file: "trip-run", src: 25, key: [1105, 1000, 60, 9, 12], roll: .7, seed: 367, say: ["3 made it"] },
+  { file: "trip-run", src: 37.6, key: [850, 290, 48, -2, 12], roll: .6, seed: 373, say: ["the plan: a weekend at the coast", "$278 total. $22 left over"] },
+  { file: "trip-describe", src: 13.5, key: [150, 70, 60, -4, 12], roll: -.5, seed: 379, say: ["it's called lithnode", "free, runs on the Claude plan you already have"] },
+  ],
+  phoneplan: [   // the real app running the Phone plan hunt team (capture.js phoneplan): 6 plans, 4 with hidden fees cut, the cheapest kept
+  { file: "phoneplan-run", src: 25, key: [600, 1030, 52, -6, 10], roll: -1, seed: 383, size: 72, say: ["i had AI agents find me a cheaper phone plan", "they cut every one with hidden fees"] },
+  { file: "phoneplan-describe", src: 8, key: [915, 1030, 46, 5, 12], roll: .8, seed: 389, say: ["all i typed was this"] },
+  { file: "phoneplan-describe", src: 13.5, key: [910, 500, 70, -7, 11], roll: -.7, seed: 397, say: ["it built the team", "a scout, a fee checker and a helper"] },
+  { file: "phoneplan-run", src: 19, key: [520, 1030, 54, 7, 11], roll: .6, seed: 401, say: ["the scout found 6 plans"] },
+  { file: "phoneplan-run", src: 25, key: [270, 1000, 46, -8, 12], roll: -.9, seed: 409, say: ["the checker cut 4", "activation fees, promo prices, data caps"] },
+  { file: "phoneplan-run", src: 25, key: [1220, 1000, 40, 9, 12], roll: .7, seed: 419, say: ["2 made it"] },
+  { file: "phoneplan-run", src: 38.4, key: [960, 290, 54, -2, 12], roll: .6, seed: 421, say: ["the winner: $30 a month", "i pay $85. that's $660 a year back"] },
+  { file: "phoneplan-describe", src: 13.5, key: [150, 70, 60, -4, 12], roll: -.5, seed: 431, say: ["it's called lithnode", "free, runs on the Claude plan you already have"] },
+  ],
+  hustle: [   // the real app running the Side hustle hunt team (capture.js hustle): 6 found, 4 cut, a plan for the winner
+  { file: "hustle-run", src: 27, key: [600, 1030, 52, -6, 10], roll: -1, seed: 281, size: 72, say: ["i had AI agents find me a side hustle", "they cut every overdone one"] },
+  { file: "hustle-describe", src: 10.5, key: [915, 1030, 46, 5, 12], roll: .8, seed: 283, say: ["all i typed was this"] },
+  { file: "hustle-describe", src: 16, key: [910, 500, 70, -7, 11], roll: -.7, seed: 293, say: ["it built the team", "a scout, 2 checkers and a planner"] },
+  { file: "hustle-run", src: 19, key: [520, 1030, 54, 7, 11], roll: .6, seed: 307, say: ["the scout found 6"] },
+  { file: "hustle-run", src: 27, key: [270, 1000, 46, -8, 12], roll: -.9, seed: 311, say: ["the checkers cut 4", "too crowded, or no money for months"] },
+  { file: "hustle-run", src: 27, key: [1220, 1000, 40, 9, 12], roll: .7, seed: 313, say: ["2 survived"] },
+  { file: "hustle-run", src: 39.5, key: [850, 290, 48, -2, 12], roll: .6, seed: 317, say: ["the winner: pressure washing", "$180 to start. $120 a driveway"] },
+  { file: "hustle-describe", src: 16, key: [150, 70, 60, -4, 12], roll: -.5, seed: 331, say: ["it's called lithnode", "free, runs on the Claude plan you already have"] },
+  ],
+  commute: [   // the new app's other screens: describing a team, then the Office
+  { file: "hero-describe", src: 16.5, key: [1000, 520, 80, 8, 10], roll: 1.1, seed: 151, wide: true, size: 72, say: ["i don't do product research anymore", "i hired a team of AI agents instead"] },
+  { file: "hero-describe", src: 12.3, key: [900, 1000, 50, 5, 12], roll: -.7, seed: 157, say: ["i described the team in one sentence"] },
+  { file: "hero-describe", src: 16.5, key: [830, 520, 54, -7, 11], roll: .6, seed: 163, say: ["it built them in seconds", "a scout, 2 checkers and an uploader"] },
+  { file: "hero-office", src: 12.5, key: [940, 170, 48, -10, 12], roll: .8, seed: 131, say: ["then they clock in at their own desks", "one checks the money, one reads the reviews"] },
+  { file: "hero-office", src: 18, key: [940, 170, 46, 8, 12], roll: -.9, seed: 137, say: ["when a desk goes red it needs me", "nothing gets listed till i say yes"] },
+  { src: 24.2, key: [395, 690, 55, -6, 12], roll: .6, seed: 139, say: ["3 products made the cut", "already sitting in my drafts"] },
+  { file: "hero-describe", src: 16.5, key: [150, 70, 60, -4, 12], roll: -.5, seed: 149, say: ["it's called lithnode", "free, it runs on the Claude plan you already have"] },
   ],
 }[SET];
 for (const ph of PHOTOS) { ph.keys = [[0, ...ph.key]]; ph.at = 3 + ph.seed % 7; }   // the hand's pose at some moment, held
@@ -204,12 +263,12 @@ function pointerAt(s) {   // where the pointer is, and whether Windows has hidde
   }
   return { x, y, hidden: typed > moved };
 }
-function drawPointer(s) {
+function drawPointer(s, beam = true) {   // beam: this footage has the run dialog, where the pointer turns to an I-beam
   const { x, y, hidden } = pointerAt(s);
   if (hidden) return;
   sg.save(); sg.translate(Math.round(x), Math.round(y));
   sg.lineJoin = "miter";
-  if (s < 10.9 && x > TEXTAREA[0] && x < TEXTAREA[2] && y > TEXTAREA[1] && y < TEXTAREA[3]) {
+  if (beam && s < 10.9 && x > TEXTAREA[0] && x < TEXTAREA[2] && y > TEXTAREA[1] && y < TEXTAREA[3]) {
     sg.strokeStyle = "#000"; sg.lineWidth = 3.2; sg.beginPath(); sg.moveTo(-3, -9); sg.lineTo(3, -9); sg.moveTo(0, -9); sg.lineTo(0, 9); sg.moveTo(-3, 9); sg.lineTo(3, 9); sg.stroke();
     sg.strokeStyle = "#fff"; sg.lineWidth = 1.2; sg.stroke();
   } else {
@@ -253,6 +312,11 @@ const vec3 BASE0 = vec3(-12.5, 0.0, -19.0), BASE1 = vec3(12.5, 0.9, 3.5);
 const float WALL = -36.0, DESK_EDGE = 72.0, KU = 1.905;
 const vec3 AMBIENT = vec3(0.0016, 0.0019, 0.0026);
 const vec3 ROOM = vec3(0.45, 0.35, 0.82);   // which way the lamp-lit rest of the room is, behind the phone
+#ifdef NIGHT
+const float LIFT = 3.0;   // a dim lamp, so the phone's night mode lifts the shadows: the panel's own glow shows on the desk and keys
+#else
+const float LIFT = 1.0;
+#endif
 #ifdef CITY
 // The window behind the desk: an opening in the wall from WIN0 to WIN1 (x and y), the double glazing set GLASS deep, a black frame
 // with a mullion either side of the monitor, and a painted board along the bottom. Outside is the city at night, from 18 floors up.
@@ -307,11 +371,13 @@ int trace(vec3 ro, vec3 rd, out float tt, out vec3 n, out vec3 lp) {
   if (monitorBox(ro, rd, t, nn)) { tt = t; lp = toLocal(ro - uMc) + toLocal(rd) * t; n = uMr * nn.x + uMu * nn.y + uMn * nn.z; id = nn.z > 0.5 ? 1 : 2; }
   if (box(ro, rd, NECK0, NECK1, t, nn) && t < tt) { tt = t; n = nn; id = 3; }
   if (box(ro, rd, BASE0, BASE1, t, nn) && t < tt) { tt = t; n = nn; id = 4; }
+#ifndef NOKB
   if (box(ro, rd, KB0, KB1, t, nn) && t < tt) { tt = t; n = nn; id = 7; }
+#endif
 #ifdef CITY
   if (box(ro, rd, BOARD0, BOARD1, t, nn) && t < tt) { tt = t; n = nn; id = 11; }
   for (int i = 0; i < 5; i++) if (box(ro, rd, FRAME0[i], FRAME1[i], t, nn) && t < tt) { tt = t; n = nn; id = 10; }
-#else
+#elif !defined(NIGHT)
   for (int i = 0; i < LEAVES; i++) if (leaf(ro, rd, i, t, q) && t < tt) {   // lp: the spot on the leaf, and which leaf
     tt = t; n = cross(uLeafU[i], uLeafA[i]); n *= -sign(dot(n, rd)); lp = vec3(q, float(i)); id = 8;
   }
@@ -330,8 +396,11 @@ int trace(vec3 ro, vec3 rd, out float tt, out vec3 n, out vec3 lp) {
 }
 bool blocked(vec3 ro, vec3 rd, float far) {
   float t; vec3 nn; vec2 q;
-  if ((monitorBox(ro, rd, t, nn) && t < far) || (box(ro, rd, NECK0, NECK1, t, nn) && t < far) || (box(ro, rd, KB0, KB1, t, nn) && t < far)) return true;
-#ifndef CITY
+  if ((monitorBox(ro, rd, t, nn) && t < far) || (box(ro, rd, NECK0, NECK1, t, nn) && t < far)) return true;
+#ifndef NOKB
+  if (box(ro, rd, KB0, KB1, t, nn) && t < far) return true;
+#endif
+#if !defined(CITY) && !defined(NIGHT)
   for (int i = 0; i < LEAVES; i++) if (leaf(ro, rd, i, t, q) && t < far) return true;
 #endif
   return false;
@@ -361,7 +430,7 @@ vec3 bounce(vec3 p, vec3 n) {   // the lamp's light back off the ceiling and wal
   return uLampCol * 0.2 * (0.45 + 0.55 * max(dot(n, l * inversesqrt(r2)), 0.0)) / r2;
 }
 vec3 lit(vec3 p, vec3 n, vec3 albedo, inout uint seed) {
-  vec3 e = screenLight(p, n) + lampLight(p, n, seed) + bounce(p, n) + AMBIENT;
+  vec3 e = screenLight(p, n) * LIFT + lampLight(p, n, seed) + bounce(p, n) + AMBIENT;
 #ifdef CITY
   e += GLOW * (0.5 + 0.5 * max(-n.z, 0.0));
 #endif
@@ -386,7 +455,11 @@ vec3 subpixels(vec2 px, vec2 w) {
 vec3 coating(vec3 lp, vec3 p, vec3 rd) {   // the matte anti-glare film: a faint haze of the room, smudged
   vec3 r = reflect(rd, uMn), l = normalize(uLamp - p);
   float smudge = 0.35 + 0.9 * smoothstep(0.5, 0.85, fbm(lp.xy * 0.16 + 7.3));
+#ifdef NIGHT
+  vec3 room = vec3(0.0005, 0.0006, 0.0009) * exp((dot(r, normalize(ROOM)) - 1.0) * 4.0);   // the room behind the phone, dark: a faint cool veil
+#else
   vec3 room = vec3(0.0018, 0.0013, 0.0008) * exp((dot(r, normalize(ROOM)) - 1.0) * 4.0);   // the room behind the phone, a warm veil sliding as it moves
+#endif
   return (uLampCol * 1.6e-6 * exp((dot(r, l) - 1.0) * 9.0) + room + vec3(0.0009, 0.001, 0.0012)) * smudge;
 }
 vec3 screenAt(vec3 lp, vec3 rd, vec2 fp) {
@@ -486,7 +559,12 @@ vec3 glassView(vec3 p, vec3 d, inout uint seed) {   // the city through the glas
     float c = dot(r, normalize(uLamp - p));
     back = vec3(0.003, 0.0024, 0.0019) + uLampCol * (3.0e-3 * smoothstep(0.9965, 0.9985, c) + 3.0e-6 * exp((c - 1.0) * 5.0));
   } else back = lit(p + r * t, n, id == 5 ? vec3(0.34, 0.235, 0.145) : id == 7 || id == 11 ? vec3(0.45) : vec3(0.03), seed);
+#ifdef DIMCITY
+  f *= 0.4;   // DIMCITY: a dimmer, later-at-night city, with the room in the glass dimmed to match
+  return outside(p, d) * (1.0 - f) * 0.92 * 0.3 + back * f;
+#else
   return outside(p, d) * (1.0 - f) * 0.92 + back * f;
+#endif
 }
 #endif
 
@@ -515,7 +593,12 @@ vec3 radiance(vec3 o, vec3 d, vec2 fp, inout uint seed) {
     return lit(p, n, oak, seed) + reflScreen(p, reflect(d, n), 5.0) * 0.025;
   }
   if (id == 6) return lit(p, n, vec3(0.42, 0.42, 0.43) * (0.95 + 0.1 * fbm(p.xy * 0.05)), seed);
-  if (id == 7) {   // a white keyboard
+  if (id == 7) {   // a white keyboard (DARKKB: graphite, caps faintly catching the screen)
+#ifdef DARKKB
+    float cap = keycap(p.xz - KB0.xz, 2.0 * uAp * abs(1.0 - t / uFocus) + t / uF);
+    if (n.y > 0.5) return lit(p, n, vec3(mix(0.006, 0.04, cap) * (0.85 + 0.3 * fbm(p.xz * 2.3))), seed) + reflScreen(p, reflect(d, n), 6.0) * 0.012 * cap;
+    return lit(p, n, vec3(0.018), seed);
+#endif
     if (n.y > 0.5) return lit(p, n, vec3(mix(0.1, 0.5, keycap(p.xz - KB0.xz, 2.0 * uAp * abs(1.0 - t / uFocus) + t / uF))), seed);
     return lit(p, n, vec3(0.42), seed);
   }
@@ -530,7 +613,11 @@ vec3 radiance(vec3 o, vec3 d, vec2 fp, inout uint seed) {
     vec3 felt = vec3(0.032, 0.033, 0.036) * (0.85 + 0.3 * fbm(q * 3.0));
     return lit(p, n, mix(wood, felt, mat), seed);
   }
+#ifdef NIGHT
+  if (id == 6) return lit(p, n, vec3(0.10, 0.16, 0.14) * (0.92 + 0.16 * fbm(p.xy * 0.05)), seed);   // painted deep green
+#else
   if (id == 6) return lit(p, n, vec3(0.30, 0.29, 0.27) * (0.92 + 0.16 * fbm(p.xy * 0.05)), seed);
+#endif
   if (id == 7) {
     if (n.y > 0.5) return lit(p, n, vec3(mix(0.01, 0.055, keycap(p.xz - KB0.xz, 2.0 * uAp * abs(1.0 - t / uFocus) + t / uF))), seed);
     return lit(p, n, vec3(0.025), seed);
@@ -578,7 +665,10 @@ void main() {
   fragColor = vec4(acc * uScale, 1.0);   // a photo adds up several passes
 }`;
 
-const scenes = { desk: compile(gl, SCENE), city: compile(gl, SCENE.replace("\n", "\n#define CITY\n")) }, post = compile(gl, POST);
+const scenes = {}, post = compile(gl, POST);   // each room's program, compiled the first time it's drawn
+const DARK = ["cards", "hustle", "trip", "phoneplan"].includes(SET);   // the still sets by the window: darker all round
+const defines = (room) => (room === "desk" ? "" : `#define ${room.toUpperCase()}\n`) + (DARK ? "#define DARKKB\n#define DIMCITY\n" : "");   // DARKKB: the cards set gets a graphite keyboard, DIMCITY a darker city (NOKB would clear it off the desk)
+const scene = (room) => scenes[room] ??= compile(gl, SCENE.replace("\n", "\n" + defines(room)));
 gl.bindVertexArray(gl.createVertexArray());
 const scrTex = texture(gl, gl.SRGB8_ALPHA8, 1920, 1080), hdrTex = texture(gl, gl.RGBA16F, W, H);
 const fbo = gl.createFramebuffer();
@@ -593,7 +683,7 @@ function draw(clip, ct, frame, focal = FOCAL, grain = 1, room = "desk", passes =
   const poses = Array.from({ length: 6 }, (_, k) => camAt(clip, ct - SHUT / 2 + k / 5 * (SHUT + READ)));
   const af = camAt(clip, ct - .08);   // the focus trails the moves a little
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, W, H);
-  const { p, u } = scenes[room]; gl.useProgram(p);
+  const { p, u } = scene(room); gl.useProgram(p);
   gl.uniform1i(u.uScr, 0); gl.uniform2f(u.uRes, W, H);
   gl.uniform3fv(u.uP, poses.flatMap((c) => c.p)); gl.uniform3fv(u.uRr, poses.flatMap((c) => c.r));
   gl.uniform3fv(u.uRu, poses.flatMap((c) => c.u)); gl.uniform3fv(u.uRf, poses.flatMap((c) => c.f));
@@ -609,13 +699,31 @@ function draw(clip, ct, frame, focal = FOCAL, grain = 1, room = "desk", passes =
   if (passes > 1) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); }
   for (let k = 0; k < passes; k++) { gl.uniform1f(u.uSeed, frame + 1 + k * 1009); gl.drawArrays(gl.TRIANGLES, 0, 3); }
   gl.disable(gl.BLEND);
-  develop(gl, post, hdrTex, { expo: 1.55, seed: frame % 997 + 1, grain });
+  develop(gl, post, hdrTex, { expo: DARK ? 1.05 : 1.55, seed: frame % 997 + 1, grain });
 }
 
-async function showScreen(s) {   // the footage at s seconds on the panel, with the pointer
+const others = {};   // a slide's own footage file (ph.file), each with its own pointer log
+function footage(file) {
+  return others[file] ??= (async () => {
+    const v = document.createElement("video"), f = `footage/${file}`;
+    await new Promise((r, j) => { v.muted = true; v.preload = "auto"; v.oncanplaythrough = r; v.onerror = () => j(new Error(f + ".mp4")); v.src = f + ".mp4"; v.load(); });
+    return { v, log: (await (await fetch(f + ".json")).json()).log };
+  })();
+}
+async function showScreen(s, file) {   // the footage at s seconds on the panel, with the pointer
+  if (file && file !== FOOTAGE.file) {
+    const o = await footage(file), log = LOG;
+    await seek(o.v, s); sg.drawImage(o.v, 0, 0, 1920, 1080);
+    if (o.log.length) { LOG = o.log; drawPointer(s, false); LOG = log; }   // the office recording has no pointer
+    return;
+  }
   await seek(video, s);
   sg.drawImage(video, 0, 0, 1920, 1080);
-  if (s >= FOOTAGE.folder[0] && s < FOOTAGE.folder[1]) { const [x0, y0, x1, y1] = FOOTAGE.box; sg.drawImage(blank, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0); }
+  if (s >= FOOTAGE.folder[0] && s < FOOTAGE.folder[1]) {
+    const [x0, y0, x1, y1] = FOOTAGE.box;
+    if (!FOOTAGE.patch) sg.drawImage(blank, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
+    else { sg.fillStyle = "rgb(20,19,21)"; sg.fillRect(x0, y0, x1 - x0, y1 - y0); sg.font = "400 13.6px 'Geist Mono'"; sg.fillStyle = "#ececec"; sg.fillText(FOOTAGE.patch, x0 + 9, y0 + 20); }
+  }
   drawPointer(s);
 }
 window.renderFrame = async (t) => {
@@ -627,7 +735,10 @@ window.renderFrame = async (t) => {
 // one slide of the carousel, as a JPEG in base64. By the window the city's lights are well out of focus, and 12 passes smooth their blur
 window.renderPhoto = async (i, passes = PHOTO_ROOM === "city" ? 12 : 1) => {
   const ph = PHOTOS[i];
-  await showScreen(ph.src);
+  if (ph.img) {   // a still on the screen, no pointer
+    const im = new Image(); im.src = `${SET}-screen/${ph.img}.png`; await im.decode();
+    sg.drawImage(im, 0, 0, 1920, 1080);
+  } else await showScreen(ph.src, ph.file);
   draw(ph, ph.at, 500 + i, ph.wide ? WIDE : FOCAL, .45, PHOTO_ROOM, passes);
   return slide(cv, ph.say, ph.size);
 };
@@ -635,7 +746,8 @@ window.ready = (async () => {
   const file = `footage/${FOOTAGE.file}`;
   await new Promise((r, j) => { video.muted = true; video.preload = "auto"; video.oncanplaythrough = r; video.onerror = () => j(new Error(file + ".mp4")); video.src = file + ".mp4"; video.load(); });
   LOG = (await (await fetch(file + ".json")).json()).log;
-  await seek(video, FOOTAGE.blankAt); blank.width = 1920; blank.height = 1080; blank.getContext("2d").drawImage(video, 0, 0, 1920, 1080);
+  if (FOOTAGE.patch) await document.fonts.load("400 13.6px 'Geist Mono'");
+  else { await seek(video, FOOTAGE.blankAt); blank.width = 1920; blank.height = 1080; blank.getContext("2d").drawImage(video, 0, 0, 1920, 1080); }
   const q = Q.get("t");
   if (q !== null) await window.renderFrame(+q);
   return true;

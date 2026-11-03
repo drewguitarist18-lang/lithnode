@@ -8,14 +8,17 @@
 //        --phone renders phone.html, the run as a phone filming the monitor (default ../lithnode-phone-vertical.mp4)
 //        --phone --jobs films the job hunt instead (default ../lithnode-phone-jobs-vertical.mp4)
 //        --phone --photos writes its TikTok carousel, the slides in phone.html's PHOTOS, to ../carousel/ (with --jobs, ../carousel-jobs/)
+//        --phone --commute --photos writes the new app's carousel (describe a team, the Office) to ../carousel-commute/
 //        --gym writes the gym carousel to ../carousel-gym/: gym.html's SHOTS, then phone.html's gym set (PASSES=8 for a quick look)
+//        --hustle, --trip and --phoneplan write ../carousel-hustle/, ../carousel-trip/ and ../carousel-phoneplan/ the same way (capture.js hustle, trip, phoneplan)
+//        --cards writes the trading-card carousel to ../carousel-cards/: cards.html's screens, photographed by phone.html?set=cards
 //        --hero renders hero.html, the 30-second film for the site in its new look (default ../lithnode-hero.mp4)
 // Needs puppeteer-core (NODE_PATH) and ffmpeg (FFMPEG or on PATH). Serves the repo itself, so it needs nothing else running.
 const puppeteer = require("puppeteer-core");
 const http = require("http"), fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const HOOK = process.argv.includes("--hook"), T0 = HOOK ? 8 : 0;   // the hook cut is film 8–30
 const VERSUS = process.argv.includes("--versus"), ADS = process.argv.includes("--ads"), PHONE = process.argv.includes("--phone"), GYM = process.argv.includes("--gym");
-const JOBS = process.argv.includes("--jobs"), HERO = process.argv.includes("--hero");
+const JOBS = process.argv.includes("--jobs"), COMMUTE = process.argv.includes("--commute"), HERO = process.argv.includes("--hero"), CARDS = process.argv.includes("--cards"), STILLS = CARDS ? "cards" : ["hustle", "trip", "phoneplan"].find((s) => process.argv.includes("--" + s)) || "";   // the photo sets shot by the window
 const FF = process.env.FFMPEG || "ffmpeg", ROOT = path.resolve(__dirname, "../.."), FPS = 30;
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".mp4": "video/mp4", ".webm": "video/webm" };
 
@@ -31,10 +34,10 @@ const server = http.createServer((req, res) => {
   } else { res.writeHead(200, { "Content-Type": type, "Content-Length": size, "Accept-Ranges": "bytes" }); fs.createReadStream(file).pipe(res); }
 });
 
-const VERT = VERSUS || PHONE || GYM || process.argv.includes("--vertical"), [VW, VH] = VERT ? [1080, 1920] : [1920, 1080];
+const VERT = VERSUS || PHONE || GYM || STILLS || process.argv.includes("--vertical"), [VW, VH] = VERT ? [1080, 1920] : [1920, 1080];
 (async () => {
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  const page = HERO ? "hero.html" : GYM ? "gym.html" : PHONE ? `phone.html${JOBS ? "?job=jobs" : ""}` : VERSUS ? `versus.html?${ADS ? "job=ads" : ""}` : `film.html?${VERT ? "v=1&" : ""}${HOOK ? "hook=1" : ""}`;
+  const page = CARDS ? "cards.html" : STILLS ? `phone.html?set=${STILLS}` : HERO ? "hero.html" : GYM ? "gym.html" : PHONE ? `phone.html${JOBS ? "?job=jobs" : COMMUTE ? "?set=commute" : ""}` : VERSUS ? `versus.html?${ADS ? "job=ads" : ""}` : `film.html?${VERT ? "v=1&" : ""}${HOOK ? "hook=1" : ""}`;
   const url = `http://127.0.0.1:${server.address().port}/marketing/night-film/${page}`;
   const b = await puppeteer.launch({ executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", headless: "new", protocolTimeout: 600000,
     args: ["--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"] });
@@ -43,12 +46,24 @@ const VERT = VERSUS || PHONE || GYM || process.argv.includes("--vertical"), [VW,
   p.on("pageerror", (e) => console.log("pageerror", e.message));
   await p.goto(url, { waitUntil: "load" });
   await p.evaluate(() => window.ready);
-  const LENGTH = GYM ? 0 : PHONE ? await p.evaluate(() => window.LENGTH) : VERSUS ? 14 : 30 - T0;   // the phone cut's length is its clips'
+  const LENGTH = GYM || STILLS ? 0 : PHONE ? await p.evaluate(() => window.LENGTH) : VERSUS ? 14 : 30 - T0;   // the phone cut's length is its clips'
   const grab = (t, type, q) => p.evaluate(async (t, type, q) => { await renderFrame(t); return document.getElementById("cv").toDataURL(type, q).split(",")[1]; }, t, type, q);
-  const args = process.argv.slice(2).filter((a) => !["--vertical", "--hook", "--versus", "--ads", "--phone", "--gym", "--jobs", "--hero"].includes(a)),
+  const args = process.argv.slice(2).filter((a) => !["--vertical", "--hook", "--versus", "--ads", "--phone", "--gym", "--jobs", "--commute", "--hero", "--cards", "--hustle", "--trip", "--phoneplan"].includes(a)),
     DEF = path.join(__dirname, HERO ? "../lithnode-hero.mp4" : VERSUS ? `../lithnode-versus${ADS ? "-ads" : ""}.mp4` : `../lithnode-${PHONE ? (JOBS ? "phone-jobs" : "phone") : HOOK ? "hook" : "night"}${VERT ? "-vertical" : ""}.mp4`);
 
-  if (GYM) {   // the gym's photos, then the desk's to end the story
+  if (STILLS) {   // cards: its screens as the monitor shows them first; then phone.html photographs each slide by the window
+    const scr = path.join(__dirname, `${STILLS}-screen`), dir = path.join(__dirname, `../carousel-${STILLS}`), passes = +(process.env.PASSES || 12);
+    fs.mkdirSync(dir, { recursive: true });
+    if (CARDS) fs.mkdirSync(scr, { recursive: true });
+    if (CARDS) for (let i = 0, n = await p.evaluate(() => window.SCREEN_COUNT); i < n; i++)
+      fs.writeFileSync(path.join(scr, `${i + 1}.png`), Buffer.from(await p.evaluate((i) => renderScreen(i), i), "base64"));
+    await p.goto(`http://127.0.0.1:${server.address().port}/marketing/night-film/phone.html?set=${STILLS}`, { waitUntil: "load" });
+    await p.evaluate(() => window.ready);
+    for (const f of fs.readdirSync(dir)) if (/^\d+\.jpg$/.test(f)) fs.rmSync(path.join(dir, f));
+    const n = await p.evaluate(() => window.PHOTO_COUNT);
+    for (let i = 0; i < n; i++) fs.writeFileSync(path.join(dir, `${i + 1}.jpg`), Buffer.from(await p.evaluate((i, k) => renderPhoto(i, k), i, passes), "base64"));
+    console.log(n, "slides in", dir);
+  } else if (GYM) {   // the gym's photos, then the desk's to end the story
     const dir = path.join(__dirname, "../carousel-gym"), passes = +(process.env.PASSES || 96), jpgs = [];
     for (let i = 0, n = await p.evaluate(() => window.PHOTO_COUNT); i < n; i++) jpgs.push(await p.evaluate((i, k) => renderPhoto(i, k), i, passes));
     const d = await b.newPage();
@@ -67,10 +82,10 @@ const VERT = VERSUS || PHONE || GYM || process.argv.includes("--vertical"), [VW,
       "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", "-shortest", redo]);
     fs.renameSync(redo, out); fs.rmSync(tmp); console.log("new score on", out);
   } else if (args[0] === "--photos") {   // the phone's carousel, one JPEG per slide
-    const dir = path.join(__dirname, JOBS ? "../carousel-jobs" : "../carousel"), n = await p.evaluate(() => window.PHOTO_COUNT);
+    const dir = path.join(__dirname, JOBS ? "../carousel-jobs" : COMMUTE ? "../carousel-commute" : "../carousel"), n = await p.evaluate(() => window.PHOTO_COUNT);
     fs.mkdirSync(dir, { recursive: true });
     for (const f of fs.readdirSync(dir)) if (/^\d+\.jpg$/.test(f)) fs.rmSync(path.join(dir, f));   // the last render's slides
-    for (let i = 0; i < n; i++) fs.writeFileSync(path.join(dir, `${i + 1}.jpg`), Buffer.from(await p.evaluate((i) => renderPhoto(i), i), "base64"));
+    for (let i = 0; i < n; i++) fs.writeFileSync(path.join(dir, `${i + 1}.jpg`), Buffer.from(await p.evaluate((i, k) => renderPhoto(i, k), i, COMMUTE ? 8 : undefined), "base64"));
     console.log(n, "slides in", dir);
   } else if (args[0] === "--stills") {
     const dir = path.join(__dirname, "stills"); fs.mkdirSync(dir, { recursive: true });

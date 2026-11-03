@@ -1,0 +1,198 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  /* the app's own bundled fonts */
+  @font-face { font-family: Silkscreen; font-weight: 700; src: url(../../static/fonts/silkscreen-700.woff2); }
+  @font-face { font-family: Inter; font-weight: 100 900; src: url(../../static/fonts/inter.woff2); }
+  @font-face { font-family: "Geist Mono"; font-weight: 100 900; src: url(../../static/fonts/geist-mono.woff2); }
+  html, body { margin: 0; background: #000; }
+  img { display: block; width: 960px; }
+</style>
+<html data-theme="dark">
+<script src="../../static/sprites.js"></script>
+<script>const mulberry = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };</script>
+<script>
+"use strict";
+// The trading-card carousel's screens: Lithnode's agents as collectible cards, as the monitor shows them. Each card is a real bot
+// from hq.py's roster, with its own sprite, colour and model; the moves and stats are the joke, the model and job are true.
+// render.js --cards saves renderScreen(i) to cards-screen/, then photographs them with phone.html?set=cards (captions are there).
+const CARDS = {
+  scout:    { name: "Scout", shape: "scout", color: "#2fb5a0", type: "RESEARCH", model: "Opus 5.5 · web search", no: "001",
+              move: ["Search First", "looks it up before it opens its mouth"], dmg: 90,
+              stats: [["SOURCES CITED", 99], ["TRUST IN YOU", 4]], flavor: "trusts no one. not even wikipedia." },
+  forge:    { name: "Forge", shape: "golem", color: "#e0823d", type: "BUILDER", model: "Opus 5.5 · edits files", no: "002",
+              move: ["Ship It", "writes the code, then lists every file it touched"], dmg: 120,
+              stats: [["OUTPUT", 96], ["UNASKED REFACTORS", 0]], flavor: "leaves your code how it found it. rare." },
+  beetle:   { name: "Beetle", shape: "bug", color: "#6cc070", type: "REVIEW", model: "Sonnet 5.5 · read only", no: "003",
+              move: ["Off-By-One", "file, line, and the fix. skips the nitpicks"], dmg: 80,
+              stats: [["BUGS FOUND", 97], ["CARES ABOUT TABS", 0]], flavor: "doesn't care about your spaces. found the null." },
+  sentinel: { name: "Sentinel", shape: "guard", color: "#e5566e", type: "SECURITY", model: "Sonnet 5.5 · read only", no: "004",
+              move: ["Threat Model", "rates every hole critical to low"], dmg: 110,
+              stats: [["PARANOIA", 100], ["CHILL", 1]], flavor: "assumes everyone is a hacker. including you." },
+  launch:   { name: "Launch", shape: "rocket", color: "#bb9af7", type: "SHIPPING", model: "Sonnet 5.5 · read only", no: "005",
+              move: ["Don't Ship", "ends every review with ship or don't ship"], dmg: 70,
+              stats: [["FRIDAY DEPLOYS RUINED", 94], ["VIBES-BASED CALLS", 0]], flavor: "has said \"don't ship\" at 4:59 on a friday." },
+  lith:     { name: "Lith", shape: "crab", color: "#ecebe6", type: "LEGENDARY", model: "any Claude model · web search", no: "000",
+              move: ["Do A Bit Of Everything", "answers first, explains after"], dmg: 150,
+              stats: [["RANGE", 100], ["PREACHINESS", 0]], flavor: "the mascot. the only one with claws.", legend: true },
+  you:      { name: "You", icon: "approval", color: "#e0a23c", type: "MANAGER", model: "1 human · no API key", no: "???",
+              move: ["Press Approve", "nothing goes live till you click it"], dmg: 0,
+              stats: [["WORK DONE", 2], ["CREDIT TAKEN", 100]], flavor: "the most important card in the deck. apparently." },
+};
+const SLIDES = [
+  { hook: true },
+  { card: "scout" },
+  { card: "forge" },
+  { card: "beetle" },
+  { card: "sentinel" },
+  { card: "launch" },
+  { card: "you" },
+  { card: "lith" },
+  { back: true },
+];
+window.SCREEN_COUNT = SLIDES.length;
+
+const CW = 800, CH = 1117;   // a trading card's 63:88
+const rgb = (hex) => { const n = parseInt(hex.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+const rgba = (hex, a) => `rgba(${rgb(hex).join(",")},${a})`;
+const shade = (hex, k) => `rgb(${rgb(hex).map((v) => Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k)).join(",")})`;
+function rr(x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+function wrap(text, max) {
+  return text.split(" ").reduce((ls, w) => { const l = ls.at(-1), t = l ? l + " " + w : w; if (l && g.measureText(t).width > max) ls.push(w); else ls[ls.length - 1] = t; return ls; }, [""]);
+}
+function stars(x, y, w, h, n, seed, alpha) {
+  const r = mulberry(seed);
+  for (let i = 0; i < n; i++) { g.fillStyle = `rgba(255,255,255,${alpha * (.3 + r() * .7)})`; const s = r() < .1 ? 3 : 2; g.fillRect(x + r() * w, y + r() * h, s, s); }
+}
+
+function holo(x, y, w, h, strength, seed) {   // the foil: rainbow bands raked across, plus sparkle
+  g.save(); g.globalCompositeOperation = "overlay";
+  const f = g.createLinearGradient(x, y, x + w, y + h);
+  ["#ff5f6d", "#ffc371", "#fff76b", "#7bf1a8", "#5fd3ff", "#b18cff", "#ff7ad9", "#ffc371"].forEach((c, i, a) => f.addColorStop(i / (a.length - 1), c));
+  g.globalAlpha = strength; g.fillStyle = f; g.fillRect(x, y, w, h);
+  g.globalCompositeOperation = "screen"; g.globalAlpha = strength * .9;
+  for (let i = 0; i < 4; i++) {
+    const b = x - w + (i / 3) * w * 2.2, s = g.createLinearGradient(b, y, b + w * .5, y + h);
+    s.addColorStop(0, "rgba(255,255,255,0)"); s.addColorStop(.5, "rgba(255,255,255,.22)"); s.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = s; g.fillRect(x, y, w, h);
+  }
+  const r = mulberry(seed); g.globalAlpha = 1;
+  for (let i = 0; i < 70 * strength; i++) {
+    const sx = x + r() * w, sy = y + r() * h, s = 2 + r() * 5;
+    g.fillStyle = `rgba(255,255,255,${.4 + r() * .5})`; g.fillRect(sx - s, sy - .75, s * 2, 1.5); g.fillRect(sx - .75, sy - s, 1.5, s * 2);
+  }
+  g.restore();
+}
+
+function frame(c, legend) {   // the card's metal rim: silver, or gold for the legendary
+  const metal = g.createLinearGradient(0, 0, CW, CH);
+  (legend ? ["#fff3b0", "#d4a531", "#fff7cf", "#b8860b", "#ffe680", "#c9971c"] : ["#f2f4f8", "#9aa3b5", "#ffffff", "#7d8597", "#e6e9f0", "#a7afc0"])
+    .forEach((col, i, a) => metal.addColorStop(i / (a.length - 1), col));
+  rr(0, 0, CW, CH, 38); g.fillStyle = metal; g.fill();
+  rr(16, 16, CW - 32, CH - 32, 26);
+  const inner = g.createLinearGradient(0, 0, 0, CH);
+  inner.addColorStop(0, shade(c.color, -.55)); inner.addColorStop(.5, "#121218"); inner.addColorStop(1, shade(c.color, -.72));
+  g.fillStyle = inner; g.fill();
+}
+
+function card(c, seed) {   // one card at the origin, CW x CH
+  const legend = !!c.legend;
+  g.save(); g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = 60; g.shadowOffsetY = 30; rr(0, 0, CW, CH, 38); g.fillStyle = "#000"; g.fill(); g.restore();
+  frame(c, legend);
+  // name and number
+  g.textBaseline = "alphabetic"; g.textAlign = "left";
+  g.font = "700 64px Silkscreen"; g.fillStyle = "#fff"; g.fillText(c.name.toUpperCase(), 52, 110);
+  g.textAlign = "right"; g.font = "500 30px 'Geist Mono'"; g.fillStyle = "rgba(255,255,255,.6)"; g.fillText(`#${c.no}`, CW - 52, 104);
+  // type pill
+  g.font = "800 24px Inter"; const tw = g.measureText(c.type).width + 40;
+  rr(52, 132, tw, 44, 22); g.fillStyle = legend ? "#e9c25a" : c.color; g.fill();
+  g.textAlign = "left"; g.fillStyle = "#0b0b0f"; g.fillText(c.type, 72, 163);
+  // the portrait: the sprite under a glow, on a starfield
+  const px = 52, py = 200, pw = CW - 104, ph = 380;
+  g.save(); rr(px, py, pw, ph, 20); g.clip();
+  const sky = g.createLinearGradient(0, py, 0, py + ph); sky.addColorStop(0, shade(c.color, -.78)); sky.addColorStop(1, shade(c.color, -.45));
+  g.fillStyle = sky; g.fillRect(px, py, pw, ph);
+  stars(px, py, pw, ph, 120, seed + 7, .7);
+  g.strokeStyle = "rgba(255,255,255,.05)"; g.lineWidth = 1;
+  for (let x = px; x < px + pw; x += 34) { g.beginPath(); g.moveTo(x, py); g.lineTo(x, py + ph); g.stroke(); }
+  for (let y = py; y < py + ph; y += 34) { g.beginPath(); g.moveTo(px, y); g.lineTo(px + pw, y); g.stroke(); }
+  const glow = g.createRadialGradient(CW / 2, py + ph / 2 + 10, 10, CW / 2, py + ph / 2 + 10, 300);
+  glow.addColorStop(0, rgba(c.color, .55)); glow.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = glow; g.fillRect(px, py, pw, ph);
+  const cell = 34, sx = CW / 2 - 6 * cell, sy = py + ph / 2 - 4 * cell + 14;
+  g.fillStyle = "rgba(0,0,0,.35)"; g.beginPath(); g.ellipse(CW / 2, sy + 8 * cell + 22, 200, 22, 0, 0, 7); g.fill();
+  g.shadowColor = rgba(c.color, .9); g.shadowBlur = 40;
+  if (c.icon) drawIcon(g, c.icon, sx, sy, cell); else drawBot(g, c, sx, sy, cell, { state: "idle", t: 1 });
+  g.restore();
+  g.save(); rr(px, py, pw, ph, 20); g.lineWidth = 6; g.strokeStyle = legend ? "#e9c25a" : "rgba(255,255,255,.75)"; g.stroke(); g.restore();
+  // the model strip
+  g.font = "500 26px 'Geist Mono'"; g.textAlign = "center"; g.fillStyle = "rgba(255,255,255,.72)"; g.fillText(c.model, CW / 2, py + ph + 44);
+  // the move
+  let y = py + ph + 112;
+  g.fillStyle = c.color; g.beginPath(); g.arc(78, y - 12, 22, 0, 7); g.fill();
+  g.fillStyle = "#0b0b0f"; g.font = "700 26px Silkscreen"; g.textAlign = "center"; g.fillText("✦", 78, y - 2);
+  g.textAlign = "left"; g.fillStyle = "#fff"; g.font = "800 42px Inter"; g.fillText(c.move[0], 116, y);
+  g.textAlign = "right"; g.font = "800 50px Inter"; g.fillText(String(c.dmg), CW - 52, y + 2);
+  g.textAlign = "left"; g.font = "500 28px Inter"; g.fillStyle = "rgba(255,255,255,.72)";
+  for (const l of wrap(c.move[1], CW - 220)) { y += 40; g.fillText(l, 116, y); }
+  // stats: a label, a bar, the number
+  y += 44;
+  for (const [label, v] of c.stats) {
+    y += 56;
+    g.font = "700 22px Inter"; g.fillStyle = "rgba(255,255,255,.85)"; g.textAlign = "left"; g.fillText(label, 52, y);
+    g.textAlign = "right"; g.font = "500 26px 'Geist Mono'"; g.fillText(String(v), CW - 52, y);
+    rr(52, y + 12, CW - 104, 12, 6); g.fillStyle = "rgba(255,255,255,.12)"; g.fill();
+    if (v > 0) { rr(52, y + 12, Math.max(12, (CW - 104) * v / 100), 12, 6); g.fillStyle = legend ? "#e9c25a" : c.color; g.fill(); }
+  }
+  // flavour text, then the footer
+  y = CH - 112;
+  g.strokeStyle = "rgba(255,255,255,.18)"; g.lineWidth = 2; g.beginPath(); g.moveTo(52, y - 42); g.lineTo(CW - 52, y - 42); g.stroke();
+  g.font = "italic 500 28px Inter"; g.fillStyle = "rgba(255,255,255,.8)"; g.textAlign = "center";
+  wrap(c.flavor, CW - 120).forEach((l, i) => g.fillText(l, CW / 2, y + i * 36));
+  drawLogo(g, 52, CH - 66, 2.2); g.font = "700 20px Silkscreen"; g.textAlign = "left"; g.fillStyle = "rgba(255,255,255,.7)"; g.fillText("LITHNODE", 96, CH - 46);
+  g.textAlign = "right"; g.font = "700 26px Inter"; g.fillStyle = legend ? "#e9c25a" : "rgba(255,255,255,.7)"; g.fillText(legend ? "★★★" : "★", CW - 52, CH - 44);
+  holo(0, 0, CW, CH, legend ? .55 : .2, seed);
+}
+
+function back() {   // the back of a card: the crab in foil
+  const metal = g.createLinearGradient(0, 0, CW, CH);
+  ["#2a2140", "#14141c", "#1d2a3a", "#14141c"].forEach((c, i, a) => metal.addColorStop(i / (a.length - 1), c));
+  g.save(); g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = 60; g.shadowOffsetY = 30; rr(0, 0, CW, CH, 38); g.fillStyle = metal; g.fill(); g.restore();
+  rr(28, 28, CW - 56, CH - 56, 26); g.lineWidth = 6; g.strokeStyle = "#e9c25a"; g.stroke();
+  rr(48, 48, CW - 96, CH - 96, 18); g.lineWidth = 2; g.strokeStyle = "rgba(233,194,90,.5)"; g.stroke();
+  stars(48, 48, CW - 96, CH - 96, 140, 5, .6);
+  const glow = g.createRadialGradient(CW / 2, CH / 2 - 40, 10, CW / 2, CH / 2 - 40, 340);
+  glow.addColorStop(0, "rgba(233,194,90,.35)"); glow.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = glow; g.fillRect(0, 0, CW, CH);
+  drawLogo(g, CW / 2 - 16 * 19 / 2, CH / 2 - 260, 19);
+  g.textAlign = "center"; g.font = "700 76px Silkscreen"; g.fillStyle = "#fff"; g.fillText("LITHNODE", CW / 2, CH / 2 + 150);
+  g.font = "500 30px 'Geist Mono'"; g.fillStyle = "rgba(255,255,255,.7)"; g.fillText("build your own team", CW / 2, CH / 2 + 210);
+  holo(0, 0, CW, CH, .35, 9);
+}
+
+function at(x, y, rot, s, fn) { g.save(); g.translate(x, y); g.rotate(rot * Math.PI / 180); g.scale(s, s); g.translate(-CW / 2, -CH / 2); fn(); g.restore(); }
+
+// the same slide as it shows on the monitor, 1920x1080 and without the caption: phone.html?set=cards photographs it in the city room
+const sc = document.createElement("canvas"); sc.width = 1920; sc.height = 1080;
+const g = sc.getContext("2d");
+window.renderScreen = (i) => {
+  const sl = SLIDES[i]; g.setTransform(1, 0, 0, 1, 0, 0);
+  const color = sl.hook ? "#7a5cff" : sl.back ? "#e9c25a" : CARDS[sl.card].legend ? "#e9c25a" : CARDS[sl.card].color;
+  g.fillStyle = "#0b0b10"; g.fillRect(0, 0, 1920, 1080);
+  const glow = g.createRadialGradient(960, 560, 40, 960, 560, 900); glow.addColorStop(0, rgba(color, .28)); glow.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = glow; g.fillRect(0, 0, 1920, 1080);
+  stars(0, 0, 1920, 1080, 220, 31 + i, .45);
+  if (sl.hook) {
+    at(640, 560, -12, .78, () => card(CARDS.scout, 11));
+    at(1280, 560, 12, .78, () => card(CARDS.sentinel, 13));
+    at(960, 540, 0, .86, back);
+  } else if (sl.back) at(960, 540, 0, .88, back);
+  else at(960, 540, 0, .88, () => card(CARDS[sl.card], 23 + i));
+  return sc.toDataURL("image/png").split(",")[1];
+};
+window.ready = (async () => {
+  await Promise.all(["700 64px Silkscreen", "800 42px Inter", "500 28px Inter", "italic 500 28px Inter", "500 26px 'Geist Mono'"].map((f) => document.fonts.load(f)));
+  const q = new URLSearchParams(location.search).get("i");
+  if (q !== null) { const im = new Image(); im.src = "data:image/png;base64," + window.renderScreen(+q); document.body.append(im); }
+  return true;
+})();
+</script>

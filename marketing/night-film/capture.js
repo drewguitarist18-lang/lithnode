@@ -2,7 +2,7 @@
 // cost nothing) and the site served on 8797 (`python -m http.server 8797 -d site`). Writes footage/<clip>.mp4 (30 fps)
 // and footage/<clip>.json (every mouse move, click and key with its time in the clip, so the film can draw the cursor).
 // Frames come from Chrome's screencast with their own timestamps, on the same clock as the log, so they line up exactly.
-// Usage: node capture.js [clip ...]   clips: describe, run, site, phone, ads, jobs, hero   (run, ads, jobs and hero also record the Office alongside)
+// Usage: node capture.js [clip ...]   clips: describe, run, site, phone, ads, jobs, hustle, trip, phoneplan, hero   (run, ads, jobs, hustle, trip, phoneplan and hero also record the Office alongside)
 const puppeteer = require("puppeteer-core");
 const fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const FF = process.env.FFMPEG || "ffmpeg";
@@ -152,6 +152,20 @@ const clips = {
   async jobs(b) {
     await clips.describe(b, { name: "jobs-describe", ask: "Find remote jobs that fit me, cut the bad ones, draft my cover letters" });
     await clips.run(b, { name: "jobs-run", flow: "Job hunt", task: "Find remote marketing jobs that pay over 70k", office: "jobs-office", details: true });
+  },
+  // the fourth job, for phone.html?set=hustle: a team that finds side hustles, cuts the overdone ones and plans the winner's first week
+  async hustle(b) {
+    await clips.describe(b, { name: "hustle-describe", ask: "Find me a side hustle: cut the overdone ones, show the real numbers" });
+    await clips.run(b, { name: "hustle-run", flow: "Side hustle hunt", task: "A side hustle I can start this month for under $200", office: "hustle-office", details: true });
+  },
+  // the fifth and sixth, for phone.html?set=trip and ?set=phoneplan: options found, a checker cuts, a plan for what's left
+  async trip(b) {
+    await clips.describe(b, { name: "trip-describe", ask: "Plan a weekend trip for $300: cut anything over budget" });
+    await clips.run(b, { name: "trip-run", flow: "Weekend trip", task: "A weekend away this month, $300 total for everything", office: "trip-office", details: true });
+  },
+  async phoneplan(b) {
+    await clips.describe(b, { name: "phoneplan-describe", ask: "Find me a cheaper phone plan: cut any with hidden fees" });
+    await clips.run(b, { name: "phoneplan-run", flow: "Phone plan hunt", task: "I pay $85 a month. Find something cheaper on the same coverage", office: "phoneplan-office", details: true });
   },
   // the site on a phone, for the vertical cut: the hero's black hole, live, at 1080x1920
   async phone(b) {

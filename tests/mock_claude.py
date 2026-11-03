@@ -185,6 +185,31 @@ if "--append-system-prompt" in flags:
                  "connectors": ["claude.ai Gmail"], "summary": "Drafts a cover letter for each"},
                 {"id": "done", "type": "done", "name": "Done"}],
                 "edges": [["master", "find"], ["find", "check"], ["check", "ok"], ["ok", "write"], ["write", "done"]]}
+        if "weekend trip" in prompt.lower() or "phone plan" in prompt.lower():   # the sixth and seventh: options found, a checker cuts, a plan for what's left
+            trip = "weekend trip" in prompt.lower()
+            draft = {"name": "Weekend trip" if trip else "Phone plan hunt", "nodes": [
+                {"id": "master", "type": "master", "mode": "pass"},
+                {"id": "scout", "type": "cluster", "name": "Trip scout" if trip else "Plan scout", "count": 1, "bot": "scout", "tools": "web", "role": "run",
+                 "summary": "Finds flights, stays and things to do" if trip else "Compares plans on the same coverage"},
+                {"id": "check", "type": "cluster", "name": "Budget check" if trip else "Fee check", "count": 1, "bot": "sentinel", "tools": "web", "role": "build",
+                 "summary": "Cuts anything that blows the $300" if trip else "Cuts any plan with hidden fees"},
+                {"id": "ok", "type": "approval", "name": "Your call", "message": "Approve to get the plan." if trip else "Approve to get the switch steps."},
+                {"id": "plan", "type": "cluster", "name": "Trip planner" if trip else "Switch helper", "count": 1, "bot": "atlas", "tools": "none", "role": "run",
+                 "summary": "Puts the weekend together" if trip else "Writes how to switch, keeping your number"},
+                {"id": "done", "type": "done", "name": "Done"}],
+                "edges": [["master", "scout"], ["scout", "check"], ["check", "ok"], ["ok", "plan"], ["plan", "done"]]}
+        if "side hustle" in prompt.lower():   # the fifth film's team: hustles found, the overdone ones cut, a plan for the winner
+            draft = {"name": "Side hustle hunt", "nodes": [
+                {"id": "master", "type": "master", "mode": "pass"},
+                {"id": "scout", "type": "cluster", "name": "Hustle scout", "count": 1, "bot": "scout", "tools": "web", "role": "run",
+                 "summary": "Finds side hustles people make money with"},
+                {"id": "check", "type": "cluster", "name": "Reality check", "count": 2, "bot": "sentinel", "tools": "web", "role": "build",
+                 "focuses": "Too crowded\nThe real numbers", "summary": "Cuts the overdone and the slow ones"},
+                {"id": "ok", "type": "approval", "name": "Your call", "message": "2 survived. Approve to get a plan for week one."},
+                {"id": "plan", "type": "cluster", "name": "Planner", "count": 1, "bot": "atlas", "tools": "none", "role": "run",
+                 "summary": "Writes the week-one plan"},
+                {"id": "done", "type": "done", "name": "Done"}],
+                "edges": [["master", "scout"], ["scout", "check"], ["check", "ok"], ["ok", "plan"], ["plan", "done"]]}
         text = "nope, no flow here" if "BADJSON" in prompt else "Here it is:\n```json\n" + json.dumps(draft) + "\n```"
         out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
         out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": 0.02, "num_turns": 1, **base})
@@ -302,6 +327,75 @@ if "--append-system-prompt" in flags:
                      if not any(w in i["title"] for w in ("Kettle", "Northwind", "Sunday"))]
         say = (f"{len(items)} cover letters, one for each job. They're in your Gmail drafts." if stage == "Writer"
                else f"{stage}: {len(items)} jobs.")
+        text = f"Done.\n\nREPORT: {say}\n\n```items\n" + json.dumps(items) + "\n```"
+    if stage in ("Trip scout", "Budget check", "Trip planner", "Plan scout", "Fee check", "Switch helper"):
+        # the trip and phone plan teams: 6 options found, the checker cuts the ones over budget or full of fees, a plan for what's left
+        trip = stage.startswith("Trip") or stage == "Budget check"
+        role = {"Trip scout": "scout", "Plan scout": "scout", "Budget check": "check", "Fee check": "check"}.get(stage, "plan")
+        steps = {"scout": [("WebSearch", {"query": "weekend trip under $300" if trip else "cheapest unlimited phone plan same coverage"}),
+                           ("WebFetch", {"url": "https://www.reddit.com/r/travel/top" if trip else "https://www.reddit.com/r/NoContract/top"}),
+                           ("WebSearch", {"query": "cabin 2 nights deals" if trip else "prepaid plan hidden fees"})],
+                 "check": [("WebSearch", {"query": "boat tour price" if trip else "promo phone plan price after 3 months"})],
+                 "plan": [("Read", {"file_path": "options.md"})]}[role]
+        for i, (name, args) in enumerate(steps):
+            time.sleep(pace)
+            out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [
+                {"type": "tool_use", "id": f"toolu_t{i}", "name": name, "input": args}]}, **base})
+        options = ([("Flight to Miami", "Cost", "$280", "cut", "That's the whole budget"),
+                    ("Hotel downtown, 2 nights", "Cost", "$340", "cut", "Over budget on its own"),
+                    ("Boat tour", "Cost", "$95", "cut", "Pushes it over"),
+                    ("Train to the coast", "Cost", "$48", "pass", "Round trip"),
+                    ("Cabin, 2 nights", "Cost", "$150", "pass", "Sleeps 2"),
+                    ("Beach and hike day", "Cost", "$0", "pass", "Free")] if trip else
+                   [("Big carrier unlimited", "Price", "$70/mo", "cut", "$35 activation, $10/mo fees"),
+                    ("Promo plan", "Price", "$30/mo", "cut", "Jumps to $65 after 3 months"),
+                    ("Prepaid basic", "Price", "$25/mo", "cut", "5GB, then it crawls"),
+                    ("Family plan, 1 line", "Price", "$60/mo", "cut", "Only cheap with 4 lines"),
+                    ("Budget unlimited", "Price", "$40/mo", "pass", "No contract, no fees"),
+                    ("Prepaid unlimited, 12 months", "Price", "$30/mo", "pass", "Same network, no fees")])
+        if role == "scout":
+            items = [{"title": t, "facts": {k: v}} for t, k, v, verdict, why in options]
+            say = "6 options for the weekend." if trip else "6 plans on the same coverage."
+        elif role == "check":
+            items = [{"title": t, "facts": {k: v}, "verdict": verdict, "reason": why} for t, k, v, verdict, why in options]
+            say = f"{stage}: 3 cut." if trip else f"{stage}: 4 cut."
+        elif trip:
+            items = [{"title": t, "facts": {"When": w}} for t, w in [("Train to the coast, $48", "Friday"), ("Cabin, 2 nights, $150", "Friday night"),
+                                                                     ("Beach and hike, free", "Saturday"), ("Food all weekend, $80", "Sat and Sun")]]
+            say = "A weekend at the coast for $278. $22 left over."
+        else:
+            items = [{"title": t, "facts": {"Step": n}} for t, n in [("Check your phone is unlocked", "1"), ("Get your number transfer PIN", "2"),
+                                                                     ("Order the SIM, free", "3"), ("Cancel the old plan once it moves", "4")]]
+            say = "Prepaid unlimited, 12 months: $30/mo. You pay $85 now. Saves $55 a month, $660 a year."
+        text = f"Done.\n\nREPORT: {say}\n\n```items\n" + json.dumps(items) + "\n```"
+    if stage in ("Hustle scout", "Reality check", "Planner"):
+        # the side hustle team: 6 hustles found, the crowded and the slow ones cut, a week-one plan for what's left
+        steps = {"Hustle scout": [("WebSearch", {"query": "side hustles that make money 2026"}), ("WebFetch", {"url": "https://www.reddit.com/r/sidehustle/top"}),
+                                  ("WebSearch", {"query": "side hustle under $200 to start"})],
+                 "Reality check": [("WebSearch", {"query": "dropshipping saturated 2026"}), ("WebFetch", {"url": "https://www.reddit.com/r/sidehustle/comments/real_numbers"})],
+                 "Planner": [("Read", {"file_path": "hustles.md"})]}[stage]
+        for i, (name, args) in enumerate(steps):
+            time.sleep(pace)
+            out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [
+                {"type": "tool_use", "id": f"toolu_h{i}", "name": name, "input": args}]}, **base})
+        hustles = [("Dropshipping", "$500", "Too crowded", "Everyone's doing it"),
+                   ("Faceless YouTube", "$0", "The real", "No money for 6+ months"),
+                   ("Print on demand", "$50", "Too crowded", "Saturated"),
+                   ("Notion templates", "$0", "Too crowded", "Saturated"),
+                   ("Reselling thrift finds", "$100", "", "40-60% margins"),
+                   ("Pressure washing", "$180", "", "$120 a driveway")]
+        if stage == "Hustle scout":
+            items = [{"title": t, "facts": {"To start": c}} for t, c, f, why in hustles]
+            say = "6 side hustles you can start this month."
+        elif stage == "Reality check":   # each checker cuts the hustles its focus is about; the ones nobody cuts survive
+            mine = lambda f: bool(f) and f"# Your focus\n{f}" in prompt
+            items = [{"title": t, "facts": {"To start": c}, "verdict": "cut" if mine(f) else "pass", "reason": why if mine(f) or not f else ""}
+                     for t, c, f, why in hustles]
+            say = f"Reality check: {sum(i['verdict'] == 'cut' for i in items)} cut."
+        else:
+            items = [{"title": t, "facts": {"When": w}} for t, w in [("Buy a pressure washer, $180", "Day 1"), ("Post a before and after on Nextdoor", "Day 2"),
+                                                                     ("First driveway, $120", "Day 4"), ("Paid back after 2 jobs", "Day 6")]]
+            say = "Pressure washing. $180 to start, $120 a driveway. Paid back after 2 jobs."
         text = f"Done.\n\nREPORT: {say}\n\n```items\n" + json.dumps(items) + "\n```"
     out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
     used = {"usage": {"input_tokens": 1200, "output_tokens": 800, "cache_read_input_tokens": 30000 + len(text) * 40}} if os.environ.get("CLAWD_MOCK_RICH") else {}
