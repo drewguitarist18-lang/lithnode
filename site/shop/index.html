@@ -168,16 +168,16 @@ const CHECKOUT = { "money-saver": "", "side-hustle": "", "job-hunt": "", "trip-p
 const PACKS = [
   { id: "money-saver", name: "Money Saver", price: 9, c: "var(--green)",
     what: "Finds cheaper phone, internet, streaming and insurance deals where you live, checks the fine print, and writes your switch plan with the yearly saving.",
-    team: ["3 deal scouts", "Fee check", "Savings plan"], proof: "" },
+    team: ["3 deal scouts", "Fee check", "Savings plan"], proof: "$85 Verizon, $70 internet and 3 subscriptions in Atlanta: about $858 a year saved for sure, with a step-by-step switch plan for each bill." },
   { id: "side-hustle", name: "Side Hustle Finder", price: 9, c: "var(--purple)",
     what: "Finds side hustles that fit your skills, hours and budget, cuts the MLMs and hype, and gives you the top 3 with a first week planned day by day.",
-    team: ["3 hustle scouts", "Reality check", "Game plan"], proof: "" },
+    team: ["3 hustle scouts", "Reality check", "Game plan"], proof: "Retail worker, 10 hours a week, video editing skills: local-business short-form editing ranked first, $300 to $600 a month by month 3, with a 7-day start plan." },
   { id: "job-hunt", name: "Job Hunt", price: 9, c: "var(--blue)",
     what: "Reads your resume, finds roles posted now with pay and links, writes a tailored resume and cover letter, and reviews them like a hiring manager.",
-    team: ["2 job scouts", "Application writer", "Hiring manager"], proof: "" },
+    team: ["2 job scouts", "Application writer", "Hiring manager"], proof: "Entry-level data analyst, Chicago or remote: found a $80K to $106K role posted 2 days ago, wrote a tailored resume and cover letter, then a recruiter-style review with 3 fixes." },
   { id: "trip-planner", name: "Trip Planner", price: 9, c: "var(--amber)",
     what: "Researches getting there, where to stay and things to do on your dates, checks hours and prices, and builds a day-by-day plan with a budget.",
-    team: ["3 trip scouts", "Trip check", "Planner"], proof: "" },
+    team: ["3 trip scouts", "Trip check", "Planner"], proof: "3 days in Chicago for 2 on $1,200: a day-by-day plan around a live show on the Friday, and it caught a wrong date in the request." },
 ];
 const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
 const buy = (id, label) => CHECKOUT[id]
