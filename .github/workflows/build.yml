@@ -1,6 +1,5 @@
-# Tests Lithnode on Linux and Mac, builds the Linux Flatpak and the Mac apps, checks each built app for real,
-# and (when started by hand with a version) publishes them as a GitHub release.
-# Windows is built on Windows itself: installer/build.ps1.
+# Tests Lithnode on Linux and Mac, builds the Windows installer, the Linux Flatpak and the Mac app, checks each built
+# app for real, and (when started by hand with a version) publishes them as a GitHub release.
 name: build
 
 on:
@@ -105,9 +104,30 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: "mac-${{ matrix.arch }}", path: "dist/Lithnode-mac-${{ matrix.arch }}.dmg" }
 
+  windows:   # LithnodeSetup.exe: the engine plus Claude Pet (PyInstaller), the window (Electron), the installer (Inno Setup)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { repository: drewguitarist18-lang/claude-pet, path: claude-pet }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Build LithnodeSetup.exe
+        env: { LITHNODE_PET_DIR: "${{ github.workspace }}/claude-pet" }
+        run: powershell -ExecutionPolicy Bypass -File installer/build.ps1
+      - name: Run a whole flow through the built engine
+        shell: bash
+        run: python packaging/check_installed.py '["dist/Lithnode/lithnode-server.exe"]'
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: dist/LithnodeSetup.exe }
+
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.release != ''
-    needs: [lint, test, flatpak, mac]
+    needs: [lint, test, windows, flatpak, mac]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -119,14 +139,13 @@ jobs:
         with: { name: linux, path: out }
       - uses: actions/download-artifact@v4
         with: { name: mac-arm64, path: out }
+      - uses: actions/download-artifact@v4
+        with: { name: windows, path: out }
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.release }}
         run: |
-          # the Windows installer is built on Windows (installer/build.ps1) and uploaded by hand; carry it forward so
-          # lithnode.com's link to the latest release always has one
-          gh release download --repo "$GITHUB_REPOSITORY" --pattern LithnodeSetup.exe --dir out || true
           ls -la out
           cat > notes.md <<'EOF'
           **Windows:** LithnodeSetup.exe · **Mac:** Lithnode-mac-arm64.dmg (Apple silicon) · **Linux:** Lithnode.flatpak (any distro)

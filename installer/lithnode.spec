@@ -1,12 +1,13 @@
 # PyInstaller build for the installed app: two programs sharing one folder (see lithnode_main.py).
 # Windows also bundles Claude Pet (a Windows desktop pet), from its own project folder next to this one.
 # Mac and Linux get the engine alone; their window picks folders itself, so no tkinter either.
+import os
 import sys
 from pathlib import Path
 
 HERE = Path(SPECPATH)
 ROOT = HERE.parent
-PET = ROOT.parent / "Claude Pet"
+PET = Path(os.environ.get("LITHNODE_PET_DIR") or ROOT.parent / "Claude Pet")   # CI checks claude-pet out elsewhere
 WINDOWS = sys.platform == "win32"
 
 a = Analysis(

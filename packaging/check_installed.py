@@ -1,4 +1,4 @@
-"""Checks a built Lithnode for real, on the machine that built it (CI runs this on Linux and Mac).
+"""Checks a built Lithnode for real, on the machine that built it (CI runs this on Windows, Linux and Mac).
 
     python packaging/check_installed.py <how to start the engine, as a JSON list>
 
@@ -41,6 +41,8 @@ def call(path, body=None):
 
 def main():
     engine = json.loads(sys.argv[1])
+    if Path(engine[0]).is_file():
+        engine[0] = str(Path(engine[0]).resolve())   # Windows won't start "dist/x.exe" written with forward slashes
     # under the home folder: the Flatpak sees your home, not the CI's /tmp
     work = Path(tempfile.mkdtemp(prefix="lithnode-check-", dir=Path.home()))
     project = work / "project"
@@ -57,7 +59,10 @@ def main():
     env = {**os.environ, "LITHNODE_PORT": str(PORT), "LITHNODE_HOME": str(work / "home"), "CLAWD_BOT_HOME": str(work / "bot"),
            "CLAWD_PET_HOME": str(work / "pet"), "CLAWD_MOCK_STATE": str(state), "CLAWD_MOCK_LOG": str(work / "calls.jsonl"),
            "CLAWD_MOCK_SESSIONS": str(work / "sessions.json"), "LITHNODE_AGENT_TIMEOUT": "60"}
-    env["PATH"] = "/usr/bin:/bin"   # like an app opened from a menu: it must find ~/.local/bin/claude by itself
+    if os.name == "nt":   # Windows: no sh scripts, so hand the engine the fake directly (finding claude is unit-tested)
+        env["CLAWD_BOT_CLAUDE_CMD"] = json.dumps([sys.executable, str(ROOT / "tests" / "mock_claude.py")])
+    else:
+        env["PATH"] = "/usr/bin:/bin"   # like an app opened from a menu: it must find ~/.local/bin/claude by itself
     proc = subprocess.Popen([*engine, "--no-open"], env=env)
     try:
         up = False
@@ -73,7 +78,7 @@ def main():
             return
         _, hq = call("/api/hq")
         cc = hq.get("claude_code") or {}
-        check("it finds Claude Code (~/.local/bin/claude) on its own", cc.get("available"), hq)
+        check("it finds Claude Code" + ("" if os.name == "nt" else " (~/.local/bin/claude) on its own"), cc.get("available"), hq)
         check("it sees you're signed in", cc.get("logged_in"), hq)
         _, d = call("/api/flows", {"template": "review"})
         fid = d["flow"]["id"]
@@ -90,7 +95,8 @@ def main():
         calls = [json.loads(line) for line in (work / "calls.jsonl").read_text().splitlines()] if (work / "calls.jsonl").exists() else []
         agents = [c for c in calls if "flags" in c and "--append-system-prompt" in c["flags"]]
         check("its agents really ran Claude Code", len(agents) >= 2, len(agents))
-        check("in the project folder", all(c.get("cwd", str(project)).rstrip("/") == str(project) for c in agents),
+        same = lambda a, b: os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))  # noqa: E731
+        check("in the project folder", all(same(c.get("cwd", str(project)), str(project)) for c in agents),
               [c.get("cwd") for c in agents])
         _, done = call(f"/api/runs/{r.get('run')}")
         check("the result came back", bool(done.get("final")), list(done)[:20])

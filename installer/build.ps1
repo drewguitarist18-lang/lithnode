@@ -5,11 +5,19 @@
 #   powershell -ExecutionPolicy Bypass -File installer\build.ps1
 # One-time: py -m venv installer\.venv-build; installer\.venv-build\Scripts\pip install pyinstaller
 #           winget install JRSoftware.InnoSetup;  Node.js (for Electron)
+# GitHub Actions runs this too (build.yml): there the Python on PATH builds, and Claude Pet comes from LITHNODE_PET_DIR.
 $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
 $root = Split-Path $here
 $dist = Join-Path $root "dist"
 $py = Join-Path $here ".venv-build\Scripts\python.exe"
+if ($env:CI -and -not (Test-Path $py)) {
+    $py = (Get-Command python).Source
+    & $py -m pip install -q pyinstaller
+    if ($LASTEXITCODE) { throw "pip install pyinstaller failed" }
+}
+$version = [regex]::Match((Get-Content (Join-Path $root "version.py") -Raw), 'VERSION = "([^"]+)"').Groups[1].Value
+if (-not $version) { throw "No VERSION in version.py" }
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not (Test-Path $py)) { throw "Missing build environment: see the one-time steps at the top of this file." }
 if (-not $iscc) { throw "Inno Setup isn't installed: winget install JRSoftware.InnoSetup" }
@@ -40,6 +48,6 @@ foreach ($n in "dxcompiler.dll", "dxil.dll", "vk_swiftshader.dll", "vk_swiftshad
 }
 
 # 3. the installer
-& $iscc /Q (Join-Path $here "setup.iss")
+& $iscc /Q "/DAppVersion=$version" (Join-Path $here "setup.iss")
 if ($LASTEXITCODE) { throw "Inno Setup failed" }
 Get-Item (Join-Path $dist "LithnodeSetup.exe") | Select-Object Name, @{n = "MB"; e = { [math]::Round($_.Length / 1MB, 1) } }
