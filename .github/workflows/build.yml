@@ -110,6 +110,11 @@ jobs:
     needs: [lint, test, flatpak, mac]
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: version.py, sparse-checkout-cone-mode: false }
+      - name: The release number matches version.py (the app compares it to tell people about updates)
+        env: { VERSION: "${{ inputs.release }}" }
+        run: grep -q "VERSION = \"$VERSION\"" version.py || { echo "::error::version.py says $(grep VERSION version.py); bump it to $VERSION first"; exit 1; }
       - uses: actions/download-artifact@v4
         with: { name: linux, path: out }
       - uses: actions/download-artifact@v4

@@ -26,7 +26,21 @@
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body { background: var(--bg); color: var(--ink); font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
-         display: grid; grid-template-rows: 44px 1fr; overflow: hidden; }
+         display: grid; grid-template-rows: 44px auto 1fr; overflow: hidden; }
+  /* "a newer Lithnode is out": a thin strip under the top bar, until it's dismissed for that version */
+  .update { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--line);
+            background: color-mix(in srgb, var(--accent) 12%, var(--bar)); font-size: 12.5px; }
+  .update[hidden] { display: none; }
+  .update i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .update span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .update span b { font-weight: 650; }
+  .update span em { font-style: normal; color: var(--muted); }
+  .update a, .update button { flex: none; height: 26px; padding: 0 11px; border-radius: 8px; border: 1px solid var(--line); background: transparent;
+                              color: var(--ink); font: 600 12px inherit; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+  .update a:hover, .update button:hover { background: var(--hover); }
+  .update .go { margin-left: auto; background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  .update .go:hover { background: var(--ink); filter: brightness(1.1); }
+  .update .x { width: 26px; padding: 0; justify-content: center; border-color: transparent; color: var(--muted); font-size: 15px; }
   header { display: flex; align-items: center; gap: 8px; padding: 0 10px 0 12px; background: var(--bar);
            border-bottom: 1px solid var(--line); }
   .brand { display: flex; align-items: center; gap: 7px; margin-right: 10px; font-size: 12.5px; color: var(--ink); cursor: default; }
@@ -124,6 +138,7 @@
   <button class="icon theme" id="themeBtn" title="Theme" aria-label="Switch theme"></button>
   <button class="icon quit" id="quitBtn" title="Quit Lithnode" aria-label="Quit Lithnode"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></button>
 </header>
+<div class="update" id="update" hidden role="status"></div>
 <div class="frames" id="frames"></div>
 <script src="/static/sprites.js"></script>
 <script src="/static/ui.js"></script>
@@ -348,6 +363,7 @@ const MENUS = {
   },
   help: () => [
     { icon: "?", label: "Take the tour", action: flowsDo((a) => a.tour()) },
+    { icon: "↻", label: "Check for updates", hint: release.version ? `v${release.version}` : "", action: () => checkUpdates(true) },
     { sep: true },
     { icon: "↗", label: "Lithnode website", action: () => window.open("https://lithnode.com", "_blank", "noopener") },
     { icon: "↗", label: "Report a problem", action: () => window.open("https://github.com/drewguitarist18-lang/lithnode/issues", "_blank", "noopener") },
@@ -376,6 +392,36 @@ $("quitBtn").onclick = async () => {
   try { await fetch("/api/quit", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) {}
   document.body.innerHTML = '<p style="padding:40px;font:16px system-ui;color:#8d8d8d">Lithnode has quit. You can close this window.</p>';
 };
+
+// ---- updates: Lithnode can't update itself, so it says when there's a newer one and links the right download
+let release = {};
+function showUpdate() {
+  const u = $("update"), r = release;
+  let skipped = ""; try { skipped = localStorage.getItem("hq-update-skip") || ""; } catch (e) {}
+  u.hidden = !(r.newer && r.latest !== skipped);
+  if (u.hidden) return;
+  u.innerHTML = `<i></i><span><b>Lithnode ${esc(r.latest)} is out.</b> <em>You have ${esc(r.version)}.</em></span>
+    <a class="go" href="${esc(r.download)}" target="_blank" rel="noopener">Download</a>
+    ${r.notes ? `<a href="${esc(r.notes)}" target="_blank" rel="noopener">What's new</a>` : ""}
+    <button class="x" data-act="skip" title="Hide until the next version" aria-label="Hide">×</button>`;
+}
+$("update").addEventListener("click", (e) => {
+  if (e.target.closest("[data-act=skip]")) {
+    try { localStorage.setItem("hq-update-skip", release.latest); } catch (e) {}
+    $("update").hidden = true;
+  }
+});
+async function checkUpdates(asked) {
+  try { release = await (await fetch("/api/version" + (asked ? "?refresh=1" : ""), { cache: "no-store" })).json(); } catch (e) { release = {}; }
+  if (asked && release.newer) { try { localStorage.removeItem("hq-update-skip"); } catch (e) {} }   // asked: show it even if hidden before
+  showUpdate();
+  if (!asked || release.newer) return;
+  await ui.confirm(release.checked
+    ? { title: "You're up to date", text: `Lithnode ${release.version} is the newest version.`, ok: "OK", cancel: "" }
+    : { title: "Couldn't check", text: `Lithnode ${release.version || ""} couldn't reach GitHub. Check your connection and try again.`, ok: "OK", cancel: "" });
+}
+setTimeout(() => checkUpdates(false), 4000);       // after the app has settled
+setInterval(() => checkUpdates(false), 3600000);   // the server only asks GitHub every few hours
 
 const lg = $("logo").getContext("2d");
 (function frame(ms) {

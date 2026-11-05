@@ -31,6 +31,7 @@ import claude_code
 import engines
 import flows
 import office_feed
+import updates
 
 HOST, PORT = "127.0.0.1", int(os.environ.get("LITHNODE_PORT", 8790))
 URL = f"http://{HOST}:{PORT}"
@@ -415,6 +416,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def GET_api_ping(self) -> None:
         self.send_json({"app": "lithnode"})
+
+    def GET_api_version(self) -> None:
+        """This version and, now and then, whether GitHub has a newer one (?refresh=1 asks right away)."""
+        self.send_json(updates.status(force="refresh=1" in self.path))
 
     def GET_api_connectors(self) -> None:
         """Connectors a team can be given (a free check, cached; ?refresh=1 checks again)."""

@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import agents  # noqa: E402
 import flows  # noqa: E402
+import updates  # noqa: E402
 
 failures = []
 
@@ -75,6 +76,14 @@ check("items: a fenced list is read", flows.parse_items(f"x\n{fence}items\n[{{\"
 check("items: the fence is stripped from the text", flows.strip_items(f"hi\n{fence}items\n[]\n{fence}") == "hi")
 check("webhooks: https is fine, file: isn't", flows.webhook_ok("https://ntfy.sh/x") and not flows.webhook_ok("file:///c:/x"))
 check("design: no JSON is a friendly error", raises(lambda: flows.parse_design("no json here")))
+
+# ---- updates: is the release on GitHub newer than this one ---------------------------------------------------
+check("updates: versions read as numbers", updates.parse("v0.1.21") == (0, 1, 21) and updates.parse("0.2") == (0, 2))
+check("updates: 0.1.100 is newer than 0.1.21 (not a string compare)", updates.newer("v0.1.100", "0.1.21"))
+check("updates: same or older isn't newer", not updates.newer("v0.1.21", "0.1.21") and not updates.newer("v0.1.9", "0.1.21"))
+check("updates: junk tags are never newer", not updates.newer("nightly", "0.1.21") and not updates.newer("", "0.1.21"))
+check("updates: each OS gets its own installer", updates.download_url("v1.0.0", "win32").endswith("/v1.0.0/LithnodeSetup.exe")
+      and updates.download_url("v1.0.0", "darwin").endswith(".dmg") and updates.download_url("v1.0.0", "linux").endswith(".flatpak"))
 
 print()
 if failures:

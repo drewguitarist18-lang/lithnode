@@ -49,7 +49,7 @@
       const d = document.createElement("dialog");
       d.className = "ui-pop";
       d.innerHTML = `<h3>${esc(title)}</h3>${text ? `<p>${esc(text)}</p>` : ""}
-        <div class="ui-acts"><button class="ui-btn" value="no">${esc(cancel)}</button>
+        <div class="ui-acts">${cancel ? `<button class="ui-btn" value="no">${esc(cancel)}</button>` : ""}
         <button class="ui-btn go${danger ? " danger" : ""}" value="yes">${esc(ok)}</button></div>`;
       document.body.appendChild(d);
       let answer = false;
