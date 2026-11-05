@@ -1065,6 +1065,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !typing) select(null);
   if (e.key === "s" && ctrl) { e.preventDefault(); save(); }
   if (e.key === "o" && ctrl) { e.preventDefault(); flowsApi.importTeam(); }
+  if (e.key === "," && ctrl) { e.preventDefault(); parent.openSettings?.(); }
   if (e.key === "e" && ctrl) { e.preventDefault(); flowsApi.exportTeam(); }
   if (e.key === "d" && ctrl && !typing) { e.preventDefault(); flowsApi.duplicateSel(); }
   if (e.key === "F2") { e.preventDefault(); flowsApi.rename(); }

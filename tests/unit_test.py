@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import agents  # noqa: E402
 import flows  # noqa: E402
+import settings  # noqa: E402
 import updates  # noqa: E402
 
 failures = []
@@ -84,6 +85,13 @@ check("updates: same or older isn't newer", not updates.newer("v0.1.21", "0.1.21
 check("updates: junk tags are never newer", not updates.newer("nightly", "0.1.21") and not updates.newer("", "0.1.21"))
 check("updates: each OS gets its own installer", updates.download_url("v1.0.0", "win32").endswith("/v1.0.0/LithnodeSetup.exe")
       and updates.download_url("v1.0.0", "darwin").endswith(".dmg") and updates.download_url("v1.0.0", "linux").endswith(".flatpak"))
+
+# ---- settings: what the Settings window saves --------------------------------------------------------------------
+check("settings: nothing saved means the defaults", settings.clean(None) == settings.DEFAULTS)
+check("settings: junk is dropped, a sane value is kept", settings.clean({"limit": "x", "roles": "yes", "check_updates": False, "evil": 1})
+      == {**settings.DEFAULTS, "check_updates": False})
+check("settings: the token limit is clamped like a flow's", settings.clean({"limit": 5})["limit"] == 50_000)
+check("settings: every offered limit survives cleaning", all(settings.clean({"limit": n})["limit"] == n for n in settings.LIMITS))
 
 print()
 if failures:

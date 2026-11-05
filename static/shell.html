@@ -119,6 +119,46 @@
   html.native header :is(a, button, canvas) { -webkit-app-region: no-drag; }
   html.native .quit { display: none; }
   html.native.mac header { padding-left: 84px; padding-right: 16px; }   /* the Mac's own window buttons sit top left */
+  /* Settings: one window, a few plain sections, each row a label on the left and its control on the right */
+  dialog.set { width: min(560px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); padding: 0; border-radius: 16px;
+               border: 1px solid var(--line); background: var(--bar); color: var(--ink); box-shadow: 0 24px 70px rgba(0,0,0,.45);
+               display: none; flex-direction: column; font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
+  dialog.set[open] { display: flex; animation: setIn .14s ease-out; }
+  dialog.set::backdrop { background: rgba(8, 9, 14, .5); backdrop-filter: blur(2px); }
+  @keyframes setIn { from { opacity: 0; transform: scale(.97); } }
+  .set .top { display: flex; align-items: center; padding: 16px 16px 12px 22px; border-bottom: 1px solid var(--line); }
+  .set .top h2 { margin: 0; font-size: 16px; font-weight: 650; }
+  .set .top button { margin-left: auto; width: 30px; height: 30px; border-radius: 8px; border: 0; background: transparent; color: var(--muted);
+                     font-size: 17px; cursor: pointer; }
+  .set .top button:hover { background: var(--hover); color: var(--ink); }
+  .set .body { overflow-y: auto; padding: 0 22px 18px; }
+  .set h3 { margin: 18px 0 2px; font-size: 11.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .set .row { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .set .row:last-child { border-bottom: 0; }
+  .set .row > div:first-child { flex: 1; min-width: 0; }
+  .set .row b { display: block; font-weight: 600; }
+  .set .row small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; overflow-wrap: anywhere; }
+  .set .seg { display: flex; gap: 2px; padding: 3px; border-radius: 10px; border: 1px solid var(--line); flex: none; }
+  .set .seg button { height: 26px; padding: 0 11px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: 550 12.5px inherit; cursor: pointer; }
+  .set .seg button:hover { color: var(--ink); }
+  .set .seg button.on { color: var(--ink); background: var(--hover); box-shadow: inset 0 0 0 1px var(--line); }
+  .set select, .set .btn { flex: none; height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line); background: transparent;
+                           color: var(--ink); font: 600 12.5px inherit; cursor: pointer; }
+  .set select { padding-right: 8px; }
+  .set select option { background: var(--bar); color: var(--ink); }
+  .set .btn:hover { background: var(--hover); }
+  .set .btn:disabled { opacity: .6; cursor: default; }
+  /* an on/off switch */
+  .set .sw { flex: none; position: relative; width: 38px; height: 22px; border-radius: 11px; border: 0; padding: 0; cursor: pointer;
+             background: color-mix(in srgb, var(--muted) 45%, transparent); transition: background .15s; }
+  .set .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+                    transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .set .sw[aria-checked="true"] { background: var(--ok); }
+  .set .sw[aria-checked="true"]::after { transform: translateX(16px); }
+  .set .st { flex: none; display: inline-flex; align-items: center; gap: 6px; min-width: 96px; font-size: 12px; color: var(--muted); }
+  .set .st i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .set .st.ok i { background: var(--ok); }
+  .set .st.bad i { background: var(--warn); }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>
@@ -140,6 +180,10 @@
 </header>
 <div class="update" id="update" hidden role="status"></div>
 <div class="frames" id="frames"></div>
+<dialog class="set" id="settings" aria-labelledby="setTitle">
+  <div class="top"><h2 id="setTitle">Settings</h2><button type="button" data-act="close" aria-label="Close">×</button></div>
+  <div class="body" id="setBody"></div>
+</dialog>
 <script src="/static/sprites.js"></script>
 <script src="/static/ui.js"></script>
 <script>
@@ -328,6 +372,8 @@ const MENUS = {
     { icon: "▶", label: "Run flow…", action: flowsDo((a) => a.run()) },
     { icon: "↺", label: "Past runs", action: flowsDo((a) => a.runs()) },
     { sep: true },
+    { icon: "⚙", label: "Settings…", hint: "Ctrl+,", action: () => openSettings() },
+    { sep: true },
     { icon: "✕", label: "Delete flow", danger: true, action: flowsDo((a) => a.deleteFlow()) },
     { icon: "⏻", label: "Quit Lithnode", action: () => $("quitBtn").click() },
   ],
@@ -422,6 +468,88 @@ async function checkUpdates(asked) {
 }
 setTimeout(() => checkUpdates(false), 4000);       // after the app has settled
 setInterval(() => checkUpdates(false), 3600000);   // the server only asks GitHub every few hours
+
+// ---- Settings: theme, the engines and their sign-in, what new flows start with, updates, where Lithnode keeps its files
+let prefs = null, engineList = null;
+const shortTokens = (n) => (n >= 1e6 ? `${n / 1e6}M` : `${n / 1e3}k`);
+async function openSettings() {
+  ui.closeMenu();
+  const d = $("settings");
+  if (!d.open) d.showModal();
+  try { prefs = await (await fetch("/api/settings", { cache: "no-store" })).json(); } catch (e) { prefs = null; }
+  renderSettings();
+  try { engineList = (await (await fetch("/api/engines", { cache: "no-store" })).json()).engines || []; } catch (e) { engineList = []; }
+  renderSettings();
+}
+function engineRows() {
+  if (!engineList) return `<div class="row"><div><small>Checking what's installed…</small></div></div>`;
+  if (!engineList.length) return `<div class="row"><div><small>Couldn't check the engines.</small></div></div>`;
+  return engineList.map((e) => {
+    const signed = e.id === "claude" ? !!account.logged_in : e.signed_in;
+    const [cls, text] = !e.installed ? ["", "Not installed"] : signed ? ["ok", "Signed in"] : ["bad", "Not signed in"];
+    const what = e.note ? esc(e.note)
+      : e.id === "claude" ? (account.email ? `As ${esc(account.email)}. Every flow can run on it.` : "Every flow can run on it.")
+      : e.installed ? "Pick it for any team in a flow." : "Install its command-line tool to give teams this engine.";
+    const act = e.id === "claude" && e.installed && !signed ? `<button type="button" class="btn" data-act="signin">Sign in</button>` : "";
+    return `<div class="row"><div><b>${esc(e.name)}</b><small>${what}</small></div>${act}<span class="st ${cls}"><i></i>${text}</span></div>`;
+  }).join("");
+}
+function renderSettings() {
+  const b = $("setBody");
+  if (!prefs) { b.innerHTML = `<p style="color:var(--muted)">Couldn't reach Lithnode's server. Is it still running?</p>`; return; }
+  const p = prefs.settings, sw = (key, on, label) => `<button type="button" class="sw" role="switch" aria-checked="${on}" aria-label="${label}" data-key="${key}"></button>`;
+  const limits = [...new Set([...prefs.limits, p.limit])].sort((x, y) => x - y);
+  b.innerHTML = `
+    <h3>Appearance</h3>
+    <div class="row"><div><b>Theme</b><small>Also under View, and the button at the top right.</small></div>
+      <div class="seg" role="radiogroup" aria-label="Theme">${Object.entries({ dark: "Dark", light: "Light", system: "System" }).map(([k, n]) =>
+        `<button type="button" role="radio" aria-checked="${themeMode === k}" class="${themeMode === k ? "on" : ""}" data-theme="${k}">${n}</button>`).join("")}</div></div>
+    <h3>Engines</h3>
+    ${engineRows()}
+    <h3>New flows</h3>
+    <div class="row"><div><b>Token limit</b><small>A run stops once it has used this many. Each flow can change its own.</small></div>
+      <select data-key="limit" aria-label="Token limit for new flows">${limits.map((n) =>
+        `<option value="${n}"${n === p.limit ? " selected" : ""}>${shortTokens(n)} tokens</option>`).join("")}</select></div>
+    <div class="row"><div><b>Roles</b><small>Each team gets a role (think, build, run…) and the model set for that role.</small></div>${sw("roles", p.roles, "Roles for new flows")}</div>
+    <h3>Updates</h3>
+    <div class="row"><div><b>Tell me when a new version is out</b><small>Asks GitHub every few hours. Nothing about you is sent.</small></div>${sw("check_updates", p.check_updates, "Check for updates")}</div>
+    <div class="row"><div><b>Lithnode ${esc(prefs.version)}</b><small id="setUpd">${release.newer ? `${esc(release.latest)} is out. The download is in the bar at the top.` : "The version you have."}</small></div>
+      <button type="button" class="btn" data-act="check">Check now</button></div>
+    <h3>Your files</h3>
+    <div class="row"><div><b>Lithnode folder</b><small>${esc(prefs.folder)}</small><small>Your flows, past runs and logs. Uninstalling Lithnode leaves it.</small></div>
+      <button type="button" class="btn" data-act="folder">Open</button></div>`;
+}
+async function saveSetting(key, value) {
+  try {
+    const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [key]: value }) });
+    prefs.settings = (await r.json()).settings;
+  } catch (e) {}
+  renderSettings();
+  if (key === "check_updates") checkUpdates(false);
+}
+$("settings").addEventListener("click", async (e) => {
+  const d = $("settings");
+  if (e.target === d) return d.close();                       // a click on the dim backdrop
+  const t = e.target.closest("button");
+  if (!t) return;
+  if (t.dataset.act === "close") d.close();
+  if (t.dataset.theme) { themeMode = t.dataset.theme; try { localStorage.setItem("hq-theme", themeMode); } catch (e) {} applyAll(); renderSettings(); }
+  if (t.classList.contains("sw")) saveSetting(t.dataset.key, t.getAttribute("aria-checked") !== "true");
+  if (t.dataset.act === "folder") { try { await fetch("/api/settings/open-folder", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) {} }
+  if (t.dataset.act === "signin") { d.close(); startSignin(); }
+  if (t.dataset.act === "check") {
+    t.disabled = true; t.textContent = "Checking…";
+    try { release = await (await fetch("/api/version?refresh=1", { cache: "no-store" })).json(); } catch (e) { release = {}; }
+    if (release.newer) { try { localStorage.removeItem("hq-update-skip"); } catch (e) {} }
+    showUpdate();
+    t.disabled = false; t.textContent = "Check now";
+    $("setUpd").textContent = release.newer ? `${release.latest} is out. The download is in the bar at the top.`
+      : release.checked ? "You're on the newest version." : "Couldn't reach GitHub. Check your connection.";
+  }
+});
+$("settings").addEventListener("change", (e) => { if (e.target.dataset.key === "limit") saveSetting("limit", +e.target.value); });
+window.openSettings = openSettings;   // flows.html's Ctrl+, opens it too
+document.addEventListener("keydown", (e) => { if (e.key === "," && (e.ctrlKey || e.metaKey)) { e.preventDefault(); openSettings(); } });
 
 const lg = $("logo").getContext("2d");
 (function frame(ms) {

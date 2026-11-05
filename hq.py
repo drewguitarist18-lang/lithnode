@@ -31,6 +31,7 @@ import claude_code
 import engines
 import flows
 import office_feed
+import settings
 import updates
 
 HOST, PORT = "127.0.0.1", int(os.environ.get("LITHNODE_PORT", 8790))
@@ -418,8 +419,33 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"app": "lithnode"})
 
     def GET_api_version(self) -> None:
-        """This version and, now and then, whether GitHub has a newer one (?refresh=1 asks right away)."""
-        self.send_json(updates.status(force="refresh=1" in self.path))
+        """This version and, now and then, whether GitHub has a newer one (?refresh=1 asks right away).
+        With update checks turned off in Settings, only an asked-for check goes to GitHub."""
+        force = "refresh=1" in self.path
+        if not force and not settings.load(HQ_STORE.root)["check_updates"]:
+            return self.send_json({"version": updates.VERSION, "latest": "", "newer": False, "checked": 0, "off": True})
+        self.send_json(updates.status(force=force))
+
+    # -- settings ----------------------------------------------------------------
+    def GET_api_settings(self) -> None:
+        self.send_json({"settings": settings.load(HQ_STORE.root), "limits": settings.LIMITS,
+                        "version": updates.VERSION, "folder": str(HQ_STORE.root.resolve())})
+
+    def POST_api_settings(self) -> None:
+        self.send_json({"settings": settings.save(HQ_STORE.root, self.read_json())})
+
+    def POST_api_settings_open_folder(self) -> None:
+        """Show Lithnode's own folder (flows, runs, logs) in Explorer / Finder."""
+        folder = HQ_STORE.root.resolve()
+        folder.mkdir(parents=True, exist_ok=True)
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(folder))
+            else:
+                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(folder)])
+        except OSError as exc:
+            return self.send_json({"error": f"Couldn't open it: {exc}"}, 500)
+        self.send_json({"ok": True})
 
     def GET_api_connectors(self) -> None:
         """Connectors a team can be given (a free check, cached; ?refresh=1 checks again)."""
@@ -469,7 +495,8 @@ class Handler(BaseHTTPRequestHandler):
             flow = {"id": uuid.uuid4().hex[:12], "name": "New flow", "folder": "", "edges": [], "dir": "lr",
                     "nodes": [{"id": "master", "type": "master", "x": 60, "y": 220, "name": "Start", "mode": "pass"},
                               {"id": "done", "type": "done", "x": 600, "y": 220, "name": "Complete"}]}
-        flow = {**flows.clean_flow(flow), "id": flow["id"]}
+        prefs = settings.load(HQ_STORE.root)          # a new flow starts with the Settings window's defaults
+        flow = {**flows.clean_flow({**flow, "limit": prefs["limit"], "roles": prefs["roles"]}), "id": flow["id"]}
         HQ_STORE.save_flow(flow)
         self.send_json(self.flow_payload(flow))
 
