@@ -1,5 +1,5 @@
 ; Inno Setup script for LithnodeSetup.exe. Build everything with installer\build.ps1.
-#define AppVersion "0.1.0"
+#define AppVersion "0.1.22"
 
 [Setup]
 AppId={{8F3C2A51-6B7E-4E9D-9C1A-1E5B7D4C2A90}
