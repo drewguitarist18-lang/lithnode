@@ -35,7 +35,8 @@ Push-Location $appDir
 try {
     if (-not (Test-Path node_modules)) { npm ci --no-fund --no-audit; if ($LASTEXITCODE) { throw "npm ci failed" } }
     npx --no-install electron-packager . Lithnode --platform=win32 --arch=x64 "--out=$dist" --overwrite --asar `
-        --icon=lithnode.ico --app-copyright=Lithnode --win32metadata.ProductName=Lithnode --win32metadata.FileDescription=Lithnode `
+        --icon=lithnode.ico --app-copyright="MIT License" --win32metadata.ProductName=Lithnode --win32metadata.FileDescription=Lithnode `
+        --win32metadata.CompanyName=Lithnode "--app-version=$version" "--build-version=$version" `
         "--ignore=^/node_modules" "--ignore=^/package-lock.json"
     if ($LASTEXITCODE) { throw "Electron packaging failed" }
 } finally { Pop-Location }

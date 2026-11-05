@@ -156,5 +156,6 @@ jobs:
           - It runs on the Claude Code, Codex or Cursor plan you already have.
 
           Completely open source: read the code, build it yourself, do what you want with it.
+          [Code signing policy](https://lithnode.com/code-signing/)
           EOF
           gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --title "Lithnode $VERSION" --notes-file notes.md
