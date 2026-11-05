@@ -18,6 +18,10 @@ concurrency: download-alerts
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      # Empty until the Gmail secrets are added; the email step is skipped then, so the run doesn't fail.
+      NOTIFY_TO: ${{ secrets.NOTIFY_TO }}
+      GMAIL_USER: ${{ secrets.GMAIL_USER }}
     steps:
       - uses: actions/cache/restore@v4
         with:
@@ -39,6 +43,7 @@ jobs:
           fi
           cat new.txt
           if [ -s new.txt ]; then
+            cat new.txt >> "$GITHUB_STEP_SUMMARY"
             echo "found=1" >> "$GITHUB_OUTPUT"
             { echo "lines<<EOF"; cat new.txt; echo EOF; } >> "$GITHUB_OUTPUT"
           fi
@@ -46,7 +51,7 @@ jobs:
         with:
           path: counts.json
           key: dl-counts-${{ github.run_id }}
-      - if: steps.diff.outputs.found == '1'
+      - if: steps.diff.outputs.found == '1' && env.NOTIFY_TO != '' && env.GMAIL_USER != ''
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
