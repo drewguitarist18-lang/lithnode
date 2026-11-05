@@ -80,8 +80,28 @@ ipcMain.handle("pick-folder", async () => {
   return r.canceled || !r.filePaths.length ? "" : r.filePaths[0];
 });
 
+// Store installs have no installer to ask about Claude Pet, so the app asks once, on its first start
+async function askAboutPet() {
+  if (!process.windowsStore) return;
+  const fs = require("fs");
+  const asked = path.join(app.getPath("userData"), "asked-about-pet");
+  if (fs.existsSync(asked)) return;
+  const r = await dialog.showMessageBox({
+    type: "question", buttons: ["Add Claude Pet", "Not now"], defaultId: 0, cancelId: 1, title: "Lithnode",
+    message: "Add Claude Pet to the desktop?",
+    detail: "A little crab that shows what Claude Code is doing. It adds hooks to Claude Code's settings (~/.claude/settings.json).",
+  });
+  fs.mkdirSync(path.dirname(asked), { recursive: true });
+  fs.writeFileSync(asked, r.response === 0 ? "yes" : "no");
+  if (r.response === 0) {
+    const cli = path.join(path.dirname(SERVER), "lithnode-cli.exe");
+    await new Promise((resolve) => spawn(cli, ["install-pet"], { windowsHide: true, stdio: "ignore" }).on("exit", resolve).on("error", resolve));
+  }
+}
+
 app.whenReady().then(async () => {
   try {
+    await askAboutPet();
     await startEngine();
   } catch (e) {
     dialog.showErrorBox("Lithnode", `${e.message}\n\nTry reinstalling Lithnode from lithnode.com.`);

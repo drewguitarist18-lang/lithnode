@@ -20,7 +20,19 @@ PET_ASYNC = set(PET_EVENTS) - {"SessionStart", "SessionEnd"}   # Claude doesn't 
 SETTINGS = Path.home() / ".claude" / "settings.json"
 
 
+def _store():
+    """Installed from the Microsoft Store (an MSIX package): our files sit in a folder other programs can't run from."""
+    if os.name != "nt":
+        return False
+    import ctypes
+    length = ctypes.c_uint32(0)
+    # 15700 = APPMODEL_ERROR_NO_PACKAGE: a normal install; anything else (122, buffer too small) means packaged
+    return ctypes.windll.kernel32.GetCurrentPackageFullName(ctypes.byref(length), None) != 15700
+
+
 def _cli():
+    if _store():   # the package's lithnode-cli alias, which any program (Claude Code's hooks too) can run
+        return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "Microsoft" / "WindowsApps" / "lithnode-cli.exe"
     return Path(sys.executable).with_name("lithnode-cli" + (".exe" if os.name == "nt" else ""))
 
 
@@ -68,7 +80,8 @@ def install_pet():
     _strip(hooks, source_too=True)   # one pet only: the installed copy replaces a from-source one
     cli = _cli().as_posix()
     for event in PET_EVENTS:
-        hook = {"type": "command", "command": f'"{cli}" hook {event}'}
+        # a Store uninstall can't remove these hooks, and then the alias is gone: `|| true` keeps Claude Code quiet
+        hook = {"type": "command", "command": f'"{cli}" hook {event}' + (" || true" if _store() else "")}
         if event in PET_ASYNC:
             hook["async"] = True
         hooks.setdefault(event, []).append({"hooks": [hook]})
