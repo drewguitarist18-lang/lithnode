@@ -288,6 +288,46 @@ const cv = document.getElementById("cv");
 cv.width = W; cv.height = H;
 const gl = cv.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false, alpha: false });
 gl.getExtension("EXT_color_buffer_float");
+// The keyboard, a row at a time from the back: "legend*width" (in key units, 1 if left out), "|n" a gap n wide, "_" a blank cap
+const KEYS = [
+  "Esc |1 F1 F2 F3 F4 |.5 F5 F6 F7 F8 |.5 F9 F10 F11 F12 |.5 PrtSc ScrLk Pause",
+  "` 1 2 3 4 5 6 7 8 9 0 - = Backspace*2 |.5 Ins Home PgUp",
+  "Tab*1.5 Q W E R T Y U I O P [ ] \\*1.5 |.5 Del End PgDn",
+  "Caps*1.75 A S D F G H J K L ; ' Enter*2.25",
+  "Shift*2.25 Z X C V B N M , . / Shift*2.75 |1.5 ↑",
+  "Ctrl*1.25 Win*1.25 Alt*1.25 _*6.25 Alt*1.25 Fn*1.25 Menu*1.25 Ctrl*1.25 |.5 ← ↓ →",
+].map((r) => r.split(" ").map((s) => s[0] === "|" ? { w: -+s.slice(1) } : { l: s.replace(/\*[\d.]+$/, ""), w: +(/\*([\d.]+)$/.exec(s)?.[1] ?? 1) }));
+const KW_GLSL = KEYS.flatMap((r) => [...r.map((k) => k.w), ...Array(20 - r.length).fill(0)]).map((w) => w.toFixed(3)).join(",");
+const KB_PX = 64, KB_U = 1.905, KB_SIZE = [36.85, 13.5];   // texels per cm; a key unit; the keyboard's top, cm (KB1 - KB0 in the shader)
+// its tops as a texture: r the legends, g how polished the caps are (the home row, WASD, the space bar's middle), b each cap's own tint
+const kbCanvas = (() => {
+  const c = document.createElement("canvas"); c.width = Math.round(KB_SIZE[0] * KB_PX); c.height = Math.round(KB_SIZE[1] * KB_PX);
+  const g = c.getContext("2d"), P = KB_PX, SHIFT = { "`": "~", 1: "!", 2: "@", 3: "#", 4: "$", 5: "%", 6: "^", 7: "&", 8: "*", 9: "(", 0: ")",
+    "-": "_", "=": "+", "[": "{", "]": "}", "\\": "|", ";": ":", "'": "\"", ",": "<", ".": ">", "/": "?" };
+  const WORN = { A: .8, S: .9, D: .9, F: .7, J: .7, K: .6, L: .5, W: .9, E: .8, R: .5, T: .4, N: .4, O: .5, I: .5, H: .4, Backspace: .7, Enter: .6, Shift: .5, Ctrl: .5, _: .9 };
+  g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height); g.globalCompositeOperation = "lighter";
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  KEYS.forEach((row, ri) => {
+    const z0 = 0.75 + (ri === 0 ? 0 : KB_U * (0.25 + ri)); let x0 = 0.8;
+    for (const k of row) {
+      const w = Math.abs(k.w) * KB_U; if (k.w < 0) { x0 += w; continue; }
+      const L = x0 + 0.34, T = z0 + 0.34, cx = (x0 + w / 2) * P, cz = (z0 + KB_U / 2) * P;
+      g.fillStyle = `rgb(0,0,${Math.round(255 * rnd())})`; g.fillRect(x0 * P, z0 * P, w * P, KB_U * P);
+      const wv = WORN[k.l] ?? (/^[A-Z]$/.test(k.l) ? .25 : .1);   // a soft polished patch where the finger lands
+      g.save(); g.translate(cx, cz); g.scale(k.l === "_" ? 3.2 : Math.min(w / KB_U, 1.6), 1);
+      const gr = g.createRadialGradient(0, 0, 0, 0, 0, 0.62 * P); gr.addColorStop(0, `rgba(0,${Math.round(255 * wv)},0,1)`); gr.addColorStop(1, "rgba(0,0,0,1)");
+      g.fillStyle = gr; g.fillRect(-P, -P, 2 * P, 2 * P); g.restore();
+      g.fillStyle = "#f00"; g.textBaseline = "top"; g.textAlign = "left";
+      if (k.l === "_") {}
+      else if (SHIFT[k.l]) { g.font = `500 ${0.3 * P}px Arial`; g.fillText(SHIFT[k.l], L * P, T * P); g.fillText(k.l, L * P, (T + 0.55) * P); }
+      else if (/^[A-Z]$/.test(k.l)) { g.font = `500 ${0.4 * P}px Arial`; g.fillText(k.l, L * P, T * P); }
+      else if (/^[←↑↓→]$/.test(k.l)) { g.font = `${0.36 * P}px Arial`; g.textAlign = "center"; g.fillText(k.l, cx, (z0 + 0.62) * P); }
+      else { g.font = `500 ${(k.l.length > 3 ? 0.2 : 0.24) * P}px Arial`; g.fillText(k.l, L * P, T * P); }
+      x0 += w;
+    }
+  });
+  return c;
+})();
 const SCENE = `#version 300 es
 precision highp float;
 precision highp int;
@@ -306,7 +346,7 @@ const float SW = 59.8, SH = 33.6;              // the panel's active area, cm
 const float BS = 0.75, BT = 0.75, BB = 2.1;    // bezel: sides, top, chin
 const float BORDER = 0.42, DEPTH = 4.5;        // the panel's black mask inside the bezel; the body's depth
 const float PI = 3.14159265;
-const vec3 KB0 = vec3(-19.0, 0.0, 11.0), KB1 = vec3(17.0, 2.4, 24.5);
+const vec3 KB0 = vec3(-19.0, 0.0, 11.0), KB1 = vec3(17.85, 2.7, 24.5);
 const vec3 NECK0 = vec3(-3.6, 0.9, -11.0), NECK1 = vec3(3.6, 24.0, -6.5);
 const vec3 BASE0 = vec3(-12.5, 0.0, -19.0), BASE1 = vec3(12.5, 0.9, 3.5);
 const float WALL = -36.0, DESK_EDGE = 72.0, KU = 1.905;
@@ -327,14 +367,14 @@ const vec3 FRAME0[5] = vec3[5](vec3(-95.0, 17.0, GLASS), vec3(90.0, 17.0, GLASS)
 const vec3 FRAME1[5] = vec3[5](vec3(-90.0, 250.0, GLASS + 4.0), vec3(95.0, 250.0, GLASS + 4.0), vec3(-45.5, 250.0, GLASS + 4.0), vec3(50.5, 250.0, GLASS + 4.0), vec3(95.0, 22.0, GLASS + 4.0));
 const vec3 GLOW = vec3(0.0011, 0.0012, 0.0017);   // the city's light through the window, mostly onto what faces it
 #endif
-// a tenkeyless layout, row by row from the back: key widths in units, gaps negative
-const float KW[120] = float[120](
-  1.,-1.,1.,1.,1.,1.,-.5,1.,1.,1.,1.,-.5,1.,1.,1.,1.,-.5,1.,1.,1.,
-  1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,2.,-.5,1.,1.,1.,0.,0.,
-  1.5,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.5,-.5,1.,1.,1.,0.,0.,
-  1.75,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,2.25,0.,0.,0.,0.,0.,0.,0.,
-  2.25,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,2.75,-1.5,1.,0.,0.,0.,0.,0.,0.,
-  1.25,1.25,1.25,6.25,1.25,1.25,1.25,1.25,-.5,1.,1.,1.,0.,0.,0.,0.,0.,0.,0.,0.);
+// a tenkeyless layout, row by row from the back: key widths in units, gaps negative (from KEYS)
+const float KW[120] = float[120](${KW_GLSL});
+uniform sampler2D uKb;   // the caps' printed legends (r) and where years of typing have polished them (g), over the keyboard's top
+// The keyboard in cm: a low case with a rim round a sunken plate, and sculpted caps standing on it (an OEM-like profile: each row's
+// tops tilted its own way, each top dished, the sides tapering in, the corners rounded)
+const float KPLATE = 1.15, KRIM = 1.6, KSKIRT = 0.28, KGAP = 0.07, KTAPER = 0.27, KRAD = 0.17, KBPX = ${KB_PX}.0;
+const float ROWTOP[6] = float[6](2.42, 2.47, 2.37, 2.29, 2.32, 2.34);
+const float ROWTILT[6] = float[6](-0.16, -0.18, -0.1, 0.0, 0.08, 0.12);   // back of the top to its front, cm
 
 uint hashu(uint x) { x ^= x >> 16; x *= 0x7feb352dU; x ^= x >> 15; x *= 0x846ca68bU; x ^= x >> 16; return x; }
 float rnd(inout uint s) { s = hashu(s); return float(s) / 4294967296.0; }
@@ -350,6 +390,75 @@ bool box(vec3 ro, vec3 rd, vec3 lo, vec3 hi, out float t, out vec3 n) {
   if (tn > tf || tn <= 0.0) return false;
   n = tn == mn.x ? vec3(-sign(rd.x), 0.0, 0.0) : tn == mn.y ? vec3(0.0, -sign(rd.y), 0.0) : vec3(0.0, 0.0, -sign(rd.z));
   return true;
+}
+// The keyboard's surface: its height above the desk at k (cm from its back-left corner). m: 0 the case, 1 the plate, 2 a cap;
+// kc: where on that cap's top (0 to 1 across, back to front) and how high its top is there
+float kbH(vec2 k, out int m, out vec3 kc) {
+  vec2 S = KB1.xz - KB0.xz, e2 = min(k, S - k);
+  float e = min(e2.x, e2.y);
+  m = 0; kc = vec3(0.0);
+  float rim = KRIM - 0.3 + sqrt(max(0.09 - pow(max(0.3 - e, 0.0), 2.0), 0.0));   // the case's rim, its outer edge rounded over
+  if (e < 0.64) return mix(KPLATE, rim, smoothstep(0.64, 0.5, e));
+  m = 1;
+  float z = k.y - 0.75, rz; int row;
+  if (z < 0.0) return KPLATE;
+  if (z < KU) { row = 0; rz = z; }
+  else { z -= KU * 1.25; if (z < 0.0) return KPLATE; row = 1 + int(z / KU); if (row > 5) return KPLATE; rz = z - float(row - 1) * KU; }
+  float x = k.x - 0.8, xs = 0.0;
+  if (x < 0.0) return KPLATE;
+  for (int i = 0; i < 20; i++) {
+    float w = KW[row * 20 + i];
+    if (w == 0.0) break;
+    float aw = abs(w) * KU;
+    if (x < xs + aw) {
+      if (w < 0.0) return KPLATE;
+      vec2 c = vec2(x - xs - aw * 0.5, rz - KU * 0.5), hs = vec2(aw, KU) * 0.5 - KGAP * 0.5;   // from the key's centre; its base's half size
+      vec2 q = abs(c) - hs + KRAD;
+      float s = -(length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - KRAD) / KTAPER;   // 0 at the base's edge, 1 where the top begins
+      if (s <= 0.0) return KPLATE;
+      vec2 uv = c / (hs - KTAPER) * 0.5 + 0.5;
+      float dish = 0.055 * smoothstep(0.0, 0.55, hs.x - KTAPER - abs(c.x)) * (aw > 5.0 ? 0.25 : 1.0);   // the top's scoop, side to side
+      float top = ROWTOP[row] + ROWTILT[row] * (uv.y - 0.5) - dish;
+      m = 2; kc = vec3(uv, top);
+      return KPLATE + (top - KPLATE) * (s >= 1.0 ? 1.0 : 1.0 - pow(1.0 - s, 4.0));   // steep sides rolling over into the top
+    }
+    xs += aw;
+  }
+  return KPLATE;
+}
+float kbH(vec2 k) { int m; vec3 kc; return kbH(k, m, kc); }
+// the ray against that surface: into the keyboard's box, then marched over the keys, the crossing found by halving
+bool kbHit(vec3 ro, vec3 rd, float tmax, out float t, out vec3 n) {
+  vec3 inv = 1.0 / rd, t0 = (KB0 - ro) * inv, t1 = (KB1 - ro) * inv, mn = min(t0, t1), mx = max(t0, t1);
+  float tn = max(max(mn.x, mn.y), mn.z), tf = min(min(mx.x, mx.y), mx.z);
+  t = 0.0; n = vec3(0.0, 1.0, 0.0);
+  if (tn > tf || tf <= 0.0 || tn > tmax) return false;
+  tn = max(tn, 0.0);
+  vec3 p = ro + rd * tn;
+  if (p.y < kbH(p.xz - KB0.xz)) {   // through the case's side
+    t = tn; n = tn == mn.x ? vec3(-sign(rd.x), 0.0, 0.0) : vec3(0.0, 0.0, -sign(rd.z));
+    return t > 0.0;
+  }
+  float te = min(tf, tmax), dt = (te - tn) / 96.0, ta = tn;
+  for (int i = 1; i <= 96; i++) {
+    float tb = tn + dt * float(i);
+    vec3 q = ro + rd * tb;
+    if (q.y < 2.65 && q.y < kbH(q.xz - KB0.xz)) {
+      for (int j = 0; j < 7; j++) { float tm = 0.5 * (ta + tb); vec3 r = ro + rd * tm; if (r.y < kbH(r.xz - KB0.xz)) tb = tm; else ta = tm; }
+      t = tb; vec2 k = (ro + rd * t).xz - KB0.xz; const float E = 0.012;
+      n = normalize(vec3(kbH(k - vec2(E, 0.0)) - kbH(k + vec2(E, 0.0)), 2.0 * E, kbH(k - vec2(0.0, E)) - kbH(k + vec2(0.0, E))));
+      return true;
+    }
+    ta = tb;
+  }
+  return false;
+}
+float kbContact(vec3 p) {   // the desk darkens right up against the keyboard, where little light gets in
+#ifdef NOKB
+  return 1.0;
+#else
+  return mix(0.4, 1.0, smoothstep(0.0, 1.8, length(max(max(KB0.xz - p.xz, p.xz - KB1.xz), 0.0))));
+#endif
 }
 vec3 toLocal(vec3 v) { return vec3(dot(v, uMr), dot(v, uMu), dot(v, uMn)); }
 bool monitorBox(vec3 ro, vec3 rd, out float t, out vec3 n) {   // in the monitor's own frame
@@ -372,7 +481,7 @@ int trace(vec3 ro, vec3 rd, out float tt, out vec3 n, out vec3 lp) {
   if (box(ro, rd, NECK0, NECK1, t, nn) && t < tt) { tt = t; n = nn; id = 3; }
   if (box(ro, rd, BASE0, BASE1, t, nn) && t < tt) { tt = t; n = nn; id = 4; }
 #ifndef NOKB
-  if (box(ro, rd, KB0, KB1, t, nn) && t < tt) { tt = t; n = nn; id = 7; }
+  if (kbHit(ro, rd, tt, t, nn)) { tt = t; n = nn; id = 7; }
 #endif
 #ifdef CITY
   if (box(ro, rd, BOARD0, BOARD1, t, nn) && t < tt) { tt = t; n = nn; id = 11; }
@@ -470,29 +579,29 @@ vec3 screenAt(vec3 lp, vec3 rd, vec2 fp) {
   float glow = 0.012 * pow(1.0 - cosv, 1.3) + 0.0022 * exp(-e.y / 1.8) * (0.4 + fbm(lp.xy * 0.25)) + 0.0012 * exp(-e.x / 2.5);   // IPS glow and backlight bleed
   return (c + vec3(0.82, 0.88, 1.0) * glow) * uBright;
 }
-// 0 between the keys, 0.6 on a cap's sides, 1 on its top; k is cm from the keyboard's back-left corner, b the blur in cm
-float keycap(vec2 k, float b) {
-  float z = k.y - 0.75, rz; int row;
-  if (z < 0.0) return 0.0;
-  if (z < KU) { row = 0; rz = z; }
-  else { z -= KU * 1.25; if (z < 0.0) return 0.0; row = 1 + int(z / KU); rz = z - float(row - 1) * KU; if (row > 5) return 0.0; }
-  float x = k.x - 0.8, xs = 0.0;
-  for (int i = 0; i < 20; i++) {
-    float w = KW[row * 20 + i];
-    if (w == 0.0) break;
-    float aw = abs(w) * KU;
-    if (x < xs + aw) {
-      if (w < 0.0 || x < 0.0) return 0.0;
-      vec2 c = vec2(x - xs, rz), sz = vec2(aw, KU);
-      float bb = max(b, 0.05);
-      vec2 d1 = min(c, sz - c);
-      float side = smoothstep(0.03, 0.03 + bb, min(d1.x, d1.y));
-      float top = smoothstep(0.26, 0.26 + bb, min(min(c.x, sz.x - c.x), min(c.y - 0.12, sz.y - 0.45 - c.y)));
-      return side * mix(0.6, 1.0, top);
-    }
-    xs += aw;
-  }
-  return 0.0;
+// the keyboard lit: caps of capC with legends of legC printed on their tops, the plate and the case; gloss is how much the caps
+// shine, more where fingers have polished them. Down between the caps, little of the room's light gets in
+vec3 keyboard(vec3 p, vec3 n, vec3 d, float t, inout uint seed, vec3 capC, vec3 legC, vec3 plateC, vec3 caseC, float gloss) {
+  int m; vec3 kc; vec2 k = p.xz - KB0.xz;
+  float h = kbH(k, m, kc);
+  if (abs(n.y) < 0.05 && h < KRIM) m = 0;   // the case's sides
+  float fp = (2.0 * uAp * abs(1.0 - t / uFocus) + t / uF) * KBPX;   // how many texels one sample's blur covers
+  vec4 tx = textureLod(uKb, k / (KB1.xz - KB0.xz), log2(max(fp, 1.0)));
+  vec3 alb = caseC; float ao = 1.0, sh = 0.25;
+  if (m == 2) {
+    float onTop = smoothstep(0.86, 0.97, (h - KPLATE) / (kc.z - KPLATE));
+    alb = mix(capC * (0.9 + 0.2 * tx.b) * (0.94 + 0.12 * fbm(p.xz * 3.1)), legC, tx.r * onTop);
+    ao = mix(0.25, 1.0, smoothstep(KPLATE, kc.z, h));
+    sh = mix(0.35, 1.0, onTop);
+  } else if (m == 1) { alb = plateC; ao = 0.2; sh = 0.1; }
+  vec3 l, le = lampLight(p, n, seed, l);
+  vec3 e = (screenLight(p, n) * LIFT + bounce(p, n) + AMBIENT) * ao + le * mix(1.0, ao, 0.6);
+#ifdef CITY
+  e += GLOW * (0.5 + 0.5 * max(-n.z, 0.0)) * ao;
+#endif
+  float fres = 0.04 + 0.96 * pow(1.0 - clamp(-dot(d, n), 0.0, 1.0), 5.0), g = gloss * sh * (0.35 + 1.65 * tx.g);
+  vec3 r = reflect(d, n);
+  return alb * e + (reflScreen(p, r, mix(6.5, 4.0, tx.g)) * fres * g + le * fres * g * 6.0 * pow(max(dot(n, normalize(l - d)), 0.0), mix(18.0, 50.0, tx.g))) * ao;
 }
 
 #ifdef CITY
@@ -590,17 +699,15 @@ vec3 radiance(vec3 o, vec3 d, vec2 fp, inout uint seed) {
 #ifdef CITY
   if (id == 5) {   // light oak, its grain along the desk, in a satin finish that catches the panel
     vec3 oak = vec3(0.34, 0.235, 0.145) * (0.78 + 0.44 * fbm(p.xz * vec2(0.045, 0.9)));
-    return lit(p, n, oak, seed) + reflScreen(p, reflect(d, n), 5.0) * 0.025;
+    return lit(p, n, oak, seed) * kbContact(p) + reflScreen(p, reflect(d, n), 5.0) * 0.025;
   }
   if (id == 6) return lit(p, n, vec3(0.42, 0.42, 0.43) * (0.95 + 0.1 * fbm(p.xy * 0.05)), seed);
-  if (id == 7) {   // a white keyboard (DARKKB: graphite, caps faintly catching the screen)
+  if (id == 7) {   // a white keyboard with grey legends (DARKKB: graphite caps, pale legends, catching the screen)
 #ifdef DARKKB
-    float cap = keycap(p.xz - KB0.xz, 2.0 * uAp * abs(1.0 - t / uFocus) + t / uF);
-    if (n.y > 0.5) return lit(p, n, vec3(mix(0.006, 0.04, cap) * (0.85 + 0.3 * fbm(p.xz * 2.3))), seed) + reflScreen(p, reflect(d, n), 6.0) * 0.012 * cap;
-    return lit(p, n, vec3(0.018), seed);
+    return keyboard(p, n, d, t, seed, vec3(0.03, 0.03, 0.033), vec3(0.32, 0.32, 0.31), vec3(0.008), vec3(0.022), 0.6);
+#else
+    return keyboard(p, n, d, t, seed, vec3(0.56, 0.555, 0.54), vec3(0.07), vec3(0.3), vec3(0.5), 0.15);
 #endif
-    if (n.y > 0.5) return lit(p, n, vec3(mix(0.1, 0.5, keycap(p.xz - KB0.xz, 2.0 * uAp * abs(1.0 - t / uFocus) + t / uF))), seed);
-    return lit(p, n, vec3(0.42), seed);
   }
   if (id == 9) return glassView(p, d, seed);
   if (id == 10) return lit(p, n, vec3(0.02), seed);              // the frame, black aluminium
@@ -611,17 +718,14 @@ vec3 radiance(vec3 o, vec3 d, vec2 fp, inout uint seed) {
     float mat = step(abs(q.x), 42.0) * step(-6.0, q.y) * step(q.y, 40.0);
     vec3 wood = vec3(0.075, 0.045, 0.028) * (0.7 + 0.6 * fbm(q * vec2(0.08, 1.4)));
     vec3 felt = vec3(0.032, 0.033, 0.036) * (0.85 + 0.3 * fbm(q * 3.0));
-    return lit(p, n, mix(wood, felt, mat), seed);
+    return lit(p, n, mix(wood, felt, mat), seed) * kbContact(p);
   }
 #ifdef NIGHT
   if (id == 6) return lit(p, n, vec3(0.10, 0.16, 0.14) * (0.92 + 0.16 * fbm(p.xy * 0.05)), seed);   // painted deep green
 #else
   if (id == 6) return lit(p, n, vec3(0.30, 0.29, 0.27) * (0.92 + 0.16 * fbm(p.xy * 0.05)), seed);
 #endif
-  if (id == 7) {
-    if (n.y > 0.5) return lit(p, n, vec3(mix(0.01, 0.055, keycap(p.xz - KB0.xz, 2.0 * uAp * abs(1.0 - t / uFocus) + t / uF))), seed);
-    return lit(p, n, vec3(0.025), seed);
-  }
+  if (id == 7) return keyboard(p, n, d, t, seed, vec3(0.04, 0.04, 0.043), vec3(0.24), vec3(0.01), vec3(0.025), 0.5);
 #endif
   if (id == 8) {   // a leaf: deep green, paler zigzag bands across it, a yellow rim and a waxy shine; the lamp glows through it a little from behind
     int i = int(lp.z + 0.5); float x = lp.x / max(leafWidth(lp.y), 1e-3);   // -1 to 1, edge to edge
@@ -671,6 +775,11 @@ const defines = (room) => (room === "desk" ? "" : `#define ${room.toUpperCase()}
 const scene = (room) => scenes[room] ??= compile(gl, SCENE.replace("\n", "\n" + defines(room)));
 gl.bindVertexArray(gl.createVertexArray());
 const scrTex = texture(gl, gl.SRGB8_ALPHA8, 1920, 1080), hdrTex = texture(gl, gl.RGBA16F, W, H);
+const kbTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, kbTex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, kbCanvas); gl.generateMipmap(gl.TEXTURE_2D);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 const fbo = gl.createFramebuffer();
 gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, hdrTex, 0);
@@ -678,6 +787,7 @@ gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, hdr
 function clipAt(t) { let i = 0; while (i < CLIPS.length - 1 && t >= CLIPS[i + 1].t0) i++; return CLIPS[i]; }
 // the take (or photo) at its own time ct, in that room; passes adds up that many, for a photo with less noise in its blur
 function draw(clip, ct, frame, focal = FOCAL, grain = 1, room = "desk", passes = 1) {
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, kbTex);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, scrTex);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, scr); gl.generateMipmap(gl.TEXTURE_2D);
   const poses = Array.from({ length: 6 }, (_, k) => camAt(clip, ct - SHUT / 2 + k / 5 * (SHUT + READ)));
@@ -685,6 +795,7 @@ function draw(clip, ct, frame, focal = FOCAL, grain = 1, room = "desk", passes =
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, W, H);
   const { p, u } = scene(room); gl.useProgram(p);
   gl.uniform1i(u.uScr, 0); gl.uniform2f(u.uRes, W, H);
+  if (u.uKb) gl.uniform1i(u.uKb, 2);
   gl.uniform3fv(u.uP, poses.flatMap((c) => c.p)); gl.uniform3fv(u.uRr, poses.flatMap((c) => c.r));
   gl.uniform3fv(u.uRu, poses.flatMap((c) => c.u)); gl.uniform3fv(u.uRf, poses.flatMap((c) => c.f));
   gl.uniform1f(u.uF, focal); gl.uniform1f(u.uFocus, toScreen(af.p, af.f)); gl.uniform1f(u.uAp, ROOMS[room].ap);

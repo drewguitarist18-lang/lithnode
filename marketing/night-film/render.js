@@ -39,7 +39,8 @@ const VERT = VERSUS || PHONE || GYM || STILLS || process.argv.includes("--vertic
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const page = CARDS ? "cards.html" : STILLS ? `phone.html?set=${STILLS}` : HERO ? "hero.html" : GYM ? "gym.html" : PHONE ? `phone.html${JOBS ? "?job=jobs" : COMMUTE ? "?set=commute" : ""}` : VERSUS ? `versus.html?${ADS ? "job=ads" : ""}` : `film.html?${VERT ? "v=1&" : ""}${HOOK ? "hook=1" : ""}`;
   const url = `http://127.0.0.1:${server.address().port}/marketing/night-film/${page}`;
-  const b = await puppeteer.launch({ executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", headless: "new", protocolTimeout: 600000,
+  // BROWSER picks another Chromium (e.g. Chrome, when headless Edge won't start); pipe instead of a port, which both accept
+  const b = await puppeteer.launch({ executablePath: process.env.BROWSER || "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", headless: "new", pipe: true, protocolTimeout: 600000,
     args: ["--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"] });
   const p = await b.newPage();
   await p.setViewport({ width: VW, height: VH });
