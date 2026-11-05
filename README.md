@@ -138,7 +138,8 @@ A team with connectors can change things in those apps for real, so the Run menu
    ```
 2. Then either:
    - **Windows:** download the installer from [lithnode.com](https://lithnode.com). It's a standalone app, with
-     Claude Pet as an optional extra.
+     Claude Pet as an optional extra. It isn't code-signed yet (that costs money), so Windows may say it
+     protected your PC: click *More info*, then *Run anyway*. Scan it with any antivirus first if you like.
    - **Mac (Apple silicon):** download `Lithnode-mac-arm64.dmg` from the
      [latest release](https://github.com/drewguitarist18-lang/lithnode/releases/latest) and drag Lithnode to
      Applications. It isn't notarized yet, so the first time open *System Settings → Privacy & Security* and click

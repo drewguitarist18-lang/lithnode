@@ -128,5 +128,14 @@ jobs:
           # lithnode.com's link to the latest release always has one
           gh release download --repo "$GITHUB_REPOSITORY" --pattern LithnodeSetup.exe --dir out || true
           ls -la out
-          gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --title "Lithnode $VERSION" \
-            --notes "Linux: Lithnode.flatpak (any distro). Mac: the .dmg (Apple silicon). Windows: LithnodeSetup.exe."
+          cat > notes.md <<'EOF'
+          **Windows:** LithnodeSetup.exe · **Mac:** Lithnode-mac-arm64.dmg (Apple silicon) · **Linux:** Lithnode.flatpak (any distro)
+
+          **Before you install**
+          - Lithnode isn't code-signed yet (that costs money), so Windows may say "Windows protected your PC". Click **More info**, then **Run anyway**. Feel free to scan the file with any antivirus first.
+          - On a Mac, the first open is blocked too: open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+          - It runs on the Claude Code, Codex or Cursor plan you already have.
+
+          Completely open source: read the code, build it yourself, do what you want with it.
+          EOF
+          gh release create "v$VERSION" out/* --repo "$GITHUB_REPOSITORY" --title "Lithnode $VERSION" --notes-file notes.md
