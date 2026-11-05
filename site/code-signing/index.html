@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code signing policy · Lithnode</title>
+<meta name="description" content="How Lithnode's downloads are built and signed, who can release them, and what the app sends over the network.">
+<link rel="canonical" href="https://lithnode.com/code-signing/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<meta name="theme-color" content="#08080a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@700&family=Geist:wght@600&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+  :root { --void: #08080a; --ink: #ecebe6; --soft: #b1b0aa; --faint: #74736e; --edge: rgba(236, 235, 230, .13);
+          --glass: rgba(236, 235, 230, .045); --green: #79c47f; --amber: #e6b450;
+          --mono: "Geist Mono", ui-monospace, Menlo, Consolas, monospace; --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+          --pixel: "Pixelify Sans", "Geist Mono", monospace; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--void); }
+  body { color: var(--ink); font: 430 15px/1.7 var(--mono); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-underline-offset: 3px; }
+  a:hover { color: #fff; }
+  .wrap { width: min(760px, 100% - 32px); margin-inline: auto; }
+  nav { display: flex; align-items: center; height: 72px; gap: 16px; }
+  .brand { font: 700 15px var(--pixel); text-decoration: none; letter-spacing: .02em; }
+  nav .back { margin-left: auto; color: var(--soft); font-size: 13.5px; text-decoration: none; }
+  h1 { font: 600 clamp(32px, 6vw, 52px)/1.05 var(--sans); letter-spacing: -.03em; margin: 40px 0 14px; }
+  .lead { color: var(--soft); margin: 0 0 26px; }
+  .status { display: flex; gap: 12px; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--edge); background: var(--glass); margin-bottom: 34px; }
+  .status i { flex: none; width: 8px; height: 8px; margin-top: 9px; border-radius: 50%; background: var(--amber); }
+  .status p { margin: 0; color: var(--soft); }
+  .status b { color: var(--ink); font-weight: 600; }
+  h2 { font: 600 21px/1.3 var(--sans); letter-spacing: -.015em; margin: 40px 0 10px; }
+  p, li { color: var(--soft); }
+  b, strong { color: var(--ink); font-weight: 600; }
+  ul { padding-left: 20px; margin: 0 0 14px; }
+  li { margin: 6px 0; }
+  .quote { margin: 14px 0; padding: 14px 18px; border-left: 2px solid var(--green); background: var(--glass); border-radius: 0 12px 12px 0; color: var(--ink); }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--edge); }
+  th { color: var(--ink); font-weight: 600; white-space: nowrap; width: 34%; }
+  td { color: var(--soft); }
+  footer { margin: 60px 0 40px; padding-top: 20px; border-top: 1px solid var(--edge); color: var(--faint); font-size: 13px; }
+  @media (max-width: 560px) { th { white-space: normal; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="/">lithnode</a><a class="back" href="/#download">← Download</a></nav>
+
+<main>
+  <h1>Code signing policy</h1>
+  <p class="lead">How Lithnode's downloads are built and signed, who can release them, and what the app sends over the network.</p>
+
+  <div class="status"><i></i><p><b>Not signed yet.</b> Lithnode is applying to SignPath Foundation for free code signing of the Windows installer.
+    Until that's approved, Windows may say it protected your PC: click <b>More info</b>, then <b>Run anyway</b>.
+    This page will say when signed releases start.</p></div>
+
+  <h2>Signing</h2>
+  <p>Once approved, Windows releases are signed under this arrangement:</p>
+  <p class="quote">Free code signing provided by <a href="https://signpath.io" target="_blank" rel="noopener">SignPath.io</a>, certificate by <a href="https://signpath.org" target="_blank" rel="noopener">SignPath Foundation</a>.</p>
+  <p>That means the publisher shown on the installer is <b>SignPath Foundation</b>, and a signature proves the file was built automatically
+    from the public source code, not on someone's own computer.</p>
+
+  <h2>How a release is built</h2>
+  <ul>
+    <li>Every release is built by <a href="https://github.com/drewguitarist18-lang/lithnode/blob/main/.github/workflows/build.yml" target="_blank" rel="noopener">GitHub Actions</a>
+      from the <a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">lithnode repository</a> on GitHub, on GitHub's own machines.</li>
+    <li>The Windows installer also includes <a href="https://github.com/drewguitarist18-lang/claude-pet" target="_blank" rel="noopener">Claude Pet</a>,
+      by the same maintainer, also MIT licensed, built from its public repository in the same run.</li>
+    <li>Before anything is published, each build runs a whole flow through the built app to check it works.</li>
+    <li>Every signing request is approved by hand, one release at a time.</li>
+  </ul>
+
+  <h2>Team roles</h2>
+  <table>
+    <tr><th>Committers and reviewers</th><td><a href="https://github.com/drewguitarist18-lang" target="_blank" rel="noopener">drewguitarist18-lang</a>, the maintainer and owner of both repositories.
+      Changes from anyone else come in as pull requests and are reviewed by the maintainer before they're merged.</td></tr>
+    <tr><th>Approvers</th><td><a href="https://github.com/drewguitarist18-lang" target="_blank" rel="noopener">drewguitarist18-lang</a></td></tr>
+  </table>
+  <p>Everyone with these roles uses two-factor sign-in on GitHub and SignPath.</p>
+
+  <h2>Privacy</h2>
+  <p class="quote">This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.</p>
+  <p>The only network traffic Lithnode makes is what you set up:</p>
+  <ul>
+    <li><b>Your engines.</b> Lithnode runs Claude Code, Codex or Cursor, whichever you've installed and signed in to. They talk to Anthropic, OpenAI or Cursor
+      under those companies' own privacy policies, exactly as when you run them yourself.</li>
+    <li><b>Update check.</b> Every few hours Lithnode asks GitHub's public releases page whether there's a newer version. It sends nothing about you.
+      Turn it off in <b>File → Settings</b>.</li>
+    <li><b>Things you add.</b> Webhooks, connectors and the web tools you give a team only send what that team produces, to where you pointed them.</li>
+  </ul>
+  <p>The app has no analytics or tracking. Your flows, runs and logs stay in the Lithnode folder on your computer.</p>
+
+  <h2>Changes to your system</h2>
+  <ul>
+    <li>The Windows installer installs for your user only (no admin rights) into <code>%LOCALAPPDATA%\Programs\Lithnode</code>.</li>
+    <li>Claude Pet is optional, with its own checkbox in the installer. If you keep it, it adds hooks to Claude Code's settings
+      (<code>~/.claude/settings.json</code>) so the pet can show what Claude is doing.</li>
+  </ul>
+
+  <h2>Uninstalling</h2>
+  <p>Windows: <b>Settings → Apps → Installed apps → Lithnode → Uninstall</b>. That removes the app and Claude Pet's hooks.
+    Your flows and past runs stay in <code>~/.lithnode</code>; delete that folder to remove them too.
+    Mac: drag Lithnode from Applications to the Trash. Linux: <code>flatpak uninstall com.lithnode.Lithnode</code>.</p>
+</main>
+
+<footer>Lithnode is free and open source under the MIT license. <a href="https://github.com/drewguitarist18-lang/lithnode/issues" target="_blank" rel="noopener">Report a problem</a>.</footer>
+</div>
+</body>
+</html>
