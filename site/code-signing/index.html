@@ -54,14 +54,15 @@
   <h1>Code signing policy</h1>
   <p class="lead">How Lithnode's downloads are built and signed, who can release them, and what the app sends over the network.</p>
 
-  <div class="status"><i></i><p><b>Not signed yet.</b> Lithnode is applying to SignPath Foundation for free code signing of the Windows installer.
-    Until that's approved, Windows may say it protected your PC: click <b>More info</b>, then <b>Run anyway</b>.
+  <div class="status"><i></i><p><b>Not signed yet.</b> Lithnode's Windows installer isn't code-signed. SignPath Foundation, which signs open-source projects for free,
+    said the project is too new for now, so Lithnode will apply again as it grows.
+    Until then, Windows may say it protected your PC: click <b>More info</b>, then <b>Run anyway</b>. Every installer is built in public by GitHub Actions (below).
     This page will say when signed releases start.</p></div>
 
   <h2>Signing</h2>
-  <p>Once approved, Windows releases are signed under this arrangement:</p>
+  <p>Once SignPath Foundation approves the project, Windows releases will be signed under this arrangement:</p>
   <p class="quote">Free code signing provided by <a href="https://signpath.io" target="_blank" rel="noopener">SignPath.io</a>, certificate by <a href="https://signpath.org" target="_blank" rel="noopener">SignPath Foundation</a>.</p>
-  <p>That means the publisher shown on the installer is <b>SignPath Foundation</b>, and a signature proves the file was built automatically
+  <p>That means the publisher shown on the installer will be <b>SignPath Foundation</b>, and a signature proves the file was built automatically
     from the public source code, not on someone's own computer.</p>
 
   <h2>How a release is built</h2>
@@ -80,7 +81,7 @@
       Changes from anyone else come in as pull requests and are reviewed by the maintainer before they're merged.</td></tr>
     <tr><th>Approvers</th><td><a href="https://github.com/drewguitarist18-lang" target="_blank" rel="noopener">drewguitarist18-lang</a></td></tr>
   </table>
-  <p>Everyone with these roles uses two-factor sign-in on GitHub and SignPath.</p>
+  <p>Everyone with these roles uses two-factor sign-in on GitHub.</p>
 
   <h2>Privacy</h2>
   <p class="quote">This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.</p>
