@@ -35,9 +35,7 @@
 // a phone or tablet can't run Lithnode, so it gets "Send me the link" in place of a download (set here, before the first paint)
 if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) || (navigator.userAgentData && navigator.userAgentData.mobile)) document.documentElement.classList.add("phone");
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/fonts/fonts.css">
 <style>
   /* Space, black and white. One accent: white. One radius: 14px soft glass. */
   :root {
@@ -605,6 +603,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
       <a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a>
       <a href="https://github.com/drewguitarist18-lang/lithnode/releases" target="_blank" rel="noopener">Releases</a>
       <a href="https://shop.lithnode.com">Team shop</a>
+      <a href="https://lithnode.com/privacy">Privacy</a>
       <a href="https://discord.gg/5mU7XXSMVA" target="_blank" rel="noopener">Discord</a>
       <a href="https://pet.lithnode.com" target="_blank" rel="noopener">Claude Pet</a>
       <a href="https://ko-fi.com/lithnode" target="_blank" rel="noopener">Tip jar</a>
@@ -1081,15 +1080,8 @@ aimPointer(); addEventListener("resize", aimPointer);
 const io = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } }), { threshold: .12 });
 document.querySelectorAll(".rv").forEach((el, i) => { el.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(el); });
 </script>
-<!-- Ko-fi tip button, bottom corner -->
-<script src="https://storage.ko-fi.com/cdn/scripts/overlay-widget.js"></script>
-<script>
-  kofiWidgetOverlay.draw('lithnode', {
-    'type': 'floating-chat',
-    'floating-chat.donateButton.text': 'Support me',
-    'floating-chat.donateButton.background-color': '#323842',
-    'floating-chat.donateButton.text-color': '#fff'
-  });
-</script>
+<!-- Tip button, bottom corner. A plain link: nothing loads from Ko-fi until someone clicks it. -->
+<style>.kofi{position:fixed;left:16px;bottom:16px;z-index:60;display:inline-flex;align-items:center;gap:8px;padding:10px 16px 10px 12px;border-radius:999px;background:#323842;color:#fff;font:600 14px/1 "Geist",system-ui,sans-serif;text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,.35);transition:transform .15s}.kofi:hover{transform:translateY(-2px)}.kofi svg{width:18px;height:18px;color:#ff5e5b}@media print{.kofi{display:none}}</style>
+<a class="kofi" href="https://ko-fi.com/lithnode" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg>Support me</a>
 </body>
 </html>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · Lithnode</title>
+<meta name="description" content="What lithnode.com, pet.lithnode.com, Lithnode and Claude Pet collect: almost nothing, and never your IP address or a cookie.">
+<link rel="canonical" href="https://lithnode.com/privacy/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<meta name="theme-color" content="#08080a">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<style>
+  :root { --void: #08080a; --ink: #ecebe6; --soft: #b1b0aa; --faint: #74736e; --edge: rgba(236, 235, 230, .13);
+          --glass: rgba(236, 235, 230, .045); --green: #79c47f;
+          --mono: "Geist Mono", ui-monospace, Menlo, Consolas, monospace; --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+          --pixel: "Pixelify Sans", "Geist Mono", monospace; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--void); }
+  body { color: var(--ink); font: 430 15px/1.7 var(--mono); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-underline-offset: 3px; }
+  a:hover { color: #fff; }
+  .wrap { width: min(760px, 100% - 32px); margin-inline: auto; }
+  nav { display: flex; align-items: center; height: 72px; gap: 16px; }
+  .brand { font: 700 15px var(--pixel); text-decoration: none; letter-spacing: .02em; }
+  nav .back { margin-left: auto; color: var(--soft); font-size: 13.5px; text-decoration: none; }
+  h1 { font: 600 clamp(32px, 6vw, 52px)/1.05 var(--sans); letter-spacing: -.03em; margin: 40px 0 14px; }
+  .lead { color: var(--soft); margin: 0 0 26px; }
+  .status { display: flex; gap: 12px; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--edge); background: var(--glass); margin-bottom: 34px; }
+  .status i { flex: none; width: 8px; height: 8px; margin-top: 9px; border-radius: 50%; background: var(--green); }
+  .status p { margin: 0; color: var(--soft); }
+  h2 { font: 600 21px/1.3 var(--sans); letter-spacing: -.015em; margin: 40px 0 10px; }
+  p, li { color: var(--soft); }
+  b, strong { color: var(--ink); font-weight: 600; }
+  ul { padding-left: 20px; margin: 0 0 14px; }
+  li { margin: 6px 0; }
+  footer { margin: 60px 0 40px; padding-top: 20px; border-top: 1px solid var(--edge); color: var(--faint); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><a class="brand" href="/">lithnode</a><a class="back" href="/">← lithnode.com</a></nav>
+
+<main>
+  <h1>Privacy</h1>
+  <p class="lead">This covers lithnode.com, pet.lithnode.com, the Lithnode app and the Claude Pet app. Last updated November 7, 2026.</p>
+
+  <div class="status"><i></i><p><b>The short version:</b> no accounts, no cookies, no ads, no tracking across sites, and your IP address is never stored.
+    Lithnode and Claude Pet run on your own computer, and your work never goes through our servers.</p></div>
+
+  <h2>The websites</h2>
+  <ul>
+    <li><b>Visit counts.</b> lithnode.com uses Vercel Web Analytics, which counts page views without cookies and without storing your IP address.</li>
+    <li><b>Download counts.</b> When you click a download button, the site records the day, which OS you picked and which site sent you (for example, "tiktok.com"). Nothing that identifies you.</li>
+    <li><b>Fonts are hosted here.</b> The sites load nothing from Google or other font services.</li>
+    <li><b>Tips.</b> The "Support me" button is a plain link to Ko-fi. Nothing loads from Ko-fi until you click it, and anything you do there is under <a href="https://more.ko-fi.com/privacy" target="_blank" rel="noopener">Ko-fi's privacy policy</a>.</li>
+    <li><b>No session recording.</b> The sites don't record clicks, scrolling or typing.</li>
+    <li><b>No email list.</b> The sites never ask for your email, and we don't send marketing emails.</li>
+  </ul>
+
+  <h2>The Lithnode app</h2>
+  <ul>
+    <li><b>One install count per version.</b> The first time a new version starts, it tells lithnode.com "install" or "update", plus the version number and OS. No ID, nothing about you. Turn it off in Settings (<i>Count my install</i>).</li>
+    <li><b>Your work stays on your computer.</b> Every agent is a real Claude Code (or Codex or Cursor) session on your own sign-in. Lithnode never sees your sign-in, and your prompts, files and results go only between your computer and the AI provider you already use, under that provider's terms.</li>
+    <li><b>Webhooks are yours.</b> If you add a webhook to an approval step, Lithnode sends the flow name and message to the URL you enter, and nowhere else.</li>
+  </ul>
+
+  <h2>The Claude Pet app</h2>
+  <ul>
+    <li><b>No network requests.</b> Claude Pet reads the hook events Claude Code passes it on your computer, keeps a few small files in <code>~/.claude-pet</code>, and sends nothing anywhere.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>These are developer tools, not made for children. They're not directed at anyone under 13, and we don't knowingly collect anything from children. Since nothing here collects personal information in the first place, there's nothing to delete. If you think a child sent us something, tell us and we'll remove it.</p>
+
+  <h2>Selling or sharing data</h2>
+  <p>We don't sell or share personal information, because we don't collect any. The only services involved are Vercel (which hosts the sites) and GitHub (which hosts the downloads), and each sees the ordinary web requests needed to serve a page or a file.</p>
+
+  <h2>Changes and contact</h2>
+  <p>If this changes, this page will say so and update the date above. Questions or requests: open an issue on <a href="https://github.com/drewguitarist18-lang/lithnode/issues" target="_blank" rel="noopener">GitHub</a> or ask on <a href="https://discord.gg/5mU7XXSMVA" target="_blank" rel="noopener">Discord</a>.</p>
+</main>
+
+<footer>Lithnode and Claude Pet are free and open source under the MIT license. Not affiliated with or endorsed by Anthropic. <a href="/code-signing/">Code signing policy</a>.</footer>
+</div>
+</body>
+</html>
