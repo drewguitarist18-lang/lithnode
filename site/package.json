@@ -1,8 +1,9 @@
 {
   "name": "lithnode-site",
   "private": true,
-  "description": "lithnode.com: a static page, plus api/hit.js, which emails Drew on views and download clicks",
+  "description": "lithnode.com: a static page, plus api/: hit.js (emails Drew on views and download clicks, and counts the clicks), ping.js (the app's install ping) and stats.js (the private stats page)",
   "dependencies": {
-    "nodemailer": "6.9.16"
+    "nodemailer": "6.9.16",
+    "@vercel/blob": "2.8.2"
   }
 }

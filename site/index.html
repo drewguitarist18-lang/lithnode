@@ -747,18 +747,27 @@ const OS_ICON = {"win": "<svg class=\"os-i\" viewBox=\"0 0 24 24\" fill=\"curren
   if (os === "win" && !phone) document.querySelector(".src code").textContent = "git clone https://github.com/drewguitarist18-lang/lithnode; py lithnode/hq.py";
 })();
 
-// ---------------------------------------------------------------- a ping per visit, per download click and per "Send me the link" tap on a phone (api/hit.js emails Drew; it stores nothing)
+// ---------------------------------------------------------------- a ping per visit, per download click and per "Send me the link" tap on a phone
+// (api/hit.js counts download clicks and taps by day, OS and the site that sent the visitor; no IP, no cookie)
 // Open the site once with ?me and your own visits stop counting on that browser.
 (() => {
   let me = false;
   try { if (/[?&]me\b/.test(location.search)) localStorage.setItem("lithnode-me", "1"); me = localStorage.getItem("lithnode-me") === "1"; } catch (e) {}
   if (me || !/^(www\.)?lithnode\.com$/.test(location.hostname)) return;
   const hit = (d) => { try { navigator.sendBeacon("/api/hit", JSON.stringify(d)); } catch (e) {} };
+  // where this visit came from: the referring site's name, or the /tiktok link; kept for the visit so a later click carries it
+  let from = "";
+  try {
+    const ref = /^https?:\/\/([^/]+)/.exec(document.referrer || "");
+    from = sessionStorage.getItem("lithnode-from") || (location.pathname === "/tiktok" ? "tiktok"
+      : ref && !/lithnode\.com$/.test(ref[1]) ? ref[1].replace(/^www\./, "") : "direct");
+    sessionStorage.setItem("lithnode-from", from);
+  } catch (e) {}
   hit({ kind: "view", ref: document.referrer });
   document.addEventListener("click", (e) => {
-    if (e.target.closest("[data-send]")) return hit({ kind: "send" });
+    if (e.target.closest("[data-send]")) return hit({ kind: "send", from });
     const a = e.target.closest('a[href*="/releases/latest/download/"]');
-    if (a) hit({ kind: "download", os: a.dataset.os || (/\.dmg$/.test(a.href) ? "mac" : /\.flatpak$/.test(a.href) ? "linux" : "win") });
+    if (a) hit({ kind: "download", from, os: a.dataset.os || (/\.dmg$/.test(a.href) ? "mac" : /\.flatpak$/.test(a.href) ? "linux" : "win") });
   });
 })();
 

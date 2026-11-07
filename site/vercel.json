@@ -39,6 +39,10 @@
     {
       "src": "/tiktok",
       "dest": "/index.html"
+    },
+    {
+      "src": "/stats/?",
+      "dest": "/api/stats"
     }
   ]
 }

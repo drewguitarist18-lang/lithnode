@@ -1,8 +1,9 @@
-// Emails Drew when someone views lithnode.com, clicks a download button, or taps "Send me the link" on a phone.
-// Stores nothing: no IP, no cookie, no log.
-// The page sends {kind: "view" | "download" | "send", os} with sendBeacon. Bots, other sites' requests and floods are dropped.
-// Env (Vercel project settings): GMAIL_USER, GMAIL_APP_PASSWORD (a Google app password), NOTIFY_TO.
+// Emails Drew when someone views lithnode.com, clicks a download button, or taps "Send me the link" on a phone,
+// and counts the clicks and taps for the stats page (_count.js: the day, the OS and the site that sent them; no IP, no cookie).
+// The page sends {kind: "view" | "download" | "send", os, from} with sendBeacon. Bots, other sites' requests and floods are dropped.
+// Env (Vercel project settings): GMAIL_USER, GMAIL_APP_PASSWORD (a Google app password), NOTIFY_TO; BLOB_READ_WRITE_TOKEN for counting.
 const nodemailer = require("nodemailer");
+const { record } = require("./_count");
 
 const BOT = /bot|crawl|spider|slurp|preview|fetch|curl|wget|python|headless|lighthouse|vercel|monitor|facebookexternalhit|embedly|discord|telegram|whatsapp/i;
 const OS = { win: "Windows", mac: "Mac", linux: "Linux" };
@@ -20,6 +21,9 @@ module.exports = async (req, res) => {
   body = body || {};
   const kind = ["download", "send", "test"].includes(body.kind) ? body.kind : "view";
   const os = OS[body.os] || null;
+  const cameFrom = typeof body.from === "string" ? body.from : "";
+  if (kind === "download") await record("d", [body.os in OS ? body.os : "unknown", cameFrom]);
+  if (kind === "send") await record("s", ["phone", cameFrom]);
 
   const now = Date.now();
   while (sent.length && now - sent[0] > 3600e3) sent.shift();
