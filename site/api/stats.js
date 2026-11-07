@@ -1,5 +1,5 @@
-// lithnode.com/stats?key=... : Download clicks, "Send me the link" taps, installs and updates for the last 30 days.
-// Private: needs the STATS_KEY env var's value as ?key=. Only counts, nothing about anyone (see _count.js).
+// lithnode.com/stats : Download clicks, "Send me the link" taps, installs and updates for the last 30 days.
+// Private: asks for the STATS_KEY env var's value once, then a cookie remembers it. Only counts, nothing about anyone (see _count.js).
 const crypto = require("crypto");
 const { events, KINDS } = require("./_count");
 
@@ -24,7 +24,29 @@ const table = (title, rows, head) => rows.length
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Robots-Tag", "noindex");
-  if (!same(req.query.key, process.env.STATS_KEY)) return res.status(404).send("Not found");
+  // the key comes as ?key= (then it's remembered in a cookie for a year) or from that cookie; without it, a key box
+  const cookie = /(?:^|;\s*)stats_key=([^;]+)/.exec(req.headers.cookie || "");
+  const fromCookie = cookie ? decodeURIComponent(cookie[1]) : "";
+  if (same(req.query.key, process.env.STATS_KEY)) {
+    res.setHeader("Set-Cookie", `stats_key=${encodeURIComponent(req.query.key)}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Strict`);
+    res.setHeader("Location", "/stats");
+    return res.status(303).end();
+  }
+  if (!same(fromCookie, process.env.STATS_KEY)) {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.status(req.query.key ? 403 : 200).send(`<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Lithnode stats</title><style>
+:root{--bg:#0b0b0d;--fg:#ececf1;--dim:#8b8b96;--line:#24242b;--card:#141418}
+@media (prefers-color-scheme: light){:root{--bg:#fafafa;--fg:#111;--dim:#666;--line:#e3e3e8;--card:#fff}}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;padding:24px 16px}
+form{max-width:360px;margin:12vh auto 0;display:grid;gap:10px}h1{font-size:22px;margin:0}p{margin:0;color:var(--dim)}
+input,button{font:inherit;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+button{background:var(--fg);color:var(--bg);border:0;cursor:pointer}.bad{color:#e5484d}</style></head><body>
+<form method="get" action="/stats"><h1>Lithnode stats</h1><p>Enter the stats key. This browser remembers it for a year.</p>
+${req.query.key ? '<p class="bad">That key is wrong.</p>' : ""}
+<input name="key" type="password" autocomplete="current-password" aria-label="Stats key" placeholder="Stats key" autofocus required>
+<button type="submit">Open stats</button></form></body></html>`);
+  }
 
   const since = new Date(Date.now() - 29 * 864e5).toISOString().slice(0, 10);
   let all;

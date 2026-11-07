@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # the built apps' install ping (updates.ping_once) goes nowhere here, so test runs don't count as installs
+  LITHNODE_PING_URL: http://127.0.0.1:9/
+
 jobs:
   lint:
     runs-on: ubuntu-22.04
@@ -64,7 +68,7 @@ jobs:
         run: |
           flatpak install --user -y --noninteractive dist/Lithnode.flatpak
           dbus-run-session -- python3 packaging/check_installed.py \
-            '["flatpak", "run", "--share=network", "--command=/app/lithnode/server/lithnode-server", "com.lithnode.Lithnode"]'
+            '["flatpak", "run", "--share=network", "--env=LITHNODE_PING_URL=http://127.0.0.1:9/", "--command=/app/lithnode/server/lithnode-server", "com.lithnode.Lithnode"]'
       - name: Open the window and take a screenshot
         run: |
           sudo apt-get install -yq xvfb x11-apps imagemagick
