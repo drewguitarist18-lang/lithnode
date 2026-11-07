@@ -513,6 +513,7 @@ function renderSettings() {
     <div class="row"><div><b>Roles</b><small>Each team gets a role (think, build, run…) and the model set for that role.</small></div>${sw("roles", p.roles, "Roles for new flows")}</div>
     <h3>Updates</h3>
     <div class="row"><div><b>Tell me when a new version is out</b><small>Asks GitHub every few hours. Nothing about you is sent.</small></div>${sw("check_updates", p.check_updates, "Check for updates")}</div>
+    <div class="row"><div><b>Count my install</b><small>Once per version, tells lithnode.com "installed" or "updated", with the version and Windows, Mac or Linux. Nothing about you.</small></div>${sw("count_install", p.count_install, "Count my install")}</div>
     <div class="row"><div><b>Lithnode ${esc(prefs.version)}</b><small id="setUpd">${release.newer ? `${esc(release.latest)} is out. The download is in the bar at the top.` : "The version you have."}</small></div>
       <button type="button" class="btn" data-act="check">Check now</button></div>
     <h3>Your files</h3>

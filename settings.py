@@ -1,4 +1,4 @@
-"""App-wide settings, in settings.json in Lithnode's folder: what new flows start with, and whether to check for updates.
+"""App-wide settings, in settings.json in Lithnode's folder: what new flows start with, whether to check for updates, and whether to count this install (updates.ping_once).
 
 The theme lives in the window itself (it has to apply before the page draws), so it isn't here.
 """
@@ -11,7 +11,7 @@ from typing import Any
 import flows
 
 LIMITS = [250_000, 500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000]   # the choices the Settings window offers
-DEFAULTS: dict[str, Any] = {"limit": flows.DEFAULT_LIMIT, "roles": True, "check_updates": True}
+DEFAULTS: dict[str, Any] = {"limit": flows.DEFAULT_LIMIT, "roles": True, "check_updates": True, "count_install": True}
 _lock = threading.Lock()
 
 
@@ -21,7 +21,7 @@ def clean(raw: Any) -> dict[str, Any]:
     out = dict(DEFAULTS)
     if "limit" in raw:
         out["limit"] = flows.clean_limit(raw["limit"])
-    for key in ("roles", "check_updates"):
+    for key in ("roles", "check_updates", "count_install"):
         if isinstance(raw.get(key), bool):
             out[key] = raw[key]
     return out

@@ -47,6 +47,7 @@ for _old_home in (Path.home() / ".relay", Path.home() / ".clawd-hq"):   # the ap
             _old_home.rename(_home)      # keep your flows and runs
         except OSError:
             pass
+_HAD_DATA = Path(os.environ.get("LITHNODE_HOME") or _home).exists()   # before anything writes there: a new install or not
 HQ_STORE = flows.Store(os.environ.get("LITHNODE_HOME") or _home)
 try:
     claude_code.setup_tools(os.environ.get("LITHNODE_HOME") or _home)   # lithnode-shot, for agents to look at what they make
@@ -780,6 +781,8 @@ def main() -> None:
         log.warning("Couldn't backfill flow tasks", exc_info=True)
     if "--no-open" not in sys.argv:
         open_window()
+    if settings.load(HQ_STORE.root)["count_install"]:
+        threading.Thread(target=updates.ping_once, args=(HQ_STORE.root, _HAD_DATA), daemon=True).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

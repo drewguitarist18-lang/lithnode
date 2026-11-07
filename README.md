@@ -186,7 +186,8 @@ Agents are real Claude Code sessions working in the folder you choose. Read this
 - **It stays local:**
   - The server listens on `127.0.0.1` only, and rejects requests from other websites and hosts.
   - Your Claude sign-in stays inside Claude Code, and Lithnode never sees it.
-  - Lithnode has no telemetry.
+  - No telemetry, except one install count: the first launch of each version tells lithnode.com "install" or
+    "update" with the version and OS, nothing else. Turn it off in Settings (*Count my install*).
 - **Webhooks** on approval nodes send the flow name and message to the URL you enter. Only use your own.
 - **Your account, your usage.** Every agent is a real session on your own Claude, ChatGPT (Codex) or Cursor
   plan, under that company's terms for your account, and big flows can use a lot of it or hit your limits.

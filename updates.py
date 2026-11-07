@@ -1,11 +1,13 @@
 """Is there a newer Lithnode? Asks GitHub for the latest release, at most every few hours, and never blocks the app:
-offline or rate-limited just means "no news". It only tells people; downloading and installing stays theirs."""
+offline or rate-limited just means "no news". It only tells people; downloading and installing stays theirs.
+Also the one anonymous install/update ping per version (ping_once)."""
 import json
 import os
 import re
 import sys
 import threading
 import time
+from pathlib import Path
 from urllib import request as urlrequest
 
 from version import VERSION
@@ -28,6 +30,43 @@ def parse(v: str) -> tuple[int, ...]:
 def newer(latest: str, current: str = VERSION) -> bool:
     a, b = parse(latest), parse(current)
     return bool(a and b) and a > b
+
+
+PING = os.environ.get("LITHNODE_PING_URL") or "https://lithnode.com/api/ping"
+PING_OS = {"win32": "win", "darwin": "mac"}   # anything else: linux
+
+
+def ping_once(root, had_data: bool) -> str:
+    """The first launch of each version of an installed Lithnode tells lithnode.com, once: 'install' (a new copy) or
+    'update', with the version and win/mac/linux. No ID, nothing about you. Settings > 'Count my install' turns it off.
+    Runs from source don't ping (unless LITHNODE_PING_URL points somewhere, for testing). Returns what it sent, or ''."""
+    if not (getattr(sys, "frozen", False) or os.environ.get("LITHNODE_PING_URL")):
+        return ""
+    marker = Path(root) / "pinged.json"
+    try:
+        seen = json.loads(marker.read_text(encoding="utf-8"))
+        seen = seen if isinstance(seen, list) else []
+    except FileNotFoundError:
+        seen = None
+    except (OSError, ValueError):
+        seen = []
+    if seen is not None and VERSION in seen:
+        return ""
+    kind = "update" if (seen or had_data) else "install"
+    body = json.dumps({"kind": kind, "v": VERSION, "os": PING_OS.get(sys.platform, "linux")}).encode()
+    req = urlrequest.Request(PING, data=body, method="POST",
+                             headers={"Content-Type": "application/json", "User-Agent": f"Lithnode/{VERSION}"})
+    try:
+        with urlrequest.urlopen(req, timeout=8):
+            pass
+    except Exception:   # offline: try again next launch
+        return ""
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(json.dumps((seen or []) + [VERSION]), encoding="utf-8")
+    except OSError:
+        pass
+    return kind
 
 
 def download_url(tag: str, platform: str = sys.platform) -> str:
