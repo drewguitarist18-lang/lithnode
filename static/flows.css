@@ -346,10 +346,11 @@ a.item:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
 .tchip:has(input:checked) .tick { display: block; }
 .tchip.missing { opacity: .5; }
 .tchip.add { padding: 4px 10px; border-style: dashed; }
-.slabel { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--ink); }
-.slabel a, .slabel span { font-weight: 500; font-size: 11.5px; color: var(--muted); }
+.slabel { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+.slabel a, .slabel span { font-weight: 500; font-size: 11.5px; color: var(--muted); text-decoration: none; }
+.slabel a:hover { color: var(--ink); }
 /* which engine a team runs on: a compact switch with each engine's mark */
-.eseg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 11px; }
+.eseg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 11px; }
 .eseg button { display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; background: transparent; padding: 6px 4px; border-radius: 8px;
                font-size: 12.5px; color: var(--muted); white-space: nowrap; min-width: 0; }
 .eseg button:hover { color: var(--ink); background: transparent; }
@@ -357,11 +358,14 @@ a.item:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
 .eseg button.off { opacity: .5; }
 .eseg .eico { width: 18px; height: 18px; border-radius: 5px; }
 .eseg .eico canvas { width: 14px; height: 10.5px; }
-.estat { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.estat { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); padding: 0 2px; min-height: 22px; }
+.estat > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .estat i { width: 7px; height: 7px; border-radius: 50%; background: var(--done); flex: none; }
 .estat i.bad { background: var(--approval); }
-.estat a { margin-left: auto; }
-.engines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.estat a { margin-left: auto; flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: var(--muted); }
+.estat a:hover { color: var(--ink); background: var(--hover); }
+.estat a svg { width: 13px; height: 13px; }
+.engines { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .engines button { display: grid; justify-items: start; gap: 3px; text-align: left; padding: 9px 10px; border-radius: 10px;
                    font-size: 12.5px; font-weight: 600; white-space: nowrap; min-width: 0; }
 .engines button .eico { margin-bottom: 3px; }
@@ -455,18 +459,17 @@ main.running #floatRun { display: none; }
 .iconbtn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .iconbtn:hover { color: var(--failed); background: color-mix(in srgb, var(--failed) 10%, transparent); }
 /* sliders: a soft track that fills in the control's color, a glowing thumb, the value up top */
-.sl { --c: var(--accent); display: grid; gap: 4px; }
+.sl { --c: var(--accent); display: grid; gap: 2px; margin-top: 4px; }
 .sl-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); }
 .sl-top b { color: var(--ink); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.sl-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); letter-spacing: .04em; opacity: .8; }
-.sl input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.sl-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); opacity: .75; }
+.sl input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .sl input[type=range]:focus { outline: none; }
-.sl input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 999px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--c, var(--accent)) 55%, transparent), var(--c, var(--accent)) var(--fill, 0%), color-mix(in srgb, var(--ink) 9%, transparent) var(--fill, 0%)); }
-.sl input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -7px; border-radius: 50%;
-  background: #fff; border: 0; box-shadow: 0 0 0 5px color-mix(in srgb, var(--c, var(--accent)) 35%, transparent), 0 3px 12px color-mix(in srgb, var(--c, var(--accent)) 60%, transparent);
-  transition: box-shadow .15s; }
-.sl input[type=range]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 8px color-mix(in srgb, var(--c, var(--accent)) 30%, transparent), 0 3px 14px color-mix(in srgb, var(--c, var(--accent)) 70%, transparent); }
+.sl input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--c, var(--accent)) var(--fill, 0%), color-mix(in srgb, var(--ink) 12%, transparent) var(--fill, 0%)); }
+.sl input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%;
+  background: #fff; border: 0; box-shadow: 0 0 0 1px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.35); transition: box-shadow .15s, transform .15s; }
+.sl input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.12); box-shadow: 0 0 0 5px color-mix(in srgb, var(--c, var(--accent)) 18%, transparent), 0 2px 6px rgba(0,0,0,.35); }
 .sl input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--c); outline-offset: 3px; }
 /* the bot a team starts from */
 .bpick { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
@@ -477,22 +480,40 @@ main.running #floatRun { display: none; }
 .agents .how b { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); }
 .stepper button:disabled { opacity: .35; }
 /* a team's role: Composer, Orchestrator or Performer, each with the model it plays on */
-.mpick { margin-top: 10px; }
-.seg.mpick { display: grid; grid-template-columns: repeat(3, auto); }
-.mcard { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 2px 5px 7px; border-radius: 8px; cursor: pointer; color: var(--muted); }
-.mcard b { font-size: 11.5px; letter-spacing: -.1px; overflow: visible; }
-.switch.rolesw { padding: 0; margin-top: 8px; font-size: 12px; color: var(--muted); }
-.switch.rolesw input { width: 32px; height: 19px; }
-.switch.rolesw input::after { top: 3px; left: 3px; width: 13px; height: 13px; }
-.switch.rolesw input:checked::after { transform: translateX(13px); }
-.mcard:hover { color: var(--ink); }
-.mcard.on { background: var(--pad); color: var(--ink); box-shadow: 0 1px 4px var(--shadow); outline: 1px solid var(--line); }
-.mcard b { flex: none; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mcard select { appearance: none; -webkit-appearance: none; flex: 0 1 auto; width: auto; min-width: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px;
-  padding: 1px 12px 1px 4px; border-radius: 6px; cursor: pointer; text-align: center;
+.mrow { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+/* By role / Per team: a small two-way toggle */
+.rtog { display: inline-flex; padding: 2px; gap: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.rtog button { border: 0; background: transparent; padding: 3px 9px; border-radius: 6px; font-size: 11.5px; color: var(--muted); }
+.rtog button:hover { color: var(--ink); background: transparent; }
+.rtog button.on { background: var(--pad); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px var(--shadow); }
+/* the three roles as a radio list, each with the model it plays on */
+.rlist { display: grid; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--pad); }
+.mcard { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 9px 10px 9px 11px; cursor: pointer; color: var(--muted); }
+.mcard + .mcard { border-top: 1px solid var(--line); }
+.mcard:hover { background: var(--hover); }
+.mcard:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* role badges: a glossy tile in the role's colors, full strength on the picked role */
+.rico { --a: #8b5cf6; --b: #ec4899; flex: none; position: relative; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(140deg, var(--a), var(--b)); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 2px 8px color-mix(in srgb, var(--b) 35%, transparent);
+  filter: saturate(.6) brightness(.9); opacity: .85; transition: filter .15s, opacity .15s, box-shadow .15s, transform .15s; }
+.rico::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(255,255,255,.28), transparent 55%); pointer-events: none; }
+.rico svg { width: 18px; height: 18px; position: relative; z-index: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
+.rico.r-think { --a: #a78bfa; --b: #7c3aed; }
+.rico.r-build { --a: #38bdf8; --b: #2563eb; }
+.rico.r-run   { --a: #fbbf24; --b: #f43f5e; }
+.mcard:hover .rico { filter: none; opacity: .95; }
+.mcard.on .rico { filter: none; opacity: 1; transform: scale(1.04);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 0 0 2px var(--pad), 0 0 0 3.5px var(--b), 0 4px 14px color-mix(in srgb, var(--b) 55%, transparent); }
+.mcard .rn { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.mcard .rn b { font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mcard .rn small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mcard:not(.on) .rn b { font-weight: 500; color: color-mix(in srgb, var(--ink) 75%, transparent); }
+.mcard.on { background: color-mix(in srgb, var(--ink) 4%, var(--pad)); }
+.mcard select { appearance: none; -webkit-appearance: none; flex: none; width: auto; min-width: 0; max-width: 45%; border: 1px solid var(--line); background-color: var(--bg); color: var(--ink);
+  font: inherit; font-size: 11.5px; font-weight: 500; padding: 4px 22px 4px 9px; border-radius: 7px; cursor: pointer;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 1px center; background-size: 10px; }
-.mcard select:hover { background-color: var(--bg); color: var(--ink); }
+  background-repeat: no-repeat; background-position: right 7px center; background-size: 10px; }
+.mcard select:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
 .mcard select option { background: var(--pad); color: var(--ink); }
 /* what a team may touch, safe to powerful: each level named, in its own color */
 .access { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
@@ -504,7 +525,7 @@ main.running #floatRun { display: none; }
 .access button.on { border-color: color-mix(in srgb, var(--c) 60%, var(--line)); background: color-mix(in srgb, var(--c) 12%, var(--pad)); font-weight: 600;
                     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent); }
 /* the overview: how the flow works, then where it works and its latest runs */
-.isec > h4 .aside { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--muted); text-decoration: none; }
+.isec > h4 .aside { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--muted); text-decoration: none; text-transform: none; letter-spacing: 0; }
 .isec > h4 a.aside:hover { color: var(--ink); }
 .rruns { display: grid; gap: 1px; margin: 0 -8px; }
 .rrun { display: grid; grid-template-columns: 14px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 10px;
@@ -566,9 +587,9 @@ main.running #floatRun { display: none; }
 .rrun i.running { background: var(--running); } .rrun i.waiting { background: var(--approval); } .rrun i.done { background: var(--done); }
 .rrun i.failed, .rrun i.stopped, .rrun i.interrupted { background: var(--failed); }
 .switch.mini { padding: 8px 12px; border-radius: 12px; }
-.isec { padding: 14px 16px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.isec { padding: 16px 16px 18px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
 .isec:last-child { border-bottom: 0; }
-.isec > h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.isec > h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
 .isec .field { margin: 0; }
 .isec .sub, .isec .note { color: var(--muted); font-size: 11.5px; }
 .seg { display: flex; gap: 3px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 11px; }
@@ -890,7 +911,7 @@ html body .rp-bottom p { font-family: var(--sans); }
 #wires .wire.live .vis { stroke: var(--wc, var(--running)); filter: drop-shadow(0 0 4px var(--wc, var(--running))); }
 #wires .wire.ok .vis { stroke: color-mix(in srgb, var(--done) 75%, var(--wire)); }
 #taskSub.need { color: var(--failed); }
-.rolemodel { display: grid; gap: 6px; margin-top: 10px; min-width: 0; }
+.rolemodel { display: grid; gap: 6px; margin-top: 0; min-width: 0; }
 .rolemodel select[data-k] { width: 100%; }
 .rolemodel .seg { min-width: 0; }
 .rolemodel .seg button { padding: 5px 2px; font-size: 12px; }

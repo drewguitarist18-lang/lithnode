@@ -454,7 +454,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({k: info[k] for k in ("ok", "connectors", "error")})
 
     def GET_api_engines(self) -> None:
-        """Which agent CLIs a team can run on (Claude Code, Codex, Cursor): installed, signed in, any note."""
+        """Which engines a team can run on (Claude Code, Codex, Cursor, Ollama): installed, signed in, any note."""
         info = engines.all_status(force="refresh=1" in self.path)
         force = "refresh=1" in self.path
         self.send_json({"engines": [{"id": e, "name": engines.LABELS[e], **info[e],
@@ -727,6 +727,12 @@ class Handler(BaseHTTPRequestHandler):
     def POST_api_engine_login(self) -> None:
         engine = str(self.read_json().get("engine") or "")
         ok, message = engines.start_login(engine)
+        self.send_json({"ok": ok, "message": message}, 200 if ok else 400)
+
+    def POST_api_engine_install(self) -> None:
+        """Opens a terminal running an engine's official installer (for Ollama with no model: downloads one)."""
+        engine = str(self.read_json().get("engine") or "")
+        ok, message = engines.start_install(engine)
         self.send_json({"ok": ok, "message": message}, 200 if ok else 400)
 
     def POST_api_quit(self) -> None:

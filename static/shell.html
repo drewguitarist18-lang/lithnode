@@ -93,6 +93,12 @@
   .acct .engine:first-of-type { border-top: 0; }
   .acct .engine .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none; }
   .acct .engine.on .dot { background: var(--ok); }
+  .acct .engine .logo { position: relative; width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center; overflow: hidden; background: #161616; }
+  .acct .engine .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .acct .engine .logo.codex img { width: 70%; height: 70%; object-fit: contain; }
+  .acct .engine .logo .dot { position: absolute; right: 2px; bottom: 2px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--pad, var(--panel)); }
+  .acct .engine:not(.on) .logo img { opacity: .55; filter: grayscale(.6); }
+  .acct .engine .free { margin-left: 5px; padding: 0 5px; border-radius: 5px; font: 600 10px/16px inherit; color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent); vertical-align: 1px; }
   .acct .engine main { flex: 1; min-width: 0; }
   .acct .engine b { display: block; font-size: 12.5px; color: var(--ink); }
   .acct .engine small { margin: 0; font-size: 11.5px; }
@@ -269,10 +275,10 @@ async function poll() {
     const cc = d.claude_code || {}, es = d.engines || {}, si = d.signin || {}, st = $("status");
     const changed = JSON.stringify([cc, es, si]) !== JSON.stringify([account, engineStatus, signin]);
     account = cc; engineStatus = es; signin = si;
-    const signed = Object.entries(es).filter(([, v]) => v.installed && v.signed_in).map(([id]) => ({ claude: "Claude Code", codex: "Codex", cursor: "Cursor" })[id]);
+    const signed = Object.entries(es).filter(([, v]) => v.installed && v.signed_in).map(([id]) => LABEL[id] || id);
     st.className = "status " + (signed.length ? "ok" : "bad");
-    st.querySelector("span").textContent = signed.length === 1 ? `${signed[0]} signed in`
-      : signed.length ? `${signed.length} engines signed in` : "No engine signed in";
+    st.querySelector("span").textContent = signed.length === 1 ? `${signed[0]} ${signed[0] === "Ollama" ? "ready" : "signed in"}`
+      : signed.length ? `${signed.length} engines ready` : "No engine signed in";
     $("signinBtn").hidden = true;
     // first look at a signed-out Lithnode: open the card so signing in is one click away, once the first-launch notice
     // (flows.html's usage dialog) is out of the way, so there's one thing on screen at a time
@@ -287,23 +293,30 @@ async function poll() {
 poll(); setInterval(poll, 2000);
 
 // Lithnode has no account of its own. Each engine uses the account already signed in to its own CLI.
+const LABEL = { claude: "Claude Code", codex: "Codex", cursor: "Cursor", ollama: "Ollama" };
+const ENGINE_LOGO = { claude: "engine-claude.svg", codex: "engine-codex.png", cursor: "engine-cursor.png", ollama: "engine-ollama.png" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function renderAcct() {
   const cc = account, si = signin, a = $("acct");
   const typed = $("codeIn")?.value || "", focused = document.activeElement?.id === "codeIn";   // a poll mustn't eat a half-pasted code
   a.className = "acct" + (Object.values(engineStatus).some((e) => e.installed && e.signed_in) ? " ok" : si.active ? " wait" : "");
   const err = si.error ? `<p class="err">${esc(si.error)}</p>` : "";
-  const label = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" };
-  const rows = ["claude", "codex", "cursor"].map((id) => {
+  const rows = ["claude", "codex", "cursor", "ollama"].map((id) => {
     const e = engineStatus[id] || {}, on = e.installed && e.signed_in;
-    const action = id === "claude" ? (on ? "" : e.installed ? `<button data-act="login">Sign in</button>` : `<a href="https://claude.com/claude-code" target="_blank" rel="noopener">Install</a>`)
-      : (on ? "" : e.installed ? `<button data-act="engine-login" data-engine="${id}">Sign in</button>` : `<small>Not installed</small>`);
-    return `<div class="engine ${on ? "on" : ""}"><i class="dot"></i><main><b>${label[id]}</b><small>${on ? "Signed in" : e.installed ? "Needs sign-in" : "Not installed"}</small></main>${action}</div>`;
+    const action = on ? ""
+      : id === "claude" ? (e.installed ? `<button data-act="login">Sign in</button>` : `<a href="https://claude.com/claude-code" target="_blank" rel="noopener">Install</a>`)
+      : id === "ollama" ? `<button data-act="engine-install" data-engine="ollama">${!e.installed ? "Install" : /not running/i.test(e.note || "") ? "Start" : "Get a model"}</button>`
+      : e.installed ? `<button data-act="engine-login" data-engine="${id}">Sign in</button>` : `<button data-act="engine-install" data-engine="${id}">Install</button>`;
+    const state = on ? (id === "ollama" ? "Ready · runs on this PC" : "Signed in")
+      : !e.installed ? (/Cursor app/.test(e.note || "") ? "Cursor app found · its CLI isn't" : "Not installed")
+      : id === "ollama" ? (/not running/i.test(e.note || "") ? "Installed · not running" : "No model downloaded yet") : "Needs sign-in";
+    const tip = esc(e.note || "");
+    return `<div class="engine ${on ? "on" : ""}" title="${tip}"><span class="logo ${id}"><img src="/static/${ENGINE_LOGO[id]}" alt=""><i class="dot"></i></span><main><b>${LABEL[id]}${id === "ollama" ? `<span class="free">FREE</span>` : ""}</b><small>${esc(state)}</small></main>${action}</div>`;
   }).join("");
   const claudeHelp = !cc.logged_in && cc.available && si.active ? `
     <p>Finish Claude Code sign-in in your browser.</p>
     ${trouble || si.error ? `<p>${si.url ? `<a href="${esc(si.url)}" target="_blank" rel="noopener">Open the sign-in page</a>, then paste` : "Paste"} the code it shows:</p><form class="code"><input id="codeIn" placeholder="Paste the code" autocomplete="off" spellcheck="false" aria-label="Sign-in code"><button>Sign in</button></form>${err}` : `<small><a href="#" data-act="trouble">Having trouble?</a></small>`}` : "";
-  a.innerHTML = `<h3><i></i>Agent engines</h3><p>Flows use any engine signed in on this computer. Build flow chooses the first available one.</p>${rows}${claudeHelp}<div class="row"><button data-act="check">Check again</button></div>`;
+  a.innerHTML = `<h3><i></i>Agent engines</h3><p>Flows use any engine ready on this computer. Build flow chooses the first available one. Ollama runs free models on your own PC.</p>${rows}${claudeHelp}<div class="row"><button data-act="check">Check again</button></div>`;
   const input = $("codeIn");
   if (input) { input.value = typed; if (focused) input.focus(); }
 }
@@ -339,6 +352,19 @@ async function startEngineSignin(engine, button) {
     alert(e.message || "Couldn't start sign-in.");
   }
 }
+async function startEngineInstall(engine, button) {
+  button.disabled = true; button.textContent = "Opening…";
+  try {
+    const r = await fetch("/api/engine-install", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ engine }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.message || "Couldn't start the install.");
+    button.textContent = /starting/i.test(d.message || "") ? "Starting…" : engine === "ollama" ? "Downloading…" : "Installing…";
+    if (/starting/i.test(d.message || "")) setTimeout(checkNow, 4000);
+  } catch (e) {
+    button.disabled = false; button.textContent = "Install";
+    alert(e.message || "Couldn't start the install.");
+  }
+}
 function toggleAcct(open = $("acct").hidden) {
   $("acct").hidden = !open; $("status").setAttribute("aria-expanded", String(open));
   if (open) renderAcct();
@@ -354,6 +380,7 @@ $("acct").addEventListener("click", (e) => {
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (act) e.preventDefault();
   if (act === "login") startSignin();
+  if (act === "engine-install") startEngineInstall(e.target.closest("[data-engine]").dataset.engine, e.target.closest("button"));
   if (act === "engine-login") startEngineSignin(e.target.closest("[data-engine]").dataset.engine, e.target.closest("button"));
   if (act === "trouble") { trouble = true; renderAcct(); $("codeIn")?.focus(); }
   if (act === "check") { e.target.textContent = "Checking…"; checkNow(); }

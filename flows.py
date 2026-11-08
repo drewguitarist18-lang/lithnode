@@ -384,9 +384,9 @@ def estimate(flow: dict[str, Any]) -> dict[str, Any]:
             add(n["model"])
     sessions = sum(per_model.values())
     weight = sum(MODEL_WEIGHT.get(m, 3) * c for m, c in per_model.items())
-    per_engine = {}   # whose plan each session uses: Claude, Codex (ChatGPT) or Cursor
+    per_engine = {}   # whose plan each session uses: Claude, Codex (ChatGPT), Cursor, or none (Ollama, free and local)
     for m, c in per_model.items():
-        e = m if m in ("codex", "cursor") else "claude"
+        e = m if m in ("codex", "cursor", "ollama") else "claude"
         per_engine[e] = per_engine.get(e, 0) + c
     return {"sessions": sessions, "per_model": per_model, "per_engine": per_engine, "weight": weight}
 

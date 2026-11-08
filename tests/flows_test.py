@@ -70,7 +70,8 @@ def server_env():
             "CLAWD_MOCK_STATE": str(Path(cli_dir, "state.json")), "CLAWD_MOCK_LOG": str(Path(cli_dir, "calls.jsonl")),
             "CLAWD_MOCK_SESSIONS": str(Path(cli_dir, "sessions.json")), "LITHNODE_CLIS": "git,gh,vercel", "LITHNODE_CODEX_SANDBOX": "1",
             "LITHNODE_CODEX_CMD": json.dumps([sys.executable, str(ROOT / "tests" / "mock_engines.py"), "codex"]),
-            "LITHNODE_CURSOR_CMD": json.dumps([sys.executable, str(ROOT / "tests" / "mock_engines.py"), "cursor"])}
+            "LITHNODE_CURSOR_CMD": json.dumps([sys.executable, str(ROOT / "tests" / "mock_engines.py"), "cursor"]),
+            "LITHNODE_OLLAMA_URL": "http://127.0.0.1:9"}
 
 
 def start_server():
@@ -451,7 +452,8 @@ try:
     # ---- engines: a team can run on Codex or Cursor instead of Claude Code ------------------------------
     s, en = call("/api/engines")
     check("engines are listed with their sign-in", [(e["id"], e["installed"], e["signed_in"]) for e in en["engines"]]
-          == [("claude", True, True), ("codex", True, True), ("cursor", True, True)] and en["engines"][1]["sandbox"] is True, en)
+          [:3] == [("claude", True, True), ("codex", True, True), ("cursor", True, True)] and en["engines"][1]["sandbox"] is True
+          and en["engines"][3]["id"] == "ollama" and en["engines"][3]["signed_in"] is False, en)   # no Ollama server in tests
     _, made = call("/api/flows", {}, "POST")
     mixed = {"name": "Mixed engines", "nodes": [{"id": "master", "type": "master", "x": 0, "y": 0, "mode": "pass"},
              {"id": "cx", "type": "cluster", "x": 0, "y": 0, "name": "Codex team", "engine": "codex", "tools": "edit", "count": 1,

@@ -221,6 +221,8 @@ class Agent:
 
     def run(self) -> bool:
         """Blocks until the session ends. Returns True on success."""
+        if self.engine == "ollama":
+            return self._run_ollama()
         if self.engine != "claude":
             return self._run_other()
         ok = self._run_claude()
@@ -329,6 +331,25 @@ class Agent:
         if self.error and ("Not logged in" in self.error or "/login" in self.error):
             self.error = "Claude Code isn't signed in. Run `claude auth login` once, then try again."
         self.out_of_usage = bool(self.error) and not (self.stopped or self.capped) and bool(OUT_OF_USAGE_RE.search(self.error))
+        self.step = "Done" if not self.error else "Failed"
+        self.on_update()
+        return not self.error
+
+    def _run_ollama(self) -> bool:
+        """The same session on a free local model through Ollama: one streamed answer, no tools."""
+        self._set_step("Thinking on this computer")
+        seen = [0]
+
+        def grow(total: str) -> None:
+            if len(total) - seen[0] > 400:       # a step line now and then, not one per token
+                seen[0] = len(total)
+                self._set_step(f"Writing ({len(total.split())} words)")
+
+        self.text, error = engines.ollama_chat(self.engine_model, self.system, self.prompt, grow, lambda: self.stopped, TIMEOUT)
+        self.turns = 1
+        self.error = "Stopped" if self.stopped else engines.friendly_error("ollama", error) if error else None
+        if not self.error and not self.text:
+            self.error = "The local model gave an empty answer."
         self.step = "Done" if not self.error else "Failed"
         self.on_update()
         return not self.error

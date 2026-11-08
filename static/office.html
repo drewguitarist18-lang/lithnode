@@ -332,7 +332,7 @@ function drawStation(ctx, station, ox, oy, t, isSel) {
 
 // which agent CLI a desk runs on: Claude Code (the default, unlabeled), Codex or Cursor
 const ENGINE_NAME = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" };
-const ENGINE_IMG = Object.fromEntries(["codex", "cursor"].map((e) => { const i = new Image(); i.src = `/static/engine-${e}.png`; return [e, i]; }));
+const ENGINE_IMG = Object.fromEntries(["codex", "cursor", "ollama"].map((e) => { const i = new Image(); i.src = `/static/engine-${e}.png`; return [e, i]; }));
 
 // -------------------------------------------------------------------- stage
 const stage = $("stage"), sctx = stage.getContext("2d");

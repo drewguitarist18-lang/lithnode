@@ -23,6 +23,7 @@
   <developer id="com.lithnode"><name>Lithnode</name></developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.26" date="2026-11-08"/>
     <release version="0.1.25" date="2026-11-08"/>
     <release version="0.1.24" date="2026-11-06"/>
     <release version="0.1.23" date="2026-11-05"/>

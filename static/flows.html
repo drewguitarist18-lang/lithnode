@@ -117,7 +117,7 @@
 
 <dialog id="usageDlg" class="usagedlg">
   <h2>Lithnode runs on your own plan</h2>
-  <p>Every agent is a real Claude Code, Codex or Cursor session, signed in with <b>your</b> account. Each one uses your Claude, ChatGPT or Cursor plan, and big flows can use a lot of it or hit your limits.</p>
+  <p>Every agent is a real Claude Code, Codex or Cursor session, signed in with <b>your</b> account. Each one uses your Claude, ChatGPT or Cursor plan, and big flows can use a lot of it or hit your limits. Teams set to Ollama run free models on your own PC instead.</p>
   <p>Lithnode is free and never charges you, so it can't refund usage. Before each run, the Run menu shows how many agents it will start.</p>
   <p><b>Use it at your own risk.</b> Lithnode is provided as is, with no warranty. You're responsible for what your agents do in your folders and for the usage they spend.</p>
   <div class="acts"><button class="primary" id="usageOk">Got it</button></div>
@@ -209,7 +209,7 @@ async function loadConnectors(force) {
   renderInspector();
 }
 let engines = null;   // null while checking; then [{id, name, installed, signed_in, note, sandbox?}]
-const ENGINE_NAME = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" };
+const ENGINE_NAME = { claude: "Claude Code", codex: "Codex", cursor: "Cursor", ollama: "Ollama" };
 const engineOf = (n) => n.engine || "claude";
 const engineInfo = (id) => (engines || []).find((e) => e.id === id) || { id, name: ENGINE_NAME[id], installed: true, signed_in: true, note: "" };
 async function loadEngines(force) {
@@ -242,6 +242,12 @@ const TYPE_LABEL = { master: "Start", cluster: "Team", checkpoint: "Checkpoint",
 // Stages take a role, and the flow says which model fills it (flows.py DEFAULT_MODELS)
 const DEFAULT_MODELS = { think: "claude-opus-5-5", build: "claude-sonnet-5-5", run: "claude-haiku-4-5" };
 const ROLE_NAME = { think: "Composer", build: "Orchestrator", run: "Performer" };   // writes the idea, arranges it into something real, plays it out
+// each role's badge: a music note for the Composer, a conductor's baton for the Orchestrator, a stage mic for the Performer
+const ROLE_ICON = {
+  think: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2.5v12"/><circle cx="6.5" cy="18" r="2.6" fill="currentColor"/><circle cx="16.5" cy="15.5" r="2.6" fill="currentColor"/><path d="M9 10l10-2.5" opacity=".55"/></svg>`,
+  build: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5 15 9"/><circle cx="4.6" cy="19.4" r="2" fill="currentColor"/><path d="M15.5 3.5a5.5 5.5 0 0 1 5 5" opacity=".9"/><path d="M15 6.6a2.6 2.6 0 0 1 2.4 2.4" opacity=".6"/></svg>`,
+  run: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" fill-opacity=".25"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>`,
+};
 const ROLE_OF = { "claude-opus-5-5": "think", "claude-sonnet-5-5": "build", "claude-haiku-4-5": "run" };
 const roleModel = (role) => ((flow && flow.models) || DEFAULT_MODELS)[role] || DEFAULT_MODELS[role];
 // on Codex and Cursor a role's model is "" until you pick one: that's the CLI's own default
@@ -1156,22 +1162,23 @@ function engineModels(n) {
   list.forEach((m) => (groups[modelFamily(m)] = groups[modelFamily(m)] || []).push(m));
   const order = ["OpenAI", "Claude", "Grok", "Gemini", "Cursor", "Other"].filter((g) => groups[g]);
   const opts = order.map((g) => `<optgroup label="${g}">${groups[g].map((m) => `<option value="${esc(m.id)}"${m.id === cur ? " selected" : ""}>${esc(m.label)}</option>`).join("")}</optgroup>`).join("");
-  return `<select data-k="engine_model" aria-label="Model"><option value="">${engineOf(n) === "codex" ? "Default (your Codex setting)" : "Auto (Cursor picks)"}</option>`
+  return `<select data-k="engine_model" aria-label="Model"><option value="">${{ codex: "Default (your Codex setting)", cursor: "Auto (Cursor picks)", ollama: "First downloaded model" }[engineOf(n)]}</option>`
     + (cur && !known ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : "") + opts + `</select>`;
 }
 
 // which agent CLI a team runs on, with whether it's ready on this computer
 function engineCards(n) {
   const cur = engineOf(n), info = engineInfo(cur), ready = (e) => e.installed && e.signed_in;
-  const seg = ["claude", "codex", "cursor"].map((id) => {
+  const seg = ["claude", "codex", "cursor", "ollama"].map((id) => {
     const e = engineInfo(id), why = !engines ? "" : !e.installed ? `${ENGINE_NAME[id]} isn't installed` : !e.signed_in ? `${ENGINE_NAME[id]} isn't signed in` : "";
     return `<button type="button" data-engine="${id}" class="${id === cur ? "on" : ""}${engines && !ready(e) ? " off" : ""}" title="${esc(why || ENGINE_NAME[id])}">${engineIcon(id)}<span>${id === "claude" ? "Claude" : ENGINE_NAME[id]}</span></button>`;
   }).join("");
-  const plan = { claude: "your Claude plan", codex: "your ChatGPT plan", cursor: "your Cursor plan" }[cur];
+  const plan = { claude: "your Claude plan", codex: "your ChatGPT plan", cursor: "your Cursor plan", ollama: "free, on this PC" }[cur];
   const stat = !engines ? `<i class="bad"></i>Checking…` : !ready(info) ? `<i class="bad"></i>${esc(info.note || `${ENGINE_NAME[cur]} isn't ready on this computer`)}`
     : info.sandbox === false ? `<i class="bad"></i><span title="${esc(info.note)}">Codex can change files and run commands anywhere on this PC</span>`
+    : info.local ? `<i></i><span title="${esc(info.note)}">Ready · free, on this PC · no web, files or tools</span>`
     : info.note ? `<i class="bad"></i>${esc(info.note)}` : `<i></i>Ready · ${plan.replace(/^your /, "")}`;
-  return `<div class="eseg" role="group" aria-label="Runs on">${seg}</div><div class="estat">${stat}<a href="#" id="engRefresh">Check again</a></div>`;
+  return `<div class="eseg" role="group" aria-label="Runs on">${seg}</div><div class="estat">${stat}<a href="#" id="engRefresh" title="Check again" aria-label="Check again"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></a></div>`;
 }
 
 // a team's command-line tools: it may run only commands that start with one of these
@@ -1261,20 +1268,21 @@ function renderInspector() {
   const effortBar = (node) => {   // how hard it thinks: a slider from quick to deep
     if (String(node.model || "").startsWith("claude-haiku")) return "";   // Haiku has no effort setting
     const k = Math.max(0, EFFORTS.findIndex(([v]) => v === node.effort));
-    return slider("efRange", 0, EFFORTS.length - 1, k, { name: "Effort", val: EFFORTS[k][1], lo: "Quick", hi: "Deep", c: "#b48cf2" });
+    return slider("efRange", 0, EFFORTS.length - 1, k, { name: "Effort", val: EFFORTS[k][1], lo: "Quick", hi: "Deep" });
   };
   const short = (label) => String(label).replace(/^Claude /, "").replace(/ \d+(\.\d+)*$/, "")   // "Opus 5.5" -> "Opus"
     .replace(/^GPT-/i, "").replace(/^(Codex|Cursor) /, "").replace(/^default$/, "Default").replace(/^picks$/, "Auto");   // "GPT-6-Luna" -> "6-Luna"
   const modelPick = (node) => {   // with roles on: the team's role, each showing the model it plays on; off: just a model
     const eng = node.type === "cluster" ? engineOf(node) : "claude";
     const rolesOn = flow.roles !== false;
-    const sw = `<label class="switch rolesw" title="On: each team is a Composer, Orchestrator or Performer, and one pick sets the model for all of that role. Off: every team just has its own model."><span>Use roles</span><input type="checkbox" id="rolesSw"${rolesOn ? " checked" : ""}></label>`;
+    const sw = `<div class="mrow"><span>${rolesOn && eng === "claude" ? "Role" : "Model"}</span><div class="rtog" role="group" aria-label="How models are picked" title="By role: each team is a Composer, Orchestrator or Performer, and one pick sets the model for all of that role. Per team: every team just has its own model."><button type="button" data-roles="1" class="${rolesOn ? "on" : ""}">By role</button><button type="button" data-roles="0" class="${rolesOn ? "" : "on"}">Per team</button></div></div>`;
     if (eng !== "claude") return `${sw}<div class="rolemodel">${engineModels(node)}</div>`;
     const pick = (attr, cur) => `<select ${attr} aria-label="Model">${ordered.map((m) => `<option value="${esc(m.id)}"${m.id === cur ? " selected" : ""}>${esc(short(m.label))}</option>`).join("")}</select>`;
     if (!rolesOn) return `${sw}<div class="rolemodel">${pick("data-ownmodel", node.model)}</div>`;
     const role = node.role || "build";
-    const card = (v, name, sel, tip) => `<div class="mcard${v === role ? " on" : ""}" data-v="${v}" role="button" tabindex="0" title="${esc(tip)}"><b>${name}</b>${sel}</div>`;
-    return `${sw}<div class="seg mpick" data-pickrole>${["think", "build", "run"].map((r) => card(r, ROLE_NAME[r], pick(`data-rolemodel="${r}"`, roleModel(r)), `${ROLE_NAME[r]}: its model is shared by every ${ROLE_NAME[r]} in this flow`)).join("")}</div>`;
+    const ROLE_JOB = { think: "Thinks it through", build: "Builds it", run: "Runs the steps" };
+    const card = (v, name, sel, tip) => `<div class="mcard${v === role ? " on" : ""}" data-v="${v}" role="radio" aria-checked="${v === role}" tabindex="0" title="${esc(tip)}"><span class="rico r-${v}">${ROLE_ICON[v]}</span><span class="rn"><b>${name}</b><small>${ROLE_JOB[v]}</small></span>${sel}</div>`;
+    return `${sw}<div class="rlist" role="radiogroup" data-pickrole>${["think", "build", "run"].map((r) => card(r, ROLE_NAME[r], pick(`data-rolemodel="${r}"`, roleModel(r)), `${ROLE_NAME[r]}: its model is shared by every ${ROLE_NAME[r]} in this flow`)).join("")}</div>`;
   };
   const modelNote = () => "";   // the model's blurb was one line too many; the slider says enough
   const ACCESS = [["none", "Think"], ["read", "Read"], ["web", "Web"], ["research", "Read + web"], ["edit", "Edit"], ["full", "Edit + run"], ["all", "All"]];
@@ -1402,8 +1410,9 @@ function renderInspector() {
     c.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === c) { e.preventDefault(); takeRole(c); } });
   });
   box.querySelectorAll("[data-rolemodel]").forEach((s) => s.addEventListener("change", () => { setRoleModel(s.dataset.rolemodel, s.value); changed(false); renderInspector(); }));
-  $("rolesSw")?.addEventListener("change", (e) => {   // for the whole flow: off keeps every model as it is
-    flow.roles = e.target.checked;
+  box.querySelectorAll("[data-roles]").forEach((btn) => btn.addEventListener("click", () => {   // for the whole flow: off keeps every model as it is
+    if ((flow.roles !== false) === (btn.dataset.roles === "1")) return;
+    flow.roles = btn.dataset.roles === "1";
     flow.nodes.filter((x) => ["master", "cluster", "checkpoint"].includes(x.type)).forEach((x) => {
       if (!flow.roles) { x.role = ""; return; }
       x.role = ROLE_OF[x.model] || (x.type === "checkpoint" ? "run" : "build");
@@ -1411,7 +1420,7 @@ function renderInspector() {
       else x.model = roleModel(x.role);
     });
     changed(false); renderInspector();
-  });
+  }));
   box.querySelectorAll("[data-ownmodel]").forEach((s) => s.addEventListener("change", () => { n.role = ""; n.model = s.value; changed(false); renderInspector(); }));
   if ($("engRefresh")) $("engRefresh").onclick = (e) => { e.preventDefault(); engines = null; renderInspector(); loadEngines(true); };
   box.querySelectorAll("[data-cmds] button").forEach((b) => b.addEventListener("click", () => {
@@ -1502,12 +1511,13 @@ $("runBtn").onclick = () => {
   $("runDlg").showModal(); $("taskIn").focus();
 };
 // whose plan this run uses, so nobody is surprised by their usage
-const PLAN_NAME = { claude: "Claude", codex: "ChatGPT (Codex)", cursor: "Cursor" };
+const PLAN_NAME = { claude: "Claude", codex: "ChatGPT (Codex)", cursor: "Cursor" };   // Ollama is free: no plan
 const BIG_RUN = 8;
 function usageLine(e) {
   if (!e || !e.sessions) return "";
   const per = e.per_engine || { claude: e.sessions };
-  const parts = Object.keys(PLAN_NAME).filter((k) => per[k]).map((k) => `${per[k]} on your ${PLAN_NAME[k]} plan`);
+  const parts = Object.keys(PLAN_NAME).filter((k) => per[k]).map((k) => `${per[k]} on your ${PLAN_NAME[k]} plan`)
+    .concat(per.ollama ? [`${per.ollama} free on this PC (Ollama)`] : []);
   const big = e.sessions >= BIG_RUN || flow.nodes.some((n) => n.type === "cluster" && n.split && n.count > 2);
   return `<b>${e.sessions} agent session${e.sessions === 1 ? "" : "s"}</b>: ${esc(parts.join(", "))}.` +
     (big ? ` <span class="bigrun">This is a big run and can use a lot of your plan.</span>` : "");

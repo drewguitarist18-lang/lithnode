@@ -86,6 +86,50 @@ _codex_design = flows.build_design({"name": "Codex flow", "nodes": [
 check("design: a Codex-built flow keeps Codex for every agent stage",
       all(n.get("engine") == "codex" for n in _codex_design["nodes"] if n["type"] in ("master", "cluster", "checkpoint")), _codex_design)
 
+# ---- ollama: a free local model, through a stand-in Ollama server on this computer ------------------------------
+import json  # noqa: E402
+import threading  # noqa: E402
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # noqa: E402
+
+import engines  # noqa: E402
+
+_asked = []
+
+
+class _FakeOllama(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        body = json.dumps({"models": [{"name": "tiny:latest"}]}).encode()
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        _asked.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+        self.send_response(200)
+        self.end_headers()
+        for piece in ("Red, ", "blue, ", "yellow."):
+            self.wfile.write(json.dumps({"message": {"content": piece}, "done": False}).encode() + b"\n")
+        self.wfile.write(b'{"done": true}\n')
+
+
+_srv = ThreadingHTTPServer(("127.0.0.1", 0), _FakeOllama)
+threading.Thread(target=_srv.serve_forever, daemon=True).start()
+engines.OLLAMA_URL = f"http://127.0.0.1:{_srv.server_address[1]}"
+_st = engines.status("ollama", force=True)
+check("ollama: ready once its server has a model", _st["installed"] and _st["signed_in"] and _st.get("local"), _st)
+check("ollama: its downloaded models are the choices", engines.models("ollama", force=True) == [{"id": "tiny:latest", "label": "tiny"}])
+_ag = agents.Agent(model="", effort="low", tools="none", system="Be terse.", prompt="Three colors?", cwd=".", on_update=lambda: None, engine="ollama")
+check("ollama: a session streams the model's answer into the report", _ag.run() and _ag.text == "Red, blue, yellow.", (_ag.text, _ag.error))
+check("ollama: it uses the first downloaded model, with the role as the system message",
+      _asked and _asked[0]["model"] == "tiny:latest" and _asked[0]["messages"][0] == {"role": "system", "content": "Be terse."}, _asked)
+_srv.shutdown()
+engines.OLLAMA_URL = "http://127.0.0.1:9"
+_st = engines.status("ollama", force=True)
+check("ollama: no server means not ready", not _st["signed_in"] and _st["note"], _st)
+
 # ---- updates: is the release on GitHub newer than this one ---------------------------------------------------
 check("updates: versions read as numbers", updates.parse("v0.1.21") == (0, 1, 21) and updates.parse("0.2") == (0, 2))
 check("updates: 0.1.100 is newer than 0.1.21 (not a string compare)", updates.newer("v0.1.100", "0.1.21"))
