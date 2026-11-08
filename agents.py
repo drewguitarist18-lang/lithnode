@@ -16,6 +16,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+import apikeys
 import claude_code
 import engines
 
@@ -223,6 +224,8 @@ class Agent:
         """Blocks until the session ends. Returns True on success."""
         if self.engine == "ollama":
             return self._run_ollama()
+        if self.engine == "api":
+            return self._run_api()
         if self.engine != "claude":
             return self._run_other()
         ok = self._run_claude()
@@ -350,6 +353,27 @@ class Agent:
         self.error = "Stopped" if self.stopped else engines.friendly_error("ollama", error) if error else None
         if not self.error and not self.text:
             self.error = "The local model gave an empty answer."
+        self.step = "Done" if not self.error else "Failed"
+        self.on_update()
+        return not self.error
+
+    def _run_api(self) -> bool:
+        """The same session on a provider's API with your own key: one streamed answer, no tools, billed per token."""
+        pid, _ = apikeys.split_model(self.engine_model)
+        self._set_step(f"Asking {apikeys.PROVIDERS[pid]['name']}" if pid else "Asking the API")
+        seen = [0]
+
+        def grow(total: str) -> None:
+            if len(total) - seen[0] > 400:
+                seen[0] = len(total)
+                self._set_step(f"Writing ({len(total.split())} words)")
+
+        self.text, error, self.tokens = apikeys.chat(self.engine_model, self.system, self.prompt, grow, lambda: self.stopped, TIMEOUT)
+        self.turns = 1
+        self.capped = bool(self.token_cap) and self.tokens > self.token_cap
+        self.error = "Stopped" if self.stopped else engines.friendly_error("api", error) if error else None
+        if not self.error and not self.text:
+            self.error = "The model gave an empty answer."
         self.step = "Done" if not self.error else "Failed"
         self.on_update()
         return not self.error

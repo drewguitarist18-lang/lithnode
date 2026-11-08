@@ -819,7 +819,18 @@ details.more[open] { padding-bottom: 4px; }
 #toast { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px;
          border-radius: 12px; display: none; z-index: 20; max-width: min(560px, 80vw); font-size: 13px; line-height: 1.45; text-align: center;
          box-shadow: 0 12px 32px -10px rgba(0, 0, 0, .45); }
-#toast.show { display: block; }
+#toast.show { display: block; animation: toastIn .18s ease-out; }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 6px); } }
+#toast.rich { text-align: left; background: var(--panel); color: var(--ink); padding: 10px 16px 10px 10px;
+              border: 1px solid color-mix(in srgb, var(--ic) 35%, var(--line)); box-shadow: 0 12px 32px -10px rgba(0, 0, 0, .55), 0 0 0 4px color-mix(in srgb, var(--ic) 8%, transparent); }
+#toast.rich.show { display: flex; align-items: center; gap: 11px; }
+#toast.rich b { display: block; font-weight: 650; color: var(--ic); }
+#toast.rich span { color: var(--muted); }
+#toast i.ci { flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: var(--ic);
+              background: color-mix(in srgb, var(--ic) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic) 26%, transparent); }
+#toast i.ci svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#zAuto.on { color: #36d39a; background: color-mix(in srgb, #36d39a 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, #36d39a 30%, transparent); }
+#zAuto:not(.on) { opacity: .75; }
 /* ---- run view: status card, result card, activity ---- */
 .card { border: 1px solid var(--line); border-radius: 14px; background: var(--pad); padding: 14px; margin-bottom: 12px; }
 .status-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }

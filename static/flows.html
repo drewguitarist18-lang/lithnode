@@ -177,7 +177,19 @@ async function api(path, opts = {}) {
   return data;
 }
 let toastTimer;
-function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 4200); }
+function toast(msg, look) {   // look: { icon, color, title } turns it into a card with a colored icon
+  const t = $("toast");
+  if (look) {
+    const ic = ui.icon(look.icon, look.color);
+    t.innerHTML = `<i class="ci" style="--ic:${ic.color}"><svg viewBox="0 0 24 24" aria-hidden="true">${ic.svg}</svg></i><span>${look.title ? `<b>${esc(look.title)}</b>` : ""}${esc(msg)}</span>`;
+    t.style.setProperty("--ic", ic.color);
+  } else { t.textContent = msg; t.style.removeProperty("--ic"); }
+  t.classList.toggle("rich", !!look);
+  t.classList.remove("show"); void t.offsetWidth; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 4200);
+}
+const AUTO_ON = { icon: "tidyLr", color: "#36d39a", title: "Auto-arrange on" }, AUTO_OFF = { icon: "hand", color: "#ffb547", title: "Auto-arrange off" };
+function showAuto() { const on = !locked() && flow.auto !== false; $("zAuto").classList.toggle("on", on); $("zAuto").setAttribute("aria-pressed", on); }
 
 // ------------------------------------------------------------------ state
 let meta = { models: [], tools: [], shapes: [], templates: [], max_agents: 15 };
@@ -214,7 +226,8 @@ async function loadConnectors(force) {
   renderInspector();
 }
 let engines = null;   // null while checking; then [{id, name, installed, signed_in, note, sandbox?}]
-const ENGINE_NAME = { claude: "Claude Code", codex: "Codex", cursor: "Cursor", antigravity: "Antigravity", ollama: "Ollama" };
+const ENGINE_NAME = { claude: "Claude Code", codex: "Codex", cursor: "Cursor", antigravity: "Antigravity", ollama: "Ollama", api: "API keys" };
+const engineImg = (id) => `/static/engine-${id}.${id === "claude" || id === "api" ? "svg" : "png"}`;
 const engineOf = (n) => n.engine || "claude";
 const engineInfo = (id) => (engines || []).find((e) => e.id === id) || { id, name: ENGINE_NAME[id], installed: true, signed_in: true, note: "" };
 async function loadEngines(force) {
@@ -271,7 +284,10 @@ const shown = () => (run ? run.flow : flow);     // the run view draws the flow 
 const nodeById = (id) => shown().nodes.find((n) => n.id === id);
 
 // ------------------------------------------------------------------ load
+let appPrefs = {};   // Settings' defaults for new teams; the top frame calls flowsApi.reloadPrefs() when they change
+const loadPrefs = async () => { try { appPrefs = (await api("/api/settings")).settings || {}; } catch (e) {} };
 async function boot() {
+  loadPrefs();
   const d = await api("/api/flows");
   meta = d; flows = d.flows;
   bots = (await api("/api/bots").catch(() => ({ bots: [] }))).bots || [];
@@ -438,10 +454,10 @@ $("palette").addEventListener("contextmenu", (e) => {
   e.preventDefault();
   const b = bots.find((x) => x.id === row.dataset.bot); if (!b) return;
   ui.menu(e.clientX, e.clientY, [
-    { icon: "＋", label: "Add to flow", action: () => addFromPalette(row) },
-    { icon: "✎", label: b.builtin ? "Rename" : "Edit", action: () => openBotEditor(b) },
+    { icon: ui.icon("plus"), label: "Add to flow", action: () => addFromPalette(row) },
+    { icon: ui.icon("pen"), label: b.builtin ? "Rename" : "Edit", action: () => openBotEditor(b) },
     { sep: true },
-    { icon: "✕", label: "Delete bot", danger: true, disabled: !!b.builtin, action: () => deleteBot(b) },
+    { icon: ui.icon("trash"), label: "Delete bot", danger: true, disabled: !!b.builtin, action: () => deleteBot(b) },
   ]);
 });
 $("newBot").onclick = (e) => { e.stopPropagation(); openBotEditor(null); };
@@ -479,6 +495,12 @@ function addNode(type, x, y, botId) {
     Object.assign(n, { count: 1, role: "build", model: roleModel("build"), tools: "read", effort: "low", instructions: "", focuses: "", shape: "crab", color: "#ecebe6", max_turns: 0 });
     const b = bots.find((x) => x.id === botId);
     if (b) applyBot(n, b);
+    // Settings' defaults for a new team: its engine, and a Claude model that overrides the role's pick
+    if (appPrefs.engine && appPrefs.engine !== "claude") {   // Settings' model is for the picked engine; blank = the role's pick
+      n.engine = appPrefs.engine;
+      n.engine_model = appPrefs.model && (engineInfo(n.engine).models || []).some((m) => m.id === appPrefs.model) ? appPrefs.model : roleModelOn(n.engine, n.role);
+    }
+    else if (appPrefs.model && meta.models.some((m) => m.id === appPrefs.model)) { n.model = appPrefs.model; n.role = ""; }
   }
   if (type === "checkpoint") Object.assign(n, { mode: "pass", role: "run", model: roleModel("run"), on_error: "stop" });
   if (type === "approval") Object.assign(n, { message: "", webhook: "" });
@@ -687,8 +709,9 @@ function gapBetween(ay, by) {   // where a wire to the next row runs: the band b
   return g === undefined ? (ay + by) / 2 : g;
 }
 $("zAuto").onclick = () => {
-  if (flow.auto !== false) { flow.auto = false; changed(false); toast("Auto-arrange is off. Place nodes wherever you like."); }
-  else tidy(flow.dir === "tb" ? "tb" : "lr");
+  if (flow.auto !== false) { flow.auto = false; changed(false); toast("Drag nodes wherever you like. Click again to tidy up.", AUTO_OFF); }
+  else { tidy(flow.dir === "tb" ? "tb" : "lr"); toast("The flow stays neat as you add and wire steps.", AUTO_ON); }
+  showAuto(); $("zAuto").blur();
 };
 $("zDir").onclick = () => tidy(vertical() ? "lr" : "tb");
 $("canvas").addEventListener("wheel", (e) => { if (e.target.closest(".hud")) return; e.preventDefault(); autoFit = false; zoomAt(e.clientX, e.clientY, view.k * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive: false });
@@ -703,7 +726,7 @@ function renderAll() {
   doneTile.classList.toggle("used", hasDone);
   doneTile.title = hasDone ? "This flow already has its Done step" : "Where the final result lands";
   doneTile.querySelector("small").textContent = hasDone ? "in this flow" : "the result";
-  $("zAuto").classList.toggle("on", !locked() && flow.auto !== false);
+  showAuto();
   $("zDir").innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${vertical() ? "M12 4v16M6 14l6 6 6-6" : "M4 12h16M14 6l6 6-6 6"}"/></svg>`;
   $("zDir").title = vertical() ? "Flow goes top to bottom. Click to tidy it left to right." : "Flow goes left to right. Click to tidy it top to bottom.";
   renderNodes(); renderWires(); renderChips();
@@ -744,7 +767,7 @@ function summaryOf(n) {
 }
 function toolIcons(n) {
   const out = [], t = n.tools;
-  if (engineOf(n) !== "claude") out.push(`<img src="/static/engine-${engineOf(n)}.png" alt="" title="Runs on ${ENGINE_NAME[engineOf(n)]}" style="${engineOf(n) === "codex" ? "background:#161616;padding:2px" : ""}">`);
+  if (engineOf(n) !== "claude") out.push(`<img src="${engineImg(engineOf(n))}" alt="" title="Runs on ${ENGINE_NAME[engineOf(n)]}" style="${engineOf(n) === "codex" ? "background:#161616;padding:2px" : ""}">`);
   if (t === "read" || t === "research") out.push(`<span title="Reads files">${ICON.read}</span>`);
   if (t === "web" || t === "research" || t === "all") out.push(`<span title="Searches the web">${ICON.web}</span>`);
   if (t === "edit") out.push(`<span title="Edits files">${ICON.edit}</span>`);
@@ -984,8 +1007,8 @@ function endDrag(e) {
   e = e || drag.last || { clientX: -1, clientY: -1 };
   const d = drag; drag = null; $("canvas").classList.remove("panning");
   if (d.kind === "node" && d.moved) {
-    if (flow.auto !== false) { flow.auto = false; toast("Auto-arrange is off for this flow, so your layout stays. Turn it back on any time."); }
-    changed(false); $("zAuto").classList.toggle("on", false);
+    if (flow.auto !== false) { flow.auto = false; toast("You moved a node, so your layout stays put. Turn it back on any time.", AUTO_OFF); }
+    changed(false); showAuto();
   }
   if (d.kind === "wire") {
     tempWire = null;
@@ -1007,21 +1030,21 @@ $("canvas").addEventListener("contextmenu", (e) => {
     const n = nodeById(nodeEl.dataset.id), wired = flow.edges.some((ed) => ed.from === n.id || ed.to === n.id);
     select({ kind: "node", id: n.id });
     return ui.menu(x, y, [
-      { icon: "⧉", label: "Duplicate", action: () => duplicateNode(n.id), disabled: n.type === "master" || n.type === "done" },
-      { icon: "⌁", label: "Disconnect all wires", action: () => { flow.edges = flow.edges.filter((ed) => ed.from !== n.id && ed.to !== n.id); changed(); }, disabled: !wired },
+      { icon: ui.icon("copy"), label: "Duplicate", action: () => duplicateNode(n.id), disabled: n.type === "master" || n.type === "done" },
+      { icon: ui.icon("unplug"), label: "Disconnect all wires", action: () => { flow.edges = flow.edges.filter((ed) => ed.from !== n.id && ed.to !== n.id); changed(); }, disabled: !wired },
       { sep: true },
-      { icon: "✕", label: "Delete node", danger: true, action: () => deleteNode(n.id), disabled: n.type === "master" },
+      { icon: ui.icon("trash"), label: "Delete node", danger: true, action: () => deleteNode(n.id), disabled: n.type === "master" },
     ]);
   }
-  if (w) return ui.menu(x, y, [{ icon: "✕", label: "Disconnect", danger: true, action: () => disconnect(+w.dataset.edge) }]);
+  if (w) return ui.menu(x, y, [{ icon: ui.icon("unplug", "#ff6b8b"), label: "Disconnect", danger: true, action: () => disconnect(+w.dataset.edge) }]);
   const p = toWorld(x, y), at = (type) => () => addNode(type, p.x - 107, p.y - 30);
   ui.menu(x, y, [
-    { icon: "＋", label: "Add a team", action: at("cluster") },
-    { icon: "◆", label: "Add checkpoint", action: at("checkpoint") },
-    { icon: "!", label: "Add approval", action: at("approval") },
-    { icon: "✓", label: "Add done", action: at("done"), disabled: flow.nodes.some((x) => x.type === "done") },
+    { icon: ui.icon("team"), label: "Add a team", action: at("cluster") },
+    { icon: ui.icon("merge"), label: "Add checkpoint", action: at("checkpoint") },
+    { icon: ui.icon("hand"), label: "Add approval", action: at("approval") },
+    { icon: ui.icon("flag"), label: "Add done", action: at("done"), disabled: flow.nodes.some((x) => x.type === "done") },
     { sep: true },
-    { icon: "⤢", label: "Fit to screen", action: () => { autoFit = true; fit(); } },
+    { icon: ui.icon("fit"), label: "Fit to screen", action: () => { autoFit = true; fit(); } },
   ]);
 });
 function duplicateNode(id) {
@@ -1075,7 +1098,7 @@ document.addEventListener("keydown", (e) => {
   const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName), ctrl = e.ctrlKey || e.metaKey;
   if ((e.key === "Delete" || e.key === "Backspace") && !typing) { e.preventDefault(); deleteSelected(); }
   if (e.key === "Escape" && !typing) select(null);
-  if (e.key === "s" && ctrl) { e.preventDefault(); save(); }
+  if (e.key === "s" && ctrl) { e.preventDefault(); flowsApi.exportTeam(); }   // saves, then downloads the layout as a team file
   if (e.key === "o" && ctrl) { e.preventDefault(); flowsApi.importTeam(); }
   if (e.key === "," && ctrl) { e.preventDefault(); parent.openSettings?.(); }
   if (e.key === "e" && ctrl) { e.preventDefault(); flowsApi.exportTeam(); }
@@ -1153,10 +1176,11 @@ function connectorRows(n) {
 }
 
 // each engine's own mark: Claude's orange spark, Codex's and Cursor's app icons
-const engineIcon = (id) => `<i class="eico ${id}"><img src="/static/engine-${id}.${id === "claude" ? "svg" : "png"}" alt=""></i>`;
+const engineIcon = (id) => `<i class="eico ${id}"><img src="${engineImg(id)}" alt=""></i>`;
 
 // the models an engine offers this account, grouped by family (Cursor alone has hundreds)
 function modelFamily(m) {
+  if (m.label.includes(" · ")) return m.label.split(" · ")[0];   // API keys: grouped by provider
   const k = (m.id + " " + m.label).toLowerCase();
   return k.includes("claude") ? "Claude" : k.includes("grok") ? "Grok" : k.includes("gemini") ? "Gemini"
     : k.includes("composer") ? "Cursor" : /gpt|codex|\bo\d/.test(k) ? "OpenAI" : "Other";
@@ -1166,23 +1190,24 @@ function engineModels(n) {
   const cur = n.engine_model || "", known = list.some((m) => m.id === cur);
   const groups = {};
   list.forEach((m) => (groups[modelFamily(m)] = groups[modelFamily(m)] || []).push(m));
-  const order = ["OpenAI", "Claude", "Grok", "Gemini", "Cursor", "Other"].filter((g) => groups[g]);
+  const order = [...new Set(["OpenAI", "Claude", "Grok", "Gemini", "Cursor", ...Object.keys(groups), "Other"])].filter((g) => groups[g]);
   const opts = order.map((g) => `<optgroup label="${g}">${groups[g].map((m) => `<option value="${esc(m.id)}"${m.id === cur ? " selected" : ""}>${esc(m.label)}</option>`).join("")}</optgroup>`).join("");
-  return `<select data-k="engine_model" aria-label="Model"><option value="">${{ codex: "Default (your Codex setting)", cursor: "Auto (Cursor picks)", antigravity: "Default (your Antigravity setting)", ollama: "First downloaded model" }[engineOf(n)]}</option>`
+  return `<select data-k="engine_model" aria-label="Model"><option value="">${{ codex: "Default (your Codex setting)", cursor: "Auto (Cursor picks)", antigravity: "Default (your Antigravity setting)", ollama: "First downloaded model", api: "First model on your first key" }[engineOf(n)]}</option>`
     + (cur && !known ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : "") + opts + `</select>`;
 }
 
 // which agent CLI a team runs on, with whether it's ready on this computer
 function engineCards(n) {
   const cur = engineOf(n), info = engineInfo(cur), ready = (e) => e.installed && e.signed_in;
-  const seg = ["claude", "codex", "cursor", "antigravity", "ollama"].map((id) => {
-    const e = engineInfo(id), why = !engines ? "" : !e.installed ? `${ENGINE_NAME[id]} isn't installed` : !e.signed_in ? `${ENGINE_NAME[id]} isn't signed in` : "";
-    return `<button type="button" data-engine="${id}" class="${id === cur ? "on" : ""}${engines && !ready(e) ? " off" : ""}" title="${esc(why || ENGINE_NAME[id])}">${engineIcon(id)}<span>${id === "claude" ? "Claude" : ENGINE_NAME[id]}</span></button>`;
+  const seg = ["claude", "codex", "cursor", "antigravity", "ollama", "api"].map((id) => {
+    const e = engineInfo(id), why = !engines ? "" : id === "api" && !e.signed_in ? "Add an API key in Settings first" : !e.installed ? `${ENGINE_NAME[id]} isn't installed` : !e.signed_in ? `${ENGINE_NAME[id]} isn't signed in` : "";
+    return `<button type="button" data-engine="${id}" class="${id === cur ? "on" : ""}${engines && !ready(e) ? " off" : ""}" title="${esc(why || ENGINE_NAME[id])}">${engineIcon(id)}<span>${id === "claude" ? "Claude" : id === "api" ? "API" : ENGINE_NAME[id]}</span></button>`;
   }).join("");
-  const plan = { claude: "your Claude plan", codex: "your ChatGPT plan", cursor: "your Cursor plan", antigravity: "your Google plan", ollama: "free, on this PC" }[cur];
+  const plan = { claude: "your Claude plan", codex: "your ChatGPT plan", cursor: "your Cursor plan", antigravity: "your Google plan", ollama: "free, on this PC", api: "billed per token on your key" }[cur];
   const stat = !engines ? `<i class="bad"></i>Checking…` : !ready(info) ? `<i class="bad"></i>${esc(info.note || `${ENGINE_NAME[cur]} isn't ready on this computer`)}`
     : info.sandbox === false ? `<i class="bad"></i><span title="${esc(info.note)}">Codex can change files and run commands anywhere on this PC</span>`
     : info.local ? `<i></i><span title="${esc(info.note)}">Ready · free, on this PC · no web, files or tools</span>`
+    : cur === "api" ? `<i></i><span title="${esc(info.note)}">Ready · billed per token on your key · no web, files or tools</span>`
     : info.note ? `<i class="bad"></i>${esc(info.note)}` : `<i></i>Ready · ${plan.replace(/^your /, "")}`;
   return `<div class="eseg" role="group" aria-label="Runs on">${seg}</div><div class="estat">${stat}<a href="#" id="engRefresh" title="Check again" aria-label="Check again"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></a></div>`;
 }
@@ -1287,7 +1312,7 @@ function renderInspector() {
     // on Codex, Cursor and Ollama each role has its own pick from that engine's models; "" is the CLI's own default
     const engPick = (r) => {
       const list = (engineInfo(eng).models || []).filter((m) => m.id !== "auto"), cur = roleModelOn(eng, r);
-      return `<select data-erolemodel="${r}" aria-label="Model"><option value="">${{ codex: "Default", cursor: "Auto", antigravity: "Default", ollama: "First model" }[eng]}</option>`
+      return `<select data-erolemodel="${r}" aria-label="Model"><option value="">${{ codex: "Default", cursor: "Auto", antigravity: "Default", ollama: "First model", api: "First model" }[eng]}</option>`
         + (cur && !list.some((m) => m.id === cur) ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : "")
         + list.map((m) => `<option value="${esc(m.id)}"${m.id === cur ? " selected" : ""}>${esc(m.label)}</option>`).join("") + `</select>`;
     };
@@ -1541,7 +1566,8 @@ function usageLine(e) {
   if (!e || !e.sessions) return "";
   const per = e.per_engine || { claude: e.sessions };
   const parts = Object.keys(PLAN_NAME).filter((k) => per[k]).map((k) => `${per[k]} on your ${PLAN_NAME[k]} plan`)
-    .concat(per.ollama ? [`${per.ollama} free on this PC (Ollama)`] : []);
+    .concat(per.ollama ? [`${per.ollama} free on this PC (Ollama)`] : [])
+    .concat(per.api ? [`${per.api} on your API keys, billed per token`] : []);
   const big = e.sessions >= BIG_RUN || flow.nodes.some((n) => n.type === "cluster" && n.split && n.count > 2);
   return `<b>${e.sessions} agent session${e.sessions === 1 ? "" : "s"}</b>: ${esc(parts.join(", "))}.` +
     (big ? ` <span class="bigrun">This is a big run and can use a lot of your plan.</span>` : "");
@@ -2091,10 +2117,15 @@ $("newDlg").addEventListener("click", async (e) => {
 function flowMenu(r) {
   ui.menu(r.left, r.bottom + 6, [
     { head: "Your flows" },
-    ...flows.map((f) => ({ icon: f.id === flow.id ? "✓" : "", label: f.name, on: f.id === flow.id, action: () => switchFlow(f.id) })),
+    ...flows.map((f) => ({ icon: ui.icon("dot", flowHue(f.id)), label: f.name, on: f.id === flow.id, hint: f.id === flow.id ? "✓" : "", action: () => switchFlow(f.id) })),
     { sep: true },
-    { icon: "＋", label: "New flow", action: () => $("newBtn").click() },
+    { icon: ui.icon("plus"), label: "New flow", action: () => $("newBtn").click() },
   ]);
+}
+function flowHue(id) {   // each flow keeps its own dot color in the switcher
+  const HUES = ["#8b7cff", "#4fa8ff", "#36d39a", "#ffb547", "#ff6b8b", "#47d7e0", "#c084fc", "#ff8a65"];
+  let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return HUES[h % HUES.length];
 }
 $("flowMenu").onclick = (e) => flowMenu(e.currentTarget.closest(".fname").getBoundingClientRect());
 $("floatName").onclick = (e) => flowMenu(e.currentTarget.getBoundingClientRect());
@@ -2255,6 +2286,7 @@ window.flowsApi = {
   zoomIn: () => zoomBy(1.2), zoomOut: () => zoomBy(1 / 1.2), zoomReset: () => zoomBy(0), fit: () => { autoFit = true; fit(); },
   panes, toggleLeft: () => setPanes(!panes()[0], panes()[1]), toggleRight: () => setPanes(panes()[0], !panes()[1]),
   tour: () => welcomeTour(),
+  reloadPrefs: () => loadPrefs(), reloadEngines: () => loadEngines(true), setView: (v) => setView(v), view: () => viewMode, models: () => meta.models || [],
 };
 // Team files: a flow saved as a .lithnode.json to share, and one someone shared opened as a new flow.
 async function exportFlow() {

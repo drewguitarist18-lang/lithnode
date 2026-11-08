@@ -1,4 +1,5 @@
-"""App-wide settings, in settings.json in Lithnode's folder: what new flows start with, whether to check for updates, and whether to count this install (updates.ping_once).
+"""App-wide settings, in settings.json in Lithnode's folder: what new flows and teams start with, run alerts,
+whether to check for updates, and whether to count this install (updates.ping_once).
 
 The theme lives in the window itself (it has to apply before the page draws), so it isn't here.
 """
@@ -8,10 +9,16 @@ import threading
 from pathlib import Path
 from typing import Any
 
+import engines
 import flows
 
 LIMITS = [250_000, 500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000]   # the choices the Settings window offers
-DEFAULTS: dict[str, Any] = {"limit": flows.DEFAULT_LIMIT, "roles": True, "check_updates": True, "count_install": True}
+DEFAULTS: dict[str, Any] = {"limit": flows.DEFAULT_LIMIT, "roles": True, "check_updates": True, "count_install": True,
+                            "engine": "claude",   # what a new team runs on
+                            "model": "",          # a Claude model for new teams; "" lets the team's role pick
+                            "auto": True,         # new flows auto-arrange
+                            "dir": "lr",          # new blank flows go left to right, or top to bottom ("tb")
+                            "notify_sound": True, "notify_desktop": False}   # when a run finishes or needs you
 _lock = threading.Lock()
 
 
@@ -21,9 +28,15 @@ def clean(raw: Any) -> dict[str, Any]:
     out = dict(DEFAULTS)
     if "limit" in raw:
         out["limit"] = flows.clean_limit(raw["limit"])
-    for key in ("roles", "check_updates", "count_install"):
+    for key in ("roles", "check_updates", "count_install", "auto", "notify_sound", "notify_desktop"):
         if isinstance(raw.get(key), bool):
             out[key] = raw[key]
+    if raw.get("engine") in engines.ENGINES:
+        out["engine"] = raw["engine"]
+    model = str(raw.get("model") or "").strip()[:60]
+    out["model"] = model if flows.MODEL_RE.match(model) else ""
+    if raw.get("dir") in ("lr", "tb"):
+        out["dir"] = raw["dir"]
     return out
 
 

@@ -117,7 +117,8 @@ class Store:
         for path in self.runs_dir.glob("*.json") if self.runs_dir.exists() else []:
             try:
                 r = json.loads(path.read_text(encoding="utf-8"))
-                row = {k: r.get(k) for k in ("id", "flow_id", "flow_name", "task", "status", "started", "ended", "cost")}
+                row = {k: r.get(k) for k in ("id", "flow_id", "flow_name", "task", "status", "started", "ended", "cost", "tokens")}
+                row["limit"] = (r.get("flow") or {}).get("limit", 0)   # what Settings' usage bars measure against
                 # the run's latest list of items, counted: what the history shows ("3 passed · 3 cut")
                 lists = sorted((st for st in (r.get("nodes") or {}).values() if st.get("items")), key=lambda st: st.get("ended") or 0)
                 if lists:
@@ -386,7 +387,7 @@ def estimate(flow: dict[str, Any]) -> dict[str, Any]:
     weight = sum(MODEL_WEIGHT.get(m, 3) * c for m, c in per_model.items())
     per_engine = {}   # whose plan each session uses: Claude, Codex (ChatGPT), Cursor, or none (Ollama, free and local)
     for m, c in per_model.items():
-        e = m if m in ("codex", "cursor", "antigravity", "ollama") else "claude"
+        e = m if m in ("codex", "cursor", "antigravity", "ollama", "api") else "claude"
         per_engine[e] = per_engine.get(e, 0) + c
     return {"sessions": sessions, "per_model": per_model, "per_engine": per_engine, "weight": weight}
 

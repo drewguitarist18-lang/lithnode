@@ -147,7 +147,7 @@
   html.native .quit { display: none; }
   html.native.mac header { padding-left: 84px; padding-right: 16px; }   /* the Mac's own window buttons sit top left */
   /* Settings: one window, a few plain sections, each row a label on the left and its control on the right */
-  dialog.set { width: min(560px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); padding: 0; border-radius: 16px;
+  dialog.set { width: min(640px, calc(100vw - 32px)); max-height: min(760px, calc(100vh - 48px)); padding: 0; border-radius: 16px;
                border: 1px solid var(--line); background: var(--bar); color: var(--ink); box-shadow: 0 24px 70px rgba(0,0,0,.45);
                display: none; flex-direction: column; font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
   dialog.set[open] { display: flex; animation: setIn .14s ease-out; }
@@ -159,10 +159,88 @@
                      font-size: 17px; cursor: pointer; }
   .set .top button:hover { background: var(--hover); color: var(--ink); }
   .set .body { overflow-y: auto; padding: 0 22px 18px; }
-  .set h3 { margin: 18px 0 2px; font-size: 11.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .set h3 { display: flex; align-items: center; gap: 9px; margin: 20px 0 4px; font-size: 11.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase;
+            color: color-mix(in srgb, var(--ic, var(--muted)) 70%, var(--ink)); }
+  .set h3 i.ci { flex: none; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; color: var(--ic);
+                 background: color-mix(in srgb, var(--ic) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic) 24%, transparent); }
+  .set h3 i.ci svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .set .row { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
   .set .row:last-child { border-bottom: 0; }
-  .set .row > div:first-child { flex: 1; min-width: 0; }
+  .set .row > div:first-of-type { flex: 1; min-width: 0; }
+  .set .row.eng { gap: 12px; }
+  .set .kintro { margin: -2px 0 6px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .set .row.key .ktile { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center; font-weight: 700; font-size: 13px;
+                         color: var(--ec); background: color-mix(in srgb, var(--ec) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ec) 40%, transparent); }
+  .set .row.key small a { color: var(--ec); text-decoration: none; font-weight: 550; }
+  .set .row.key small a:hover { text-decoration: underline; }
+  .set .row.key .kin { width: 150px; height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-size: 12px; }
+  .set .row.key .kin:focus { outline: none; border-color: var(--ec); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ec) 20%, transparent); }
+  .set .row.eng .btn, .set .row.eng a.btn { height: 28px; padding: 0 11px; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center;
+                                            color: var(--ec); border-color: color-mix(in srgb, var(--ec) 45%, var(--line)); background: color-mix(in srgb, var(--ec) 10%, transparent); }
+  .set .row.eng .btn.ghost { color: var(--muted); border-color: var(--line); background: transparent; }
+  .set .row.eng .btn:hover { background: color-mix(in srgb, var(--ec) 20%, transparent); }
+  .set .row.eng .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--ec) 30%, transparent); border-top-color: var(--ec);
+                        animation: acctspin .8s linear infinite; flex: none; }
+  .set .row .bad { color: var(--warn); }
+  .set .st.wait { color: #ffb547; background: color-mix(in srgb, #ffb547 13%, transparent); }
+  .set .st.wait i { background: #ffb547; }
+  .set .epick { flex: none; display: flex; gap: 6px; }
+  .set .epick button { width: 34px; height: 34px; padding: 0; border-radius: 10px; border: 0; background: #161616; cursor: pointer; overflow: hidden; display: grid; place-items: center;
+                       box-shadow: 0 0 0 1px var(--line); opacity: .55; transition: opacity .12s, box-shadow .12s, transform .12s; }
+  .set .epick button img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .set .epick button[data-engine-pick="codex"] img { width: 70%; height: 70%; object-fit: contain; }
+  .set .epick button[data-engine-pick="antigravity"] img { width: 78%; height: 78%; object-fit: contain; }
+  .set .epick button:hover { opacity: .85; }
+  .set .epick button.on { opacity: 1; box-shadow: 0 0 0 2px var(--ec), 0 0 14px -3px var(--ec); transform: translateY(-1px); }
+  .set .use { display: grid; gap: 8px; padding: 8px 0 4px; }
+  .set .urow { display: grid; grid-template-columns: minmax(0, 150px) 1fr auto; align-items: center; gap: 12px; }
+  .set .urow .un { min-width: 0; }
+  .set .urow .un b { display: block; font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .set .urow .un small { margin: 0; font-size: 11px; }
+  .set .ubar { height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--uc) 12%, var(--hover)); overflow: hidden; }
+  .set .ubar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--uc) 60%, #fff 0%), var(--uc));
+                 box-shadow: 0 0 10px -2px var(--uc); }
+  .set .uv { font-size: 12px; font-weight: 600; color: var(--uc); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .set .uv small { display: inline; color: var(--muted); font-weight: 500; }
+  .set .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; padding: 8px 0 4px; }
+  .set .krow { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 4px 0; }
+  .set .krow > span:last-child { display: inline-flex; align-items: center; gap: 3px; }
+  .set .krow i { font-style: normal; color: var(--muted); font-size: 11px; }
+  .set kbd { font: 600 11px/1 inherit; min-width: 22px; padding: 4px 6px; border-radius: 6px; text-align: center; color: var(--kc);
+             background: color-mix(in srgb, var(--kc) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kc) 32%, transparent), 0 1px 0 color-mix(in srgb, var(--kc) 35%, transparent); }
+  .set .about { display: flex; align-items: center; gap: 14px; padding: 12px 14px; margin-top: 8px; border-radius: 12px;
+                background: linear-gradient(120deg, color-mix(in srgb, #D97757 12%, transparent), color-mix(in srgb, #8b7cff 10%, transparent) 60%, color-mix(in srgb, #47d7e0 10%, transparent));
+                box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent); }
+  .set .about canvas { width: 64px; height: 48px; flex: none; image-rendering: pixelated; }
+  .set .about b { display: block; font-size: 14px; font-weight: 650; }
+  .set .about b span { font-size: 11px; font-weight: 600; color: #36d39a; background: color-mix(in srgb, #36d39a 14%, transparent); padding: 1px 6px; border-radius: 6px; margin-left: 4px; }
+  .set .about small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .set .about .links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .set .about .links a { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 8px; font-size: 12px; font-weight: 550;
+                         color: var(--ink); text-decoration: none; background: color-mix(in srgb, var(--ic) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic) 30%, transparent); }
+  .set .about .links a:hover { background: color-mix(in srgb, var(--ic) 22%, transparent); }
+  .set .about .links svg { width: 13px; height: 13px; fill: none; stroke: var(--ic); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  @media (max-width: 520px) { .set .keys { grid-template-columns: 1fr; } .set .urow { grid-template-columns: 1fr auto; } .set .ubar { grid-column: 1 / -1; grid-row: 2; } }
+  .set .elogo { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; overflow: hidden; background: #161616;
+                box-shadow: 0 0 0 1px color-mix(in srgb, var(--ec) 55%, transparent), 0 0 14px -4px var(--ec); }
+  .set .elogo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .set .elogo.codex img { width: 70%; height: 70%; object-fit: contain; }
+  .set .elogo.antigravity img { width: 78%; height: 78%; object-fit: contain; }
+  .set .elogo.off { box-shadow: 0 0 0 1px var(--line); }
+  .set .elogo.off img { opacity: .5; filter: grayscale(.7); }
+  .set .row.eng b { color: color-mix(in srgb, var(--ec) 35%, var(--ink)); }
+  .set .free { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; padding: 1px 5px; border-radius: 5px; vertical-align: 1px;
+               color: #36d39a; background: color-mix(in srgb, #36d39a 16%, transparent); }
+  .set .seg button { display: inline-flex; align-items: center; gap: 6px; }
+  .set .seg button svg { width: 13px; height: 13px; fill: none; stroke: var(--ic); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .set .seg button.on { color: var(--ic) !important; background: color-mix(in srgb, var(--ic) 16%, transparent) !important;
+                        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ic) 35%, transparent) !important; }
+  .set .btn { display: inline-flex; align-items: center; gap: 7px; }
+  .set .btn svg { width: 14px; height: 14px; fill: none; stroke: var(--ic, currentColor); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .set .btn[style*="--ic"]:hover { background: color-mix(in srgb, var(--ic) 14%, transparent); border-color: color-mix(in srgb, var(--ic) 40%, var(--line)); }
+  .set .st { padding: 3px 9px; border-radius: 99px; background: color-mix(in srgb, var(--muted) 10%, transparent); min-width: 0; }
+  .set .st.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+  .set .st.bad { color: var(--warn); background: color-mix(in srgb, var(--warn) 13%, transparent); }
   .set .row b { display: block; font-weight: 600; }
   .set .row small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; overflow-wrap: anywhere; }
   .set .seg { display: flex; gap: 2px; padding: 3px; border-radius: 10px; border: 1px solid var(--line); flex: none; }
@@ -298,6 +376,8 @@ async function poll() {
     let noticed = true; try { noticed = localStorage.getItem("hq-usage-ok-2") === "1"; } catch (e) {}
     if (!greeted && noticed) { greeted = true; if (!signed.length) toggleAcct(true); }
     if (changed && !$("acct").hidden) renderAcct();
+    if (changed && $("settings").open) renderEngines();
+    watchRuns(d);
     document.title = (d.approvals ? "(!) " : "") + "Lithnode" + (d.agents ? ` · ${d.agents} working` : "");
   } catch (e) {
     $("status").className = "status bad"; $("status").querySelector("span").textContent = "Server offline";
@@ -306,9 +386,21 @@ async function poll() {
 poll(); setInterval(poll, 2000);
 
 // Lithnode has no account of its own. Each engine uses the account already signed in to its own CLI.
-const LABEL = { claude: "Claude Code", codex: "Codex", cursor: "Cursor", antigravity: "Antigravity", ollama: "Ollama" };
-const ENGINE_LOGO = { claude: "engine-claude.svg", codex: "engine-codex.png", cursor: "engine-cursor.png", antigravity: "engine-antigravity.png", ollama: "engine-ollama.png" };
+const LABEL = { claude: "Claude Code", codex: "Codex", cursor: "Cursor", antigravity: "Antigravity", ollama: "Ollama", api: "API keys" };
+const ENGINE_COLOR = { claude: "#D97757", codex: "#10a37f", cursor: "#4fa8ff", antigravity: "#8b7cff", ollama: "#36d39a", api: "#ff6b8b" };   // the tint around each logo in Settings
+const ENGINE_LOGO = { claude: "engine-claude.svg", codex: "engine-codex.png", cursor: "engine-cursor.png", antigravity: "engine-antigravity.png", ollama: "engine-ollama.png", api: "engine-api.svg" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+// The one button an engine needs right now: install it, sign in, start it, or sign out. The account card and Settings share it.
+function engineBtn(id, cls) {
+  const e = engineStatus[id] || {}, on = e.installed && e.signed_in, job = e.job || {};
+  const c = cls ? ` class="${cls}"` : "", ghost = cls ? ` class="${cls} ghost"` : ` class="ghost"`;
+  if (job.busy || (id === "claude" && signin.active && !on) || pending[id]) return `<span class="spin" aria-label="Working"></span>`;
+  if (id === "api") return on ? "" : `<button type="button"${c} data-act="keys">Add a key</button>`;
+  if (on) return id === "ollama" ? "" : `<button type="button"${ghost} data-act="signout" data-engine="${id}">Sign out</button>`;
+  if (id === "claude") return e.installed ? `<button type="button"${c} data-act="login">Sign in</button>` : `<a${c} href="https://claude.com/claude-code" target="_blank" rel="noopener">Install</a>`;
+  if (id === "ollama") return `<button type="button"${c} data-act="engine-install" data-engine="ollama">${!e.installed ? "Install" : /not running/i.test(e.note || "") ? "Start" : "Get a model"}</button>`;
+  return e.installed ? `<button type="button"${c} data-act="engine-login" data-engine="${id}">Sign in</button>` : `<button type="button"${c} data-act="engine-install" data-engine="${id}">Install</button>`;
+}
 function renderAcct() {
   const cc = account, si = signin, a = $("acct");
   const typed = $("codeIn")?.value || "", focused = document.activeElement?.id === "codeIn";   // a poll mustn't eat a half-pasted code
@@ -318,11 +410,7 @@ function renderAcct() {
     const e = engineStatus[id] || {}, on = e.installed && e.signed_in, job = e.job || {};
     const claudeWaiting = id === "claude" && si.active && !on;
     const busy = job.busy || claudeWaiting || pending[id];
-    const action = busy ? `<span class="spin" aria-label="Working"></span>`
-      : on ? (id === "ollama" ? "" : `<button class="ghost" data-act="signout" data-engine="${id}">Sign out</button>`)
-      : id === "claude" ? (e.installed ? `<button data-act="login">Sign in</button>` : `<a href="https://claude.com/claude-code" target="_blank" rel="noopener">Install</a>`)
-      : id === "ollama" ? `<button data-act="engine-install" data-engine="ollama">${!e.installed ? "Install" : /not running/i.test(e.note || "") ? "Start" : "Get a model"}</button>`
-      : e.installed ? `<button data-act="engine-login" data-engine="${id}">Sign in</button>` : `<button data-act="engine-install" data-engine="${id}">Install</button>`;
+    const action = engineBtn(id, "");
     const state = pending[id] === "signout" ? "Signing out…"
       : job.busy && job.kind === "login" ? "Finish signing in in your browser"
       : job.busy ? (id === "ollama" && e.installed ? "Downloading a model" : "Installing") + (job.pct != null ? ` · ${job.pct}%` : "…")
@@ -344,6 +432,7 @@ function renderAcct() {
   a.innerHTML = `<h3><i></i>Agent engines</h3><p>Flows use any engine ready on this computer. Build flow chooses the first available one. Ollama runs free models on your own PC.</p>${rows}${claudeHelp}<div class="row"><button data-act="check">Check again</button></div>`;
   const input = $("codeIn");
   if (input) { input.value = typed; if (focused) input.focus(); }
+  if ($("settings").open) renderEngines();
 }
 async function startSignin() {
   signin = { active: true, url: "", error: "" }; trouble = false;
@@ -420,27 +509,29 @@ const flowsDo = (fn) => () => {
 };
 const fapi = () => (frames.flows && frames.flows.contentWindow.flowsApi) || null;
 
+const THEME_COLOR = { dark: "#7aa2f7", light: "#ffb547", system: "#47d7e0" };
+const mi = (k) => ui.icon(k);
 const MENUS = {
   file: () => [
-    { icon: "＋", label: "New flow", action: flowsDo((a) => a.newFlow()) },
-    { icon: "▦", label: "New from a template…", action: flowsDo((a) => a.newFromTemplate()) },
-    { icon: "⧉", label: "Duplicate flow", action: flowsDo((a) => a.duplicate()) },
+    { icon: mi("plus"), label: "New flow", action: flowsDo((a) => a.newFlow()) },
+    { icon: mi("tpl"), label: "New from a template…", action: flowsDo((a) => a.newFromTemplate()) },
+    { icon: mi("copy"), label: "Duplicate flow", action: flowsDo((a) => a.duplicate()) },
     { sep: true },
-    { icon: "⤒", label: "Import team file…", hint: "Ctrl+O", action: flowsDo((a) => a.importTeam()) },
-    { icon: "⤓", label: "Export team file", hint: "Ctrl+E", action: flowsDo((a) => a.exportTeam()) },
+    { icon: mi("imp"), label: "Import team file…", hint: "Ctrl+O", action: flowsDo((a) => a.importTeam()) },
+    { icon: mi("exp"), label: "Export team file", hint: "Ctrl+S", action: flowsDo((a) => a.exportTeam()) },
     { sep: true },
-    { icon: "✕", label: "Delete flow", danger: true, action: flowsDo((a) => a.deleteFlow()) },
+    { icon: mi("trash"), label: "Delete flow", danger: true, action: flowsDo((a) => a.deleteFlow()) },
   ],
   edit: () => {
     const a = onTab() === "flows" ? fapi() : null;
     return [
-      { icon: "✎", label: "Rename flow", hint: "F2", action: flowsDo((x) => x.rename()) },
+      { icon: mi("pen"), label: "Rename flow", hint: "F2", action: flowsDo((x) => x.rename()) },
       { sep: true },
-      { icon: "⧉", label: "Duplicate selected", hint: "Ctrl+D", disabled: !(a && a.selIsNode()), action: flowsDo((x) => x.duplicateSel()) },
-      { icon: "✕", label: "Delete selected", hint: "Del", disabled: !(a && a.hasSel()), action: flowsDo((x) => x.deleteSel()) },
+      { icon: mi("copy"), label: "Duplicate selected", hint: "Ctrl+D", disabled: !(a && a.selIsNode()), action: flowsDo((x) => x.duplicateSel()) },
+      { icon: mi("trash"), label: "Delete selected", hint: "Del", disabled: !(a && a.hasSel()), action: flowsDo((x) => x.deleteSel()) },
       { sep: true },
-      { icon: "⇅", label: "Tidy up top to bottom", action: flowsDo((x) => x.tidy("tb")) },
-      { icon: "⇄", label: "Tidy up left to right", action: flowsDo((x) => x.tidy("lr")) },
+      { icon: mi("tidyTb"), label: "Tidy up top to bottom", action: flowsDo((x) => x.tidy("tb")) },
+      { icon: mi("tidyLr"), label: "Tidy up left to right", action: flowsDo((x) => x.tidy("lr")) },
     ];
   },
 };
@@ -467,18 +558,18 @@ $("cogBtn").onclick = () => {
   if (cogWasOpen) return;
   const b = $("cogBtn"), r = b.getBoundingClientRect();
   ui.menu(r.right - 230, r.bottom + 4, [
-    { icon: "⚙", label: "Settings…", hint: "Ctrl+,", action: () => openSettings() },
+    { icon: mi("gear"), label: "Settings…", hint: "Ctrl+,", action: () => openSettings() },
     { sep: true },
     { head: "Theme" },
-    ...Object.entries(THEMES).map(([k, [, name]]) => ({ icon: themeMode === k ? "✓" : "", label: name,
+    ...Object.entries(THEMES).map(([k, [, name]]) => ({ icon: { svg: THEMES[k][0], color: THEME_COLOR[k] }, label: name, on: themeMode === k, hint: themeMode === k ? "✓" : "",
       action: () => { themeMode = k; try { localStorage.setItem("hq-theme", k); } catch (e) {} applyAll(); } })),
     { sep: true },
-    { icon: "↻", label: "Check for updates", hint: release.version ? `v${release.version}` : "", action: () => checkUpdates(true) },
-    { icon: "?", label: "Take the tour", action: flowsDo((a) => a.tour()) },
-    { icon: "↗", label: "Lithnode website", action: () => window.open("https://lithnode.com", "_blank", "noopener") },
-    { icon: "↗", label: "Report a problem", action: () => window.open("https://github.com/drewguitarist18-lang/lithnode/issues", "_blank", "noopener") },
+    { icon: mi("update"), label: "Check for updates", hint: release.version ? `v${release.version}` : "", action: () => checkUpdates(true) },
+    { icon: mi("tour"), label: "Take the tour", action: flowsDo((a) => a.tour()) },
+    { icon: mi("web"), label: "Lithnode website", action: () => window.open("https://lithnode.com", "_blank", "noopener") },
+    { icon: mi("bug"), label: "Report a problem", action: () => window.open("https://github.com/drewguitarist18-lang/lithnode/issues", "_blank", "noopener") },
     { sep: true },
-    { icon: "⏻", label: "Quit Lithnode", action: () => $("quitBtn").click() },
+    { icon: mi("quit"), label: "Quit Lithnode", action: () => $("quitBtn").click() },
   ]);
   b.classList.add("on");
   const watch = setInterval(() => { if (!document.querySelector(".ui-menu")) { clearInterval(watch); b.classList.remove("on"); } }, 100);
@@ -538,55 +629,217 @@ setTimeout(() => checkUpdates(false), 4000);       // after the app has settled
 setInterval(() => checkUpdates(false), 3600000);   // the server only asks GitHub every few hours
 
 // ---- Settings: theme, the engines and their sign-in, what new flows start with, updates, where Lithnode keeps its files
-let prefs = null, engineList = null;
-const shortTokens = (n) => (n >= 1e6 ? `${n / 1e6}M` : `${n / 1e3}k`);
+const shortTokens = (n) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n));
+let prefs = null, engineList = null, recentRuns = null, keyList = null, keyErr = {}, keyBusy = {};
 async function openSettings() {
   ui.closeMenu();
   const d = $("settings");
   if (!d.open) d.showModal();
   try { prefs = await (await fetch("/api/settings", { cache: "no-store" })).json(); } catch (e) { prefs = null; }
   renderSettings();
+  fetch("/api/runs", { cache: "no-store" }).then((r) => r.json()).then((x) => { recentRuns = x.runs || []; if ($("setUse")) $("setUse").innerHTML = usageRows(); }).catch(() => {});
+  loadKeys();
   try { engineList = (await (await fetch("/api/engines", { cache: "no-store" })).json()).engines || []; } catch (e) { engineList = []; }
-  renderSettings();
+  renderSettings();   // the model list under New teams needs each engine's models
 }
-function engineRows() {
-  if (!engineList) return `<div class="row"><div><small>Checking what's installed…</small></div></div>`;
-  if (!engineList.length) return `<div class="row"><div><small>Couldn't check the engines.</small></div></div>`;
-  return engineList.map((e) => {
-    const signed = e.id === "claude" ? !!account.logged_in : e.signed_in;
-    const [cls, text] = !e.installed ? ["", "Not installed"] : signed ? ["ok", "Signed in"] : ["bad", "Not signed in"];
-    const what = e.note ? esc(e.note)
-      : e.id === "claude" ? (account.email ? `As ${esc(account.email)}. Every flow can run on it.` : "Every flow can run on it.")
-      : e.installed ? "Pick it for any team in a flow." : "Install its command-line tool to give teams this engine.";
-    const act = e.id === "claude" && e.installed && !signed ? `<button type="button" class="btn" data-act="signin">Sign in</button>` : "";
-    return `<div class="row"><div><b>${esc(e.name)}</b><small>${what}</small></div>${act}<span class="st ${cls}"><i></i>${text}</span></div>`;
+// API keys: an add-on beside the CLI sign-ins. The page only ever sees each key's last four characters.
+async function loadKeys() {
+  try { keyList = (await (await fetch("/api/keys", { cache: "no-store" })).json()).keys || []; } catch (e) { keyList = []; }
+  renderKeys();
+}
+function keyRows() {
+  if (!keyList) return `<div class="row"><div><small>Loading…</small></div></div>`;
+  return keyList.map((k) => {
+    const busy = keyBusy[k.id], err = keyErr[k.id];
+    const right = busy ? `<span class="spin" aria-label="Checking"></span>`
+      : k.set ? `<span class="st ok"><i></i>Saved ····${esc(k.last4)}</span><button type="button" class="btn ghost" data-act="key-remove" data-provider="${k.id}">Remove</button>`
+      : `<input type="password" class="kin" data-provider="${k.id}" placeholder="Paste key" autocomplete="off" spellcheck="false" aria-label="${esc(k.name)} API key">
+         <button type="button" class="btn" data-act="key-save" data-provider="${k.id}">Save</button>`;
+    return `<div class="row eng key" style="--ec:${k.color}"><span class="ktile">${esc(k.name.slice(0, 1))}</span>
+      <div><b>${esc(k.name)}</b><small>${err ? `<span class="bad">${esc(err)}</span>` : k.set ? "Teams on API keys can use its models." : `<a href="${esc(k.site)}" target="_blank" rel="noopener">Get a key</a>`}</small></div>${right}</div>`;
   }).join("");
 }
+function renderKeys() { if ($("setKeys")) $("setKeys").innerHTML = keyRows(); }
+async function keysChanged() {
+  await loadKeys();
+  try { engineList = (await (await fetch("/api/engines?refresh=1", { cache: "no-store" })).json()).engines || engineList; } catch (e) {}
+  poll(); renderEngines(); fapi()?.reloadPrefs?.(); fapi()?.reloadEngines?.();
+}
+async function saveKey(provider) {
+  const input = document.querySelector(`.kin[data-provider="${provider}"]`), key = (input?.value || "").trim();
+  if (!key) { input?.focus(); return; }
+  keyBusy[provider] = true; delete keyErr[provider]; renderKeys();
+  try {
+    const r = await fetch("/api/keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, key }) });
+    const x = await r.json().catch(() => ({}));
+    if (!r.ok) keyErr[provider] = x.error || "That key didn't work.";
+  } catch (e) { keyErr[provider] = "Couldn't reach Lithnode's server."; }
+  delete keyBusy[provider];
+  await keysChanged();
+}
+async function removeKey(provider) {
+  keyBusy[provider] = true; renderKeys();
+  try { await fetch("/api/keys/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider }) }); } catch (e) {}
+  delete keyBusy[provider]; delete keyErr[provider];
+  await keysChanged();
+}
+const ENGINE_IDS = ["claude", "codex", "cursor", "antigravity", "ollama", "api"];
+function engineState(id) {   // [class, words] for the pill beside each engine
+  const e = engineStatus[id] || {}, job = e.job || {}, on = e.installed && e.signed_in;
+  if (pending[id] === "signout") return ["", "Signing out…"];
+  if (job.busy && job.kind === "login") return ["wait", "Finish in your browser"];
+  if (job.busy) return ["wait", (id === "ollama" && e.installed ? "Downloading" : "Installing") + (job.pct != null ? ` ${job.pct}%` : "…")];
+  if (id === "claude" && signin.active && !on) return ["wait", "Finish in your browser"];
+  if (pending[id]) return ["wait", "Starting…"];
+  if (id === "api") return on ? ["ok", "Ready"] : ["", "No key yet"];
+  if (on) return ["ok", id === "ollama" ? "Ready" : "Signed in"];
+  if (!e.installed) return ["", "Not installed"];
+  return ["bad", id === "ollama" ? (/not running/i.test(e.note || "") ? "Not running" : "No model yet") : "Not signed in"];
+}
+function engineRows() {
+  if (!Object.keys(engineStatus).length && !engineList) return `<div class="row"><div><small>Checking what's installed…</small></div></div>`;
+  return ENGINE_IDS.map((id) => {
+    const info = (engineList || []).find((x) => x.id === id) || {}, e = engineStatus[id] || {}, on = e.installed && e.signed_in;
+    const what = errs[id] ? `<span class="bad">${esc(errs[id])}</span>`
+      : hints[id] && !on ? esc(hints[id])
+      : id === "claude" ? (account.email ? `As ${esc(account.email)}. Every flow can run on it.` : "Every flow can run on it.")
+      : info.note ? esc(info.note)
+      : id === "ollama" ? "Free models that run on this computer."
+      : e.installed ? "Pick it for any team in a flow." : "Install its command-line tool to give teams this engine.";
+    const [cls, text] = engineState(id);
+    return `<div class="row eng" style="--ec:${ENGINE_COLOR[id]}"><span class="elogo ${id}${e.installed ? "" : " off"}"><img src="/static/${ENGINE_LOGO[id]}" alt=""></span>
+      <div><b>${LABEL[id]}${id === "ollama" ? ` <span class="free">FREE</span>` : ""}</b><small>${what}</small></div>
+      <span class="st ${cls}"><i></i>${text}</span>${engineBtn(id, "btn")}</div>`;
+  }).join("");
+}
+function renderEngines() { if ($("setEng")) $("setEng").innerHTML = engineRows(); }
+function usageRows() {
+  if (!recentRuns) return `<div class="row"><div><small>Loading your runs…</small></div></div>`;
+  const rows = recentRuns.filter((r) => r.tokens).slice(0, 6);
+  if (!rows.length) return `<div class="row"><div><small>No runs yet. Your last few show here, with how much of their token limit they used.</small></div></div>`;
+  return `<div class="use">` + rows.map((r) => {
+    const pct = r.limit ? Math.min(100, Math.round((r.tokens / r.limit) * 100)) : 0;
+    const col = pct >= 90 ? "#ff6b8b" : pct >= 60 ? "#ffb547" : "#36d39a";
+    const when = r.started ? new Date(r.started * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+    return `<div class="urow" style="--uc:${col}" title="${esc(r.task || "")}"><span class="un"><b>${esc(r.flow_name || "Flow")}</b><small>${esc(when)}</small></span>
+      <span class="ubar"><i style="width:${Math.max(2, pct)}%"></i></span><span class="uv">${shortTokens(r.tokens)}${r.limit ? `<small> / ${shortTokens(r.limit)}</small>` : ""}</span></div>`;
+  }).join("") + `</div>`;
+}
+const SHORTCUTS = [
+  ["Settings", ["Ctrl", ","], "#9aa6c4"], ["Export the layout", ["Ctrl", "S"], "#36d39a"], ["Import a team file", ["Ctrl", "O"], "#47d7e0"],
+  ["Export the layout (also)", ["Ctrl", "E"], "#ffb547"], ["Duplicate selected", ["Ctrl", "D"], "#8b7cff"], ["Rename flow", ["F2"], "#4fa8ff"],
+  ["Delete selected", ["Del"], "#ff6b8b"], ["Deselect", ["Esc"], "#c084fc"], ["Start the run", ["Ctrl", "Enter"], "#D97757"],
+];
+const SEG_SVG = {
+  across: '<path d="M4 12h16M14 6l6 6-6 6"/>', down: '<path d="M12 4v16M6 14l6 6 6-6"/>',
+  nodes: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 12h3l4-5M11.5 12l4 5"/>',
+  steps: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/>',
+};
 function renderSettings() {
   const b = $("setBody");
   if (!prefs) { b.innerHTML = `<p style="color:var(--muted)">Couldn't reach Lithnode's server. Is it still running?</p>`; return; }
   const p = prefs.settings, sw = (key, on, label) => `<button type="button" class="sw" role="switch" aria-checked="${on}" aria-label="${label}" data-key="${key}"></button>`;
   const limits = [...new Set([...prefs.limits, p.limit])].sort((x, y) => x - y);
+  const btnIco = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ui.icon(k).svg}</svg>`;
+  const h = (k, t) => { const c = ui.icon(k); return `<h3 style="--ic:${c.color}"><i class="ci"><svg viewBox="0 0 24 24" aria-hidden="true">${c.svg}</svg></i>${t}</h3>`; };
+  const seg = (label, attr, cur, opts) => `<div class="seg" role="radiogroup" aria-label="${label}">${opts.map(([v, n, col, svg]) =>
+    `<button type="button" role="radio" aria-checked="${cur === v}" class="${cur === v ? "on" : ""}" ${attr}="${v}" style="--ic:${col}"><svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg>${n}</button>`).join("")}</div>`;
+  const api = fapi(), models = (api && api.models ? api.models() : []) || [], view = api && api.view ? api.view() : "nodes";
+  const pickModels = p.engine === "claude" ? models : (((engineList || []).find((x) => x.id === p.engine) || {}).models || []);   // follows the engine picked above
+  const REPO = "https://github.com/drewguitarist18-lang/lithnode";
   b.innerHTML = `
-    <h3>Appearance</h3>
-    <div class="row"><div><b>Theme</b><small>Also under View, and the button at the top right.</small></div>
-      <div class="seg" role="radiogroup" aria-label="Theme">${Object.entries({ dark: "Dark", light: "Light", system: "System" }).map(([k, n]) =>
-        `<button type="button" role="radio" aria-checked="${themeMode === k}" class="${themeMode === k ? "on" : ""}" data-theme="${k}">${n}</button>`).join("")}</div></div>
-    <h3>Engines</h3>
-    ${engineRows()}
-    <h3>New flows</h3>
+    ${h("palette", "Appearance")}
+    <div class="row"><div><b>Theme</b><small>Also in the cog menu.</small></div>
+      ${seg("Theme", "data-theme", themeMode, Object.entries({ dark: "Dark", light: "Light", system: "System" }).map(([k, n]) => [k, n, THEME_COLOR[k], THEMES[k][0]]))}</div>
+    ${h("bolt", "Engines")}
+    <div id="setEng">${engineRows()}</div>
+    ${h("key", "API keys")}
+    <p class="kintro">Optional. Run teams on your own provider keys, billed per token. Keys are encrypted on this PC and never leave it except to that provider.</p>
+    <div id="setKeys">${keyRows()}</div>
+    ${h("team", "New teams")}
+    <div class="row"><div><b>Engine</b><small>What a team runs on when you add it. You can still switch any team.</small></div>
+      <div class="epick" role="radiogroup" aria-label="Engine for new teams">${ENGINE_IDS.map((id) => `<button type="button" role="radio" aria-checked="${p.engine === id}" class="${p.engine === id ? "on" : ""}" data-engine-pick="${id}" title="${LABEL[id]}" style="--ec:${ENGINE_COLOR[id]}"><img src="/static/${ENGINE_LOGO[id]}" alt="${LABEL[id]}"></button>`).join("")}</div></div>
+    <div class="row"><div><b>${{ claude: "Claude", api: "API" }[p.engine] || LABEL[p.engine]} model</b><small>${pickModels.length || p.engine === "claude"
+      ? "Leave it on the role to let each team's job pick." : p.engine === "api" ? "Add an API key above to pick one of its models." : `${LABEL[p.engine]} isn't ready yet, so there are no models to pick.`}</small></div>
+      <select data-key="model" aria-label="Model for new teams"><option value="">From the team's role</option>${pickModels.map((m) =>
+        `<option value="${esc(m.id)}"${m.id === p.model ? " selected" : ""}>${esc(m.label)}</option>`).join("")}${p.model && !pickModels.some((m) => m.id === p.model) ? `<option value="${esc(p.model)}" selected>${esc(p.model)}</option>` : ""}</select></div>
+    <div class="row"><div><b>Roles</b><small>Each team gets a role (think, build, run…) and the model set for that role.</small></div>${sw("roles", p.roles, "Roles for new flows")}</div>
     <div class="row"><div><b>Token limit</b><small>A run stops once it has used this many. Each flow can change its own.</small></div>
       <select data-key="limit" aria-label="Token limit for new flows">${limits.map((n) =>
         `<option value="${n}"${n === p.limit ? " selected" : ""}>${shortTokens(n)} tokens</option>`).join("")}</select></div>
-    <div class="row"><div><b>Roles</b><small>Each team gets a role (think, build, run…) and the model set for that role.</small></div>${sw("roles", p.roles, "Roles for new flows")}</div>
-    <h3>Updates</h3>
+    ${h("tidyLr", "Canvas")}
+    <div class="row"><div><b>Auto-arrange new flows</b><small>Keeps nodes neatly laid out as you edit. The button by the zoom turns it off for one flow.</small></div>${sw("auto", p.auto, "Auto-arrange new flows")}</div>
+    <div class="row"><div><b>New flows go</b><small>Which way a blank flow runs.</small></div>
+      ${seg("Direction", "data-dir", p.dir, [["lr", "Across", "#4fa8ff", SEG_SVG.across], ["tb", "Down", "#c084fc", SEG_SVG.down]])}</div>
+    <div class="row"><div><b>Show flows as</b><small>Same as the Nodes / Steps switch on the canvas.</small></div>
+      ${seg("View", "data-view", view, [["nodes", "Nodes", "#36d39a", SEG_SVG.nodes], ["steps", "Steps", "#ffb547", SEG_SVG.steps]])}</div>
+    ${h("bell", "Notifications")}
+    <div class="row"><div><b>Sound</b><small>A short chime when a run finishes or needs your OK.</small></div>${sw("notify_sound", p.notify_sound, "Sound alerts")}</div>
+    <div class="row"><div><b>Desktop alert</b><small>A system notification, so you hear about it while you're in another app.</small></div>${sw("notify_desktop", p.notify_desktop, "Desktop alerts")}</div>
+    <div class="row"><div><b>Try it</b><small>Plays whatever you've turned on.</small></div><button type="button" class="btn" data-act="test-alert" style="--ic:#ffb547">${btnIco("bell")}Test</button></div>
+    ${h("chart", "Token usage")}
+    <div id="setUse">${usageRows()}</div>
+    ${h("kbd", "Shortcuts")}
+    <div class="keys">${SHORTCUTS.map(([what, ks, col]) => `<div class="krow" style="--kc:${col}"><span>${what}</span><span>${ks.map((k) => `<kbd>${k}</kbd>`).join("<i>+</i>")}</span></div>`).join("")}</div>
+    ${h("update", "Updates")}
     <div class="row"><div><b>Tell me when a new version is out</b><small>Asks GitHub every few hours. Nothing about you is sent.</small></div>${sw("check_updates", p.check_updates, "Check for updates")}</div>
     <div class="row"><div><b>Count my install</b><small>Once per version, tells lithnode.com "installed" or "updated", with the version and Windows, Mac or Linux. Nothing about you.</small></div>${sw("count_install", p.count_install, "Count my install")}</div>
     <div class="row"><div><b>Lithnode ${esc(prefs.version)}</b><small id="setUpd">${release.newer ? `${esc(release.latest)} is out. The download is in the bar at the top.` : "The version you have."}</small></div>
-      <button type="button" class="btn" data-act="check">Check now</button></div>
-    <h3>Your files</h3>
+      <button type="button" class="btn" data-act="check" style="--ic:#36d39a">${btnIco("update")}Check now</button></div>
+    ${h("folder", "Your files")}
     <div class="row"><div><b>Lithnode folder</b><small>${esc(prefs.folder)}</small><small>Your flows, past runs and logs. Uninstalling Lithnode leaves it.</small></div>
-      <button type="button" class="btn" data-act="folder">Open</button></div>`;
+      <button type="button" class="btn" data-act="folder" style="--ic:#47d7e0">${btnIco("folder")}Open</button></div>
+    ${h("info", "About")}
+    <div class="about"><canvas id="aboutLogo" width="96" height="72"></canvas><div><b>Lithnode <span>${esc(prefs.version)}</span></b><small>Teams of AI agents, wired up like a flowchart.</small>
+      <span class="links">
+        <a href="https://lithnode.com" target="_blank" rel="noopener" style="--ic:#4fa8ff">${btnIco("web")}Website</a>
+        <a href="${REPO}" target="_blank" rel="noopener" style="--ic:#c084fc">${btnIco("code")}GitHub</a>
+        <a href="${REPO}/issues" target="_blank" rel="noopener" style="--ic:#ff8a65">${btnIco("bug")}Report a bug</a>
+      </span></div></div>`;
+  const al = $("aboutLogo").getContext("2d"); al.clearRect(0, 0, 96, 72); drawLogo(al, 12, 9, 4.5);
+}
+// ---- run alerts: a chime and / or a desktop notification when a run ends or stops to ask you
+let alertPrefs = null, lastRuns = null, lastApprovals = null;
+const loadAlertPrefs = async () => { try { alertPrefs = (await (await fetch("/api/settings", { cache: "no-store" })).json()).settings; } catch (e) {} };
+loadAlertPrefs();
+function chime(kind) {
+  if (kind === "ok") {   // a run finished: the recorded sound, with the synth notes as a fallback
+    const a = chime.done || (chime.done = new Audio("/static/sound-done.mp3"));
+    a.currentTime = 0; a.volume = 0.8;
+    const played = a.play();
+    if (played) { played.catch(() => synth(kind)); return; }
+  }
+  synth(kind);
+}
+function synth(kind) {
+  try {
+    const ac = chime.ac || (chime.ac = new (window.AudioContext || window.webkitAudioContext)());
+    const notes = kind === "ask" ? [660, 880] : kind === "bad" ? [440, 330] : [523, 659, 784];
+    notes.forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + i * 0.12;
+      o.type = "sine"; o.frequency.value = f; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      o.start(t); o.stop(t + 0.4);
+    });
+  } catch (e) {}
+}
+async function runAlert(kind, title, body, test) {
+  const p = alertPrefs || {};
+  if (p.notify_sound || test === "sound") chime(kind);
+  if (p.notify_desktop && "Notification" in window) {
+    if (Notification.permission === "default") { try { await Notification.requestPermission(); } catch (e) {} }
+    if (Notification.permission === "granted") { try { new Notification(title, { body, icon: "/static/logo-512.png", silent: true }); } catch (e) {} }
+  }
+}
+async function watchRuns(d) {
+  const runs = d.runs || 0, asks = d.approvals || 0;
+  if (lastApprovals !== null && asks > lastApprovals) runAlert("ask", "A run needs you", "A flow is waiting for your OK to keep going.");
+  if (lastRuns !== null && runs < lastRuns) {
+    let r = null; try { r = ((await (await fetch("/api/runs", { cache: "no-store" })).json()).runs || [])[0]; } catch (e) {}
+    const ok = !r || r.status === "done";
+    runAlert(ok ? "ok" : "bad", ok ? "Run finished" : `Run ${r.status}`, r ? `${r.flow_name || "Your flow"} ${ok ? "is done. The report is ready." : "didn't finish."}` : "A flow finished.");
+  }
+  lastRuns = runs; lastApprovals = asks;
 }
 async function saveSetting(key, value) {
   try {
@@ -594,7 +847,9 @@ async function saveSetting(key, value) {
     prefs.settings = (await r.json()).settings;
   } catch (e) {}
   renderSettings();
+  alertPrefs = prefs.settings; fapi()?.reloadPrefs?.();
   if (key === "check_updates") checkUpdates(false);
+  if (key === "notify_desktop" && value && "Notification" in window && Notification.permission === "default") { try { await Notification.requestPermission(); } catch (e) {} }
 }
 $("settings").addEventListener("click", async (e) => {
   const d = $("settings");
@@ -605,7 +860,21 @@ $("settings").addEventListener("click", async (e) => {
   if (t.dataset.theme) { themeMode = t.dataset.theme; try { localStorage.setItem("hq-theme", themeMode); } catch (e) {} applyAll(); renderSettings(); }
   if (t.classList.contains("sw")) saveSetting(t.dataset.key, t.getAttribute("aria-checked") !== "true");
   if (t.dataset.act === "folder") { try { await fetch("/api/settings/open-folder", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) {} }
-  if (t.dataset.act === "signin") { d.close(); startSignin(); }
+  if (t.dataset.act === "login") { d.close(); startSignin(); }
+  if (t.dataset.act === "engine-install") startEngineInstall(t.dataset.engine);
+  if (t.dataset.act === "engine-login") startEngineSignin(t.dataset.engine);
+  if (t.dataset.act === "signout") signOutEngine(t.dataset.engine);
+  if (t.dataset.act === "keys") $("setKeys")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (t.dataset.act === "key-save") saveKey(t.dataset.provider);
+  if (t.dataset.act === "key-remove") removeKey(t.dataset.provider);
+  if (t.dataset.enginePick && t.dataset.enginePick !== prefs?.settings?.engine) { await saveSetting("model", ""); saveSetting("engine", t.dataset.enginePick); }
+  if (t.dataset.dir) saveSetting("dir", t.dataset.dir);
+  if (t.dataset.view) { fapi()?.setView?.(t.dataset.view); renderSettings(); }
+  if (t.dataset.act === "test-alert") {
+    const p = alertPrefs || {};
+    if (!p.notify_sound && !p.notify_desktop) chime("ok");
+    else runAlert("ok", "Run finished", "This is what you'll get when a flow is done.");
+  }
   if (t.dataset.act === "check") {
     t.disabled = true; t.textContent = "Checking…";
     try { release = await (await fetch("/api/version?refresh=1", { cache: "no-store" })).json(); } catch (e) { release = {}; }
@@ -616,9 +885,16 @@ $("settings").addEventListener("click", async (e) => {
       : release.checked ? "You're on the newest version." : "Couldn't reach GitHub. Check your connection.";
   }
 });
-$("settings").addEventListener("change", (e) => { if (e.target.dataset.key === "limit") saveSetting("limit", +e.target.value); });
+$("settings").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.classList.contains("kin")) { e.preventDefault(); saveKey(e.target.dataset.provider); } });
+$("settings").addEventListener("change", (e) => {
+  if (e.target.dataset.key === "limit") saveSetting("limit", +e.target.value);
+  if (e.target.dataset.key === "model") saveSetting("model", e.target.value);
+});
 window.openSettings = openSettings;   // flows.html's Ctrl+, opens it too
-document.addEventListener("keydown", (e) => { if (e.key === "," && (e.ctrlKey || e.metaKey)) { e.preventDefault(); openSettings(); } });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "," && (e.ctrlKey || e.metaKey)) { e.preventDefault(); openSettings(); }
+  if (e.key === "s" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (location.hash !== "#office") fapi()?.exportTeam?.(); }   // not the browser's Save page
+});
 
 const lg = $("logo").getContext("2d");
 (function frame(ms) {

@@ -17,12 +17,13 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+import apikeys
 import claude_code
 
 NO_WINDOW = claude_code.NO_WINDOW
-ENGINES = ("claude", "codex", "cursor", "antigravity", "ollama")
+ENGINES = ("claude", "codex", "cursor", "antigravity", "ollama", "api")   # api: your own provider keys (apikeys.py), an add-on
 CLIS = ("codex", "cursor", "antigravity")   # the ones run as a command line with their own account
-LABELS = {"claude": "Claude Code", "codex": "Codex", "cursor": "Cursor", "antigravity": "Antigravity", "ollama": "Ollama"}
+LABELS = {"claude": "Claude Code", "codex": "Codex", "cursor": "Cursor", "antigravity": "Antigravity", "ollama": "Ollama", "api": "API keys"}
 AGY_CREDENTIAL = "gemini:antigravity"   # where agy (and the Antigravity app) keep their Google sign-in on Windows
 OLLAMA_URL = os.environ.get("LITHNODE_OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 LOCAL = Path(os.environ.get("LOCALAPPDATA", ""))
@@ -128,6 +129,11 @@ def status(engine: str, force: bool = False) -> dict[str, Any]:
             value = _ollama_status()
             _status[engine] = (time.time(), value)
             return value
+        if engine == "api":   # nothing to install: ready once a key is saved (not cached, keys change from Settings)
+            keys = apikeys.saved()
+            return {"installed": True, "signed_in": bool(keys), "local": False,
+                    "note": f"{len(keys)} key{'s' if len(keys) != 1 else ''} saved. Billed per token by the provider. No tools, files or web."
+                    if keys else "Add a provider's API key in Settings to run teams on it."}
         cmd = FINDERS[engine]()
         value = {"installed": bool(cmd), "signed_in": False, "note": ""}
         if not cmd and engine == "cursor" and cursor_app_installed():
@@ -185,6 +191,8 @@ def models(engine: str, force: bool = False) -> list[dict[str, Any]]:
     hit = _models.get(engine)
     if hit and not force and time.time() - hit[0] < 600:
         return hit[1]
+    if engine == "api":
+        return apikeys.models(force)
     if engine == "ollama":
         found = [{"id": m["name"], "label": m["name"].removesuffix(":latest")} for m in ollama_tags() or [] if m.get("name")]
         _models[engine] = (time.time() - 540, found)   # downloads show up within a minute
@@ -217,7 +225,7 @@ def models(engine: str, force: bool = False) -> list[dict[str, Any]]:
 def all_status(force: bool = False) -> dict[str, dict[str, Any]]:
     claude = claude_code.auth_status(force=force)
     out = {"claude": {"installed": bool(claude.get("available")), "signed_in": bool(claude.get("logged_in")), "note": ""},
-           **{e: dict(status(e, force)) for e in (*CLIS, "ollama")}}
+           **{e: dict(status(e, force)) for e in (*CLIS, "ollama", "api")}}
     for engine, value in out.items():
         if job := job_state(engine):
             value["job"] = job
@@ -635,6 +643,8 @@ def friendly_error(engine: str, text: str | None) -> str | None:
         return f"Your {LABELS[engine]} plan has hit its usage limit, so this agent couldn't run."
     if "not logged in" in low or "login" in low and "required" in low or "unauthorized" in low or "authentication required" in low:
         return f"{LABELS[engine]} isn't signed in. Click Sign in in the engines menu (top right), then try again."
+    if engine == "api" and ("invalid" in low and "key" in low or "401" in low or "turned down" in low):
+        return f"The provider turned down your API key. Check it in Settings > API keys. ({text})"
     if engine == "ollama" and "not found" in low:
         return f"That model isn't downloaded in Ollama. {text}"
     return text

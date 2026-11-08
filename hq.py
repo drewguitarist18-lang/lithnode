@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 from urllib import request as urlrequest
 
+import apikeys
 import claude_code
 import engines
 import flows
@@ -39,7 +40,7 @@ URL = f"http://{HOST}:{PORT}"
 STATIC = Path(__file__).with_name("static")
 PAGES = {"/": "shell.html", "/flows": "flows.html", "/office": "office.html"}
 STATIC_TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-                ".html": "text/html; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2"}
+                ".html": "text/html; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".mp3": "audio/mpeg"}
 _home = Path.home() / ".lithnode"
 for _old_home in (Path.home() / ".relay", Path.home() / ".clawd-hq"):   # the app used to be Relay, and Clawd HQ before
     if not os.environ.get("LITHNODE_HOME") and _old_home.is_dir() and not _home.exists():
@@ -49,6 +50,7 @@ for _old_home in (Path.home() / ".relay", Path.home() / ".clawd-hq"):   # the ap
             pass
 _HAD_DATA = Path(os.environ.get("LITHNODE_HOME") or _home).exists()   # before anything writes there: a new install or not
 HQ_STORE = flows.Store(os.environ.get("LITHNODE_HOME") or _home)
+apikeys.init(HQ_STORE.root)   # provider keys sit next to the flows, in keys.json
 try:
     claude_code.setup_tools(os.environ.get("LITHNODE_HOME") or _home)   # lithnode-shot, for agents to look at what they make
 except OSError:
@@ -446,6 +448,30 @@ class Handler(BaseHTTPRequestHandler):
     def POST_api_settings(self) -> None:
         self.send_json({"settings": settings.save(HQ_STORE.root, self.read_json())})
 
+    # -- API keys: an add-on engine. The page only ever gets back a key's last four characters.
+    def GET_api_keys(self) -> None:
+        self.send_json({"keys": apikeys.public()})
+
+    def POST_api_keys(self) -> None:
+        """Save a provider's key, once the provider says it works (listing its models is free)."""
+        body = self.read_json()
+        provider, key = str(body.get("provider") or ""), str(body.get("key") or "").strip()
+        if provider not in apikeys.PROVIDERS:
+            return self.send_json({"error": "Unknown provider."}, 400)
+        if not key or len(key) > 400 or any(c.isspace() for c in key):
+            return self.send_json({"error": "Paste the whole key, with no spaces."}, 400)
+        found, error = apikeys.fetch_models(provider, key)
+        if error:
+            return self.send_json({"error": error}, 400)
+        apikeys.set_key(provider, key)
+        self.send_json({"keys": apikeys.public(), "models": len(found)})
+
+    def POST_api_keys_delete(self) -> None:
+        provider = str(self.read_json().get("provider") or "")
+        if provider in apikeys.PROVIDERS:
+            apikeys.delete_key(provider)
+        self.send_json({"keys": apikeys.public()})
+
     def POST_api_settings_open_folder(self) -> None:
         """Show Lithnode's own folder (flows, runs, logs) in Explorer / Finder."""
         folder = HQ_STORE.root.resolve()
@@ -510,7 +536,11 @@ class Handler(BaseHTTPRequestHandler):
                     "nodes": [{"id": "master", "type": "master", "x": 60, "y": 220, "name": "Start", "mode": "pass"},
                               {"id": "done", "type": "done", "x": 600, "y": 220, "name": "Complete"}]}
         prefs = settings.load(HQ_STORE.root)          # a new flow starts with the Settings window's defaults
-        flow = {**flows.clean_flow({**flow, "limit": prefs["limit"], "roles": prefs["roles"]}), "id": flow["id"]}
+        blank = not body.get("template")
+        flow = {**flows.clean_flow({**flow, "limit": prefs["limit"], "roles": prefs["roles"], "auto": prefs["auto"],
+                                    **({"dir": prefs["dir"]} if blank else {})}), "id": flow["id"]}
+        if blank and prefs["dir"] == "tb":
+            flows._layout(flow, "tb")   # Start above Done instead of beside it
         HQ_STORE.save_flow(flow)
         self.send_json(self.flow_payload(flow))
 
