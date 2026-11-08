@@ -733,7 +733,13 @@ try:
           len(seen) == 2 and all(s["bot"]["shape"] == "byte" and s["status"] == "working" for s in seen), seen)
     call(f"/api/runs/{rid}/stop", {}, "POST")
     run = wait_run(rid)
-    check("stop ends the run", run["status"] == "stopped" and run["nodes"]["c"]["status"] == "stopped", run["status"])
+    for _ in range(40):   # the run says "stopped" at once; its stage settles when the killed agents exit
+        if run["nodes"]["c"]["status"] in ("done", "failed", "stopped"):
+            break
+        time.sleep(0.25)
+        run = call(f"/api/runs/{rid}")[1]
+    check("stop ends the run", run["status"] == "stopped" and run["nodes"]["c"]["status"] == "stopped",
+          (run["status"], run["nodes"]["c"]["status"]))
     time.sleep(4.5)   # a killed agent never reaches its end
     killed = [a["session_id"] for a in run["nodes"]["c"]["agents"]]
     check("stopped agents were killed, not left running", not any(s in ends() for s in killed))
