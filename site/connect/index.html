@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect Claude · Lithnode</title>
+<meta name="description" content="Connect Claude to Lithnode. Claude builds a team of agents, runs it on your folder and reads back the result, while you watch every step live.">
+<link rel="canonical" href="https://lithnode.com/connect/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<meta name="theme-color" content="#08080a">
+<meta property="og:title" content="Run your flows from Claude · Lithnode">
+<meta property="og:description" content="Claude builds a team of agents, runs it on your folder and reads back the result.">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<style>
+  :root { --void: #08080a; --ink: #ecebe6; --soft: #b1b0aa; --faint: #74736e; --edge: rgba(236, 235, 230, .13);
+          --glass: rgba(236, 235, 230, .045); --glass-hi: rgba(236, 235, 230, .085);
+          --claude: #d97757; --blue: #7a9cf0; --green: #79c47f; --purple: #b79cf2; --amber: #e6b450; --teal: #3cc2ac;
+          --mono: "Geist Mono", ui-monospace, Menlo, Consolas, monospace; --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+          --pixel: "Pixelify Sans", "Geist Mono", monospace; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--void); }
+  body { color: var(--ink); font: 430 15px/1.65 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: clip; }
+  html { overflow-x: clip; }
+  a { color: inherit; }
+  .wrap { width: min(1040px, 100% - 32px); margin-inline: auto; }
+
+  nav { position: sticky; top: 0; z-index: 5; backdrop-filter: blur(14px); background: rgba(8, 8, 10, .72); border-bottom: 1px solid transparent; }
+  nav .wrap { display: flex; align-items: center; height: 64px; gap: 18px; }
+  .brand { font: 700 16px var(--pixel); text-decoration: none; letter-spacing: .02em; display: flex; align-items: center; gap: 9px; }
+  .brand img { width: 22px; height: 22px; }
+  nav .back { margin-left: auto; color: var(--soft); font-size: 14px; text-decoration: none; }
+  nav .back:hover { color: var(--ink); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 99px; font: 550 15px var(--sans);
+         text-decoration: none; border: 0; cursor: pointer; background: var(--glass-hi); color: var(--ink); transition: transform .15s, background .15s; }
+  .btn:hover { transform: translateY(-1px); background: rgba(236, 235, 230, .13); }
+  .btn.main { background: var(--ink); color: #0b0b0d; }
+  .btn.main:hover { background: #fff; }
+  .btn.sm { height: 36px; padding: 0 16px; font-size: 14px; }
+  .btn svg { width: 17px; height: 17px; }
+
+  .hero { text-align: center; padding: 84px 0 40px; }
+  .hero h1 { font: 700 clamp(46px, 9vw, 92px)/.98 var(--sans); letter-spacing: -.045em; margin: 0; }
+  .hero h1 span { color: var(--claude); }
+  .hero p { color: var(--soft); max-width: 40ch; margin: 22px auto 30px; font-size: 18px; text-wrap: balance; }
+  .ctas { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .tile { position: relative; width: 210px; height: 210px; margin: 70px auto 20px; border-radius: 48px; display: grid; place-items: center;
+          background: linear-gradient(160deg, #1b1b1f, #0e0e11); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 30px 80px -20px rgba(0, 0, 0, .9); }
+  .tilewrap { position: relative; isolation: isolate; width: 210px; margin: 70px auto 20px; }
+  .tilewrap .tile { margin: 0; }
+  .tilewrap::before { content: ""; position: absolute; inset: -90px; z-index: -1; border-radius: 50%;
+                  background: radial-gradient(closest-side, rgba(217, 119, 87, .5), rgba(217, 119, 87, .14) 55%, transparent); animation: breathe 5s ease-in-out infinite; }
+  .tile .pair { display: flex; align-items: center; gap: 16px; }
+  .tile img { width: 64px; height: 64px; image-rendering: pixelated; filter: drop-shadow(0 0 14px rgba(217, 119, 87, .55)); }
+  .tile .plus { width: 22px; height: 22px; color: var(--faint); }
+  @keyframes breathe { 50% { opacity: .6; transform: scale(.94); } }
+
+  section.step { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px 40px; padding: 70px 0; border-top: 1px solid rgba(236, 235, 230, .07); }
+  .num { font: 700 64px/1 var(--sans); letter-spacing: -.04em; color: rgba(236, 235, 230, .2); }
+  .step h2 { font: 650 clamp(24px, 3.4vw, 32px)/1.15 var(--sans); letter-spacing: -.025em; margin: 6px 0 12px; }
+  .step .lead { color: var(--soft); margin: 0 0 26px; max-width: 58ch; }
+  .lead b { color: var(--ink); font-weight: 600; }
+
+  .pick { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 18px; align-items: start; }
+  .tabs { display: grid; gap: 4px; }
+  .tabs button { display: grid; grid-template-columns: 34px 1fr; gap: 2px 12px; align-items: center; text-align: left; padding: 12px 14px; border-radius: 14px;
+                 border: 0; background: transparent; color: var(--ink); cursor: pointer; font: inherit; }
+  .tabs button:hover { background: var(--glass); }
+  .tabs button.on { background: var(--glass-hi); }
+  .tabs .ic { grid-row: span 2; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(236, 235, 230, .07); }
+  .tabs .ic svg { width: 17px; height: 17px; fill: none; stroke: var(--soft); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tabs b { font-weight: 600; font-size: 15px; }
+  .tabs small { color: var(--faint); font-size: 12.5px; }
+  .card { border-radius: 22px; padding: 28px; border: 1px solid var(--edge);
+          background: radial-gradient(120% 90% at 100% 0%, rgba(217, 119, 87, .12), transparent 55%), var(--glass); }
+  .card h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 8px; font: 650 24px var(--sans); letter-spacing: -.02em; }
+  .card h3 small { font: 450 13px var(--sans); color: var(--faint); }
+  .card p { color: var(--soft); margin: 0 0 18px; }
+  .card ol { margin: 0 0 18px; padding-left: 20px; color: var(--soft); }
+  .card ol li { margin: 6px 0; }
+  .card ol b { color: var(--ink); font-weight: 600; }
+  .paste { border-radius: 14px; padding: 14px 16px; background: rgba(0, 0, 0, .35); border: 1px solid rgba(236, 235, 230, .08); margin-bottom: 18px; }
+  .paste small { display: block; color: var(--faint); font-size: 12px; margin-bottom: 6px; }
+  .paste code { display: block; font: 13px/1.6 var(--mono); color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+  .pane[hidden] { display: none; }
+
+  .shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 760px; }
+  .ask { position: relative; text-align: left; padding: 16px 18px 16px 46px; border-radius: 16px; border: 1px solid var(--edge); background: var(--glass);
+         color: var(--ink); font: 500 15px/1.45 var(--sans); cursor: pointer; transition: background .15s, transform .15s; }
+  .ask::before { content: ""; position: absolute; left: 18px; top: 21px; width: 12px; height: 12px; border-radius: 4px; background: var(--k, var(--claude)); box-shadow: 0 0 12px var(--k, var(--claude)); }
+  .ask:hover { background: var(--glass-hi); transform: translateY(-1px); }
+  .ask.done::after { content: "Copied"; position: absolute; right: 14px; top: 15px; font: 600 11.5px var(--sans); color: var(--green); }
+
+  .chat { max-width: 760px; border-radius: 22px; border: 1px solid var(--edge); background: var(--glass); padding: 22px; }
+  .bubble { margin-left: auto; width: fit-content; max-width: 80%; padding: 12px 16px; border-radius: 16px 16px 4px 16px; background: rgba(217, 119, 87, .16);
+            border: 1px solid rgba(217, 119, 87, .3); font-weight: 500; }
+  .calls { margin: 18px 0 0; display: grid; gap: 8px; }
+  .call { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px;
+          background: rgba(0, 0, 0, .3); border: 1px solid rgba(236, 235, 230, .07); opacity: 0; transform: translateY(6px); transition: opacity .4s, transform .4s; }
+  .call.in { opacity: 1; transform: none; }
+  .call .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--k); display: grid; place-items: center; }
+  .call.ok .dot { background: var(--k); }
+  .call.ok .dot::after { content: ""; width: 6px; height: 3px; border: solid #0b0b0d; border-width: 0 0 2px 2px; transform: rotate(-45deg) translate(1px, -1px); }
+  .call b { display: block; font-weight: 600; font-size: 14.5px; }
+  .call span { color: var(--faint); font-size: 13px; }
+  .call code { font: 12px var(--mono); color: var(--k); background: color-mix(in srgb, var(--k) 12%, transparent); padding: 3px 8px; border-radius: 7px; }
+  .answer { margin-top: 16px; padding: 4px 2px; color: var(--soft); opacity: 0; transition: opacity .5s; }
+  .answer.in { opacity: 1; }
+  .answer b { color: var(--ink); }
+
+  .tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 860px; }
+  .tool { padding: 16px; border-radius: 14px; background: var(--glass); border: 1px solid rgba(236, 235, 230, .08); }
+  .tool code { font: 600 13px var(--mono); color: var(--k); }
+  .tool p { margin: 6px 0 0; color: var(--soft); font-size: 13.5px; line-height: 1.5; }
+  .note { color: var(--faint); font-size: 13.5px; margin-top: 18px; max-width: 70ch; }
+
+  footer { padding: 34px 0 50px; border-top: 1px solid rgba(236, 235, 230, .07); color: var(--faint); font-size: 13px; display: flex; gap: 18px; flex-wrap: wrap; }
+  footer a { color: var(--soft); text-decoration: none; }
+  footer a:hover { color: var(--ink); }
+
+  @media (max-width: 760px) {
+    section.step { grid-template-columns: 1fr; padding: 50px 0; }
+    .num { font-size: 44px; }
+    .pick { grid-template-columns: 1fr; }
+    .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tabs button { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 10px 6px; }
+    .tabs .ic { grid-row: auto; }
+    .tabs small { display: none; }
+    .shots, .tools { grid-template-columns: 1fr; }
+    .card { padding: 20px; }
+    nav .back { display: none; }
+    nav .btn { margin-left: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) { .tilewrap::before { animation: none; } .call, .answer { transition: none; } }
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="brand" href="/"><img src="/favicon.svg" alt="">lithnode</a>
+  <a class="back" href="/">← lithnode.com</a>
+  <a class="btn sm main" href="/#download">Download</a>
+</div></nav>
+
+<main>
+<header class="hero"><div class="wrap">
+  <h1>Run your flows<br>from <span>Claude.</span></h1>
+  <p>Connect Claude to Lithnode. It builds a team of agents, runs it on your folder and reads back the result, while you watch every step live.</p>
+  <div class="ctas">
+    <a class="btn main" href="#connect">Connect Claude</a>
+    <a class="btn" href="#demo">See it work</a>
+  </div>
+  <div class="tilewrap" aria-hidden="true"><div class="tile"><div class="pair">
+    <img src="/favicon.svg" alt="">
+    <svg class="plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    <svg width="60" height="60" viewBox="0 0 24 24" aria-hidden="true"><path fill="#d97757" d="M12 1.8 13.6 9l6.6-3.4L15 11l7.2 1-7.2 1.4 5 5.4-6.6-3.5L12 22.2 10.4 15l-6.6 3.4L9 13l-7.2-1L9 10.6 3.8 5.2l6.6 3.5z"/></svg>
+  </div></div></div>
+</div></header>
+
+<div class="wrap">
+<section class="step" id="get">
+  <div class="num">01</div>
+  <div>
+    <h2>Get Lithnode</h2>
+    <p class="lead">Lithnode runs your agent teams on your own computer, on the Claude, Codex or Cursor plan you already have. Connecting Claude needs <b>version 0.1.30 or newer</b>. If you have an older one, the app updates in one click.</p>
+    <a class="btn main" href="/#download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>Download Lithnode</a>
+  </div>
+</section>
+
+<section class="step" id="connect">
+  <div class="num">02</div>
+  <div>
+    <h2>Connect Claude</h2>
+    <p class="lead">Pick where you use Claude. Lithnode has to be open while Claude works, because every run happens there.</p>
+    <div class="pick">
+      <div class="tabs" role="tablist">
+        <button type="button" class="on" role="tab" aria-selected="true" data-tab="code"><span class="ic"><svg viewBox="0 0 24 24"><path d="m5 8 4 4-4 4M11 16h8"/></svg></span><b>Claude Code</b><small>Terminal or the Code tab</small></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="app"><span class="ic"><svg viewBox="0 0 24 24"><path d="M5 5.5h14v10H9l-4 3.5z"/></svg></span><b>Claude app</b><small>Desktop chat</small></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="hand"><span class="ic"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><b>By hand</b><small>The command</small></button>
+      </div>
+      <div class="card">
+        <div class="pane" data-pane="code">
+          <h3>Claude Code <small>one click</small></h3>
+          <p>Lithnode adds itself to Claude Code for every project. That covers the terminal and the Claude desktop app's Code tab.</p>
+          <ol>
+            <li>In Lithnode, open <b>Settings</b> (the cog, or <span class="osk">Ctrl+,</span>).</li>
+            <li>Under <b>Connect Claude</b>, click <b>Add to Claude Code</b>.</li>
+            <li>Start a new Claude Code session. Type <b>/mcp</b> to see <b>lithnode</b> connected.</li>
+          </ol>
+        </div>
+        <div class="pane" data-pane="app" hidden>
+          <h3>Claude desktop app <small>chat</small></h3>
+          <p>The desktop app's chat runs local tools from its config file. Lithnode writes the right entry for your computer.</p>
+          <ol>
+            <li>In Lithnode, open <b>Settings › Connect Claude</b> and click <b>Copy config</b>.</li>
+            <li>In Claude, open <b>Settings › Developer › Edit Config</b>, paste it in and save.</li>
+            <li>Quit and reopen Claude. Lithnode's tools show under the tools button in a chat.</li>
+          </ol>
+        </div>
+        <div class="pane" data-pane="hand" hidden>
+          <h3>By hand <small>any MCP client</small></h3>
+          <p>Lithnode's MCP server runs over stdio. The installed app starts it with <b>lithnode-cli mcp</b>. On <span id="osname">Windows</span> that's:</p>
+          <div class="paste"><small id="cmdwhere">Run this in Command Prompt</small><code id="cmd">claude mcp add --scope user lithnode -- "%LOCALAPPDATA%\Programs\Lithnode\server\lithnode-cli.exe" mcp</code></div>
+          <button type="button" class="btn sm" data-copy="cmd">Copy command</button>
+          <p style="margin:16px 0 0;font-size:13.5px">Settings › Connect Claude shows the exact command for your install, including on <span id="osother">Mac and Linux</span>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="step" id="ask">
+  <div class="num">03</div>
+  <div>
+    <h2>Ask for a team</h2>
+    <p class="lead">Say it the way you'd brief a person. Claude picks or builds a flow, runs it in your folder and checks on it until it's done. Tap one to copy it.</p>
+    <div class="shots">
+      <button type="button" class="ask" style="--k: var(--blue)">Use Lithnode to review this repo with the Quick code review flow.</button>
+      <button type="button" class="ask" style="--k: var(--green)">Build a Lithnode team that adds dark mode, then tests and reviews it. Run it here.</button>
+      <button type="button" class="ask" style="--k: var(--purple)">What flows do I have in Lithnode, and what does each one do?</button>
+      <button type="button" class="ask" style="--k: var(--amber)">Check on my last Lithnode run and summarize what it changed.</button>
+    </div>
+  </div>
+</section>
+
+<section class="step" id="demo">
+  <div class="num">04</div>
+  <div>
+    <h2>Watch it run</h2>
+    <p class="lead">Claude calls Lithnode's tools. Lithnode runs the agents. Steps that need your sign-off still wait for you in the app.</p>
+    <div class="chat" aria-label="An example: Claude reviewing a repo with Lithnode">
+      <div class="bubble">Review this repo with Lithnode and fix anything serious.</div>
+      <div class="calls">
+        <div class="call" style="--k: var(--blue)"><i class="dot"></i><div><b>Found your flows</b><span>Quick code review: 3 reviewers, 1 summary</span></div><code>list_flows</code></div>
+        <div class="call" style="--k: var(--green)"><i class="dot"></i><div><b>Started the run</b><span>in ~/my-app, on your Claude plan</span></div><code>run_flow</code></div>
+        <div class="call" style="--k: var(--purple)"><i class="dot"></i><div><b>Reviewers working</b><span>3 agents reading, 41k tokens so far</span></div><code>get_run</code></div>
+        <div class="call" style="--k: var(--amber)"><i class="dot"></i><div><b>Read the final report</b><span>2 bugs, 1 security note</span></div><code>get_run</code></div>
+      </div>
+      <p class="answer"><b>Done.</b> The reviewers found an off-by-one in <i>parse.py</i> and an unchecked input in the upload route. Want me to run your Build and deploy flow to fix both?</p>
+    </div>
+  </div>
+</section>
+
+<section class="step" id="tools">
+  <div class="num">05</div>
+  <div>
+    <h2>What Claude can do</h2>
+    <p class="lead">Nine tools, all on your computer. Nothing goes through lithnode.com.</p>
+    <div class="tools">
+      <div class="tool" style="--k: var(--teal)"><code>lithnode_status</code><p>Is Lithnode open, and which engines are signed in.</p></div>
+      <div class="tool" style="--k: var(--blue)"><code>list_flows</code><p>Your flows and the templates to start from.</p></div>
+      <div class="tool" style="--k: var(--blue)"><code>get_flow</code><p>A flow's steps in order, with each team's engine and model.</p></div>
+      <div class="tool" style="--k: var(--green)"><code>create_flow</code><p>A new flow from a description or a template.</p></div>
+      <div class="tool" style="--k: var(--green)"><code>run_flow</code><p>Start a flow on a task, in a folder.</p></div>
+      <div class="tool" style="--k: var(--purple)"><code>get_run</code><p>Each step's state, files changed and the final report.</p></div>
+      <div class="tool" style="--k: var(--purple)"><code>list_runs</code><p>Recent runs, newest first.</p></div>
+      <div class="tool" style="--k: var(--amber)"><code>decide</code><p>Answer an approval step, when you say so.</p></div>
+      <div class="tool" style="--k: var(--claude)"><code>stop_run</code><p>Stop a run. Finished work is kept.</p></div>
+    </div>
+    <p class="note">Claude asks before it uses a tool unless you've allowed it. Runs use your own plans and keys, so they count toward your usage like any run you start in Lithnode.</p>
+  </div>
+</section>
+</div>
+</main>
+
+<div class="wrap"><footer>
+  <span>Lithnode · free and open source</span>
+  <a href="/">Home</a><a href="/privacy/">Privacy</a>
+  <a href="https://github.com/drewguitarist18-lang/lithnode" target="_blank" rel="noopener">GitHub</a>
+  <a href="https://discord.gg/5mU7XXSMVA" target="_blank" rel="noopener">Discord</a>
+</footer></div>
+
+<script>
+// Show the Mac or Linux command and shortcut to visitors on those computers (Windows is the page's default)
+(() => {
+  const ua = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent;
+  const os = new URLSearchParams(location.search).get("os") || (/mac|iphone|ipad/i.test(ua) ? "mac" : /linux|x11|cros/i.test(ua) && !/android/i.test(ua) ? "linux" : "win");   // ?os=mac previews another OS
+  if (os === "win") return;
+  const set = (id, t) => { document.getElementById(id).textContent = t; };
+  set("osname", os === "mac" ? "a Mac" : "Linux");
+  set("cmdwhere", "Run this in Terminal");
+  set("osother", os === "mac" ? "Windows and Linux" : "Windows and Mac");
+  set("cmd", os === "mac"
+    ? "claude mcp add --scope user lithnode -- /Applications/Lithnode.app/Contents/Resources/server/lithnode-cli mcp"
+    : "claude mcp add --scope user lithnode -- flatpak run --command=/app/lithnode/server/lithnode-cli com.lithnode.Lithnode mcp");
+  if (os === "mac") document.querySelectorAll(".osk").forEach((k) => { k.textContent = "⌘,"; });
+})();
+  // tabs
+  const tabs = document.querySelectorAll("[data-tab]");
+  tabs.forEach((b) => b.addEventListener("click", () => {
+    tabs.forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-selected", x === b); });
+    document.querySelectorAll("[data-pane]").forEach((p) => { p.hidden = p.dataset.pane !== b.dataset.tab; });
+  }));
+  // copy
+  const copy = async (text, el, done) => { try { await navigator.clipboard.writeText(text); done(); } catch (e) { el.textContent = "Couldn't copy"; } };
+  document.querySelectorAll(".ask").forEach((b) => b.addEventListener("click", () => copy(b.textContent, b, () => {
+    b.classList.add("done"); setTimeout(() => b.classList.remove("done"), 1400);
+  })));
+  document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => copy(document.getElementById(b.dataset.copy).textContent, b, () => {
+    b.textContent = "Copied"; setTimeout(() => { b.textContent = "Copy command"; }, 1400);
+  })));
+  // the demo plays when it scrolls into view, then loops
+  const calls = [...document.querySelectorAll(".call")], answer = document.querySelector(".answer");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let playing = false;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function play() {
+    if (playing) return; playing = true;
+    while (true) {
+      calls.forEach((c) => c.classList.remove("in", "ok")); answer.classList.remove("in");
+      await wait(500);
+      for (const c of calls) { c.classList.add("in"); await wait(still ? 0 : 900); c.classList.add("ok"); await wait(still ? 0 : 350); }
+      answer.classList.add("in");
+      if (still) return;
+      await wait(6000);
+    }
+  }
+  new IntersectionObserver((es, o) => { if (es.some((e) => e.isIntersecting)) { o.disconnect(); play(); } }, { threshold: .35 }).observe(document.querySelector(".chat"));
+</script>
+</body>
+</html>

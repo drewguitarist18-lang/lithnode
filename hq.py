@@ -297,6 +297,27 @@ def clean_bot(bot_id: str, raw: dict[str, Any]) -> dict[str, Any]:
 
 # --------------------------------------------------------------------- server
 
+def mcp_command() -> list[str]:
+    """What starts Lithnode's MCP server here: the installed lithnode-cli, or this source tree's mcp_server.py."""
+    if not getattr(sys, "frozen", False):
+        return [sys.executable, str(Path(__file__).with_name("mcp_server.py"))]
+    if claude_code.FLATPAK:   # Claude Code runs outside the sandbox, so it starts ours through flatpak
+        return ["flatpak", "run", f"--command={claude_code.own_exe('lithnode-cli')}", "com.lithnode.Lithnode", "mcp"]
+    exe = claude_code.own_exe("lithnode-cli")
+    if "windowsapps" in exe.lower():   # the Store build: its package folder only runs through the app's alias
+        exe = str(Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "Microsoft" / "WindowsApps" / "lithnode-cli.exe")
+    return [exe, "mcp"]
+
+
+def mcp_added() -> bool:
+    """Claude Code has Lithnode for every project (its user-scope servers live in ~/.claude.json)."""
+    try:
+        data = json.loads((Path.home() / ".claude.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(data.get("mcpServers"), dict) and "lithnode" in data["mcpServers"]
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "Lithnode/1.0"
@@ -497,6 +518,42 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"engines": [{"id": e, "name": engines.LABELS[e], **info[e],
                                      "models": engines.models(e, force) if e != "claude" and info[e]["signed_in"] else []}
                                     for e in engines.ENGINES]})
+
+    # -- Connect Claude: Lithnode's MCP server (mcp_server.py) ------------------------------------------------
+    def GET_api_mcp(self) -> None:
+        """How Claude reaches Lithnode: the command to run its MCP server, ready to paste, and whether Claude Code has it."""
+        cmd = mcp_command()
+        env = {"LITHNODE_PORT": str(PORT)} if PORT != 8790 else {}
+        quoted = " ".join(f'"{c}"' if " " in c else c for c in cmd)
+        self.send_json({"command": cmd, "env": env, "added": mcp_added(), "claude_code": bool(claude_code.find_command()),
+                        "cli": "claude mcp add --scope user lithnode " + "".join(f"-e {k}={v} " for k, v in env.items()) + "-- " + quoted,
+                        "desktop": json.dumps({"mcpServers": {"lithnode": {"command": cmd[0], "args": cmd[1:], **({"env": env} if env else {})}}},
+                                              indent=2)})
+
+    def POST_api_mcp_add(self) -> None:
+        """One click: add Lithnode to Claude Code for every project (`claude mcp add --scope user`)."""
+        claude = claude_code.find_command()
+        if not claude:
+            return self.send_json({"error": "Claude Code isn't installed on this computer."}, 409)
+        env = [f"LITHNODE_PORT={PORT}"] if PORT != 8790 else []
+        for scope in ("user",):   # a stale entry (old install path) is replaced, not doubled
+            subprocess.run(claude_code.host([*claude, "mcp", "remove", "--scope", scope, "lithnode"]), capture_output=True,
+                           timeout=60, creationflags=claude_code.NO_WINDOW)
+        args = [*claude, "mcp", "add", "--scope", "user", "lithnode", *[x for e in env for x in ("-e", e)], "--", *mcp_command()]
+        try:
+            done = subprocess.run(claude_code.host(args), capture_output=True, text=True, timeout=60, creationflags=claude_code.NO_WINDOW)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return self.send_json({"error": f"Couldn't run Claude Code: {exc}"}, 500)
+        if done.returncode != 0:
+            return self.send_json({"error": (done.stderr or done.stdout or "Claude Code said no.").strip()[:400]}, 502)
+        self.send_json({"ok": True, "added": mcp_added()})
+
+    def POST_api_mcp_remove(self) -> None:
+        claude = claude_code.find_command()
+        if claude:
+            subprocess.run(claude_code.host([*claude, "mcp", "remove", "--scope", "user", "lithnode"]), capture_output=True,
+                           timeout=60, creationflags=claude_code.NO_WINDOW)
+        self.send_json({"ok": True, "added": mcp_added()})
 
     def GET_api_clis(self) -> None:
         """Command-line tools installed on this computer that a team can be allowed to run."""

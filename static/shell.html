@@ -168,6 +168,11 @@
   .set .row:last-child { border-bottom: 0; }
   .set .row > div:first-of-type { flex: 1; min-width: 0; }
   .set .row.eng { gap: 12px; }
+  .set .mcmd { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; padding: 6px 6px 6px 12px; border-radius: 10px;
+               background: color-mix(in srgb, #D97757 7%, var(--hover)); box-shadow: inset 0 0 0 1px color-mix(in srgb, #D97757 22%, transparent); }
+  .set .mcmd code { flex: 1; min-width: 0; font: 11.5px/1.5 ui-monospace, Consolas, monospace; color: var(--ink); white-space: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .set .mcmd .btn { height: 26px; font-size: 12px; }
+  .set .kintro i { color: var(--ink); font-style: normal; }
   .set .kintro { margin: -2px 0 6px; font-size: 12px; color: var(--muted); line-height: 1.45; }
   .set .row.key .ktile { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center; font-weight: 700; font-size: 13px;
                          color: var(--ec); background: color-mix(in srgb, var(--ec) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ec) 40%, transparent); }
@@ -337,7 +342,13 @@ function applyAll() {
   $("barColor").content = bar;
   if (window.lithnodeApp) window.lithnodeApp.setBar(bar, css.getPropertyValue("--muted").trim() || "#8d8d8d");   // own window: recolor its title bar
 }
-if (window.lithnodeApp) document.documentElement.classList.add("native", ...(window.lithnodeApp.platform === "darwin" ? ["mac"] : []));
+const PREVIEW_MAC = new URLSearchParams(location.search).has("mac");   // ?mac previews the Mac app from another computer
+if (window.lithnodeApp || PREVIEW_MAC) document.documentElement.classList.add("native", ...(window.lithnodeApp?.platform === "darwin" || PREVIEW_MAC ? ["mac"] : []));
+// Mac key labels: ⌘ for Ctrl (every shortcut also takes ⌘), ⌫ for Delete, ↩ for Enter
+const MAC = PREVIEW_MAC || (window.lithnodeApp ? window.lithnodeApp.platform === "darwin" : /mac/i.test(navigator.userAgentData?.platform || navigator.platform));
+window.lithnodeMac = MAC;   // flows.html reads it for its own labels
+const KEY = (k) => (MAC ? { Ctrl: "⌘", Enter: "↩", Del: "⌫" }[k] ?? k : k);
+const K = (s) => s.split("+").map(KEY).join(MAC ? "" : "+");
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themeMode === "system") applyAll(); });
 $("themeBtn").onclick = () => {
   const order = Object.keys(THEMES);
@@ -517,8 +528,8 @@ const MENUS = {
     { icon: mi("tpl"), label: "New from a template…", action: flowsDo((a) => a.newFromTemplate()) },
     { icon: mi("copy"), label: "Duplicate flow", action: flowsDo((a) => a.duplicate()) },
     { sep: true },
-    { icon: mi("imp"), label: "Import team file…", hint: "Ctrl+O", action: flowsDo((a) => a.importTeam()) },
-    { icon: mi("exp"), label: "Export team file", hint: "Ctrl+S", action: flowsDo((a) => a.exportTeam()) },
+    { icon: mi("imp"), label: "Import team file…", hint: K("Ctrl+O"), action: flowsDo((a) => a.importTeam()) },
+    { icon: mi("exp"), label: "Export team file", hint: K("Ctrl+S"), action: flowsDo((a) => a.exportTeam()) },
     { sep: true },
     { icon: mi("trash"), label: "Delete flow", danger: true, action: flowsDo((a) => a.deleteFlow()) },
   ],
@@ -527,8 +538,8 @@ const MENUS = {
     return [
       { icon: mi("pen"), label: "Rename flow", hint: "F2", action: flowsDo((x) => x.rename()) },
       { sep: true },
-      { icon: mi("copy"), label: "Duplicate selected", hint: "Ctrl+D", disabled: !(a && a.selIsNode()), action: flowsDo((x) => x.duplicateSel()) },
-      { icon: mi("trash"), label: "Delete selected", hint: "Del", disabled: !(a && a.hasSel()), action: flowsDo((x) => x.deleteSel()) },
+      { icon: mi("copy"), label: "Duplicate selected", hint: K("Ctrl+D"), disabled: !(a && a.selIsNode()), action: flowsDo((x) => x.duplicateSel()) },
+      { icon: mi("trash"), label: "Delete selected", hint: K("Del"), disabled: !(a && a.hasSel()), action: flowsDo((x) => x.deleteSel()) },
       { sep: true },
       { icon: mi("tidyTb"), label: "Tidy up top to bottom", action: flowsDo((x) => x.tidy("tb")) },
       { icon: mi("tidyLr"), label: "Tidy up left to right", action: flowsDo((x) => x.tidy("lr")) },
@@ -558,7 +569,8 @@ $("cogBtn").onclick = () => {
   if (cogWasOpen) return;
   const b = $("cogBtn"), r = b.getBoundingClientRect();
   ui.menu(r.right - 230, r.bottom + 4, [
-    { icon: mi("gear"), label: "Settings…", hint: "Ctrl+,", action: () => openSettings() },
+    { icon: mi("gear"), label: "Settings…", hint: K("Ctrl+,"), action: () => openSettings() },
+    { icon: mi("plug"), label: "Connect Claude…", action: () => openSettings("setMcp") },
     { sep: true },
     { head: "Theme" },
     ...Object.entries(THEMES).map(([k, [, name]]) => ({ icon: { svg: THEMES[k][0], color: THEME_COLOR[k] }, label: name, on: themeMode === k, hint: themeMode === k ? "✓" : "",
@@ -630,17 +642,18 @@ setInterval(() => checkUpdates(false), 3600000);   // the server only asks GitHu
 
 // ---- Settings: theme, the engines and their sign-in, what new flows start with, updates, where Lithnode keeps its files
 const shortTokens = (n) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n));
-let prefs = null, engineList = null, recentRuns = null, keyList = null, keyErr = {}, keyBusy = {};
-async function openSettings() {
+let prefs = null, engineList = null, recentRuns = null, keyList = null, keyErr = {}, keyBusy = {}, mcp = null, mcpBusy = false, mcpErr = "";
+async function openSettings(section) {   // section: an element id to scroll to, like "setMcp"
   ui.closeMenu();
   const d = $("settings");
   if (!d.open) d.showModal();
   try { prefs = await (await fetch("/api/settings", { cache: "no-store" })).json(); } catch (e) { prefs = null; }
   renderSettings();
   fetch("/api/runs", { cache: "no-store" }).then((r) => r.json()).then((x) => { recentRuns = x.runs || []; if ($("setUse")) $("setUse").innerHTML = usageRows(); }).catch(() => {});
-  loadKeys();
+  loadKeys(); loadMcp();
   try { engineList = (await (await fetch("/api/engines", { cache: "no-store" })).json()).engines || []; } catch (e) { engineList = []; }
   renderSettings();   // the model list under New teams needs each engine's models
+  if (typeof section === "string") $(section)?.previousElementSibling?.previousElementSibling?.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 // API keys: an add-on beside the CLI sign-ins. The page only ever sees each key's last four characters.
 async function loadKeys() {
@@ -660,6 +673,39 @@ function keyRows() {
   }).join("");
 }
 function renderKeys() { if ($("setKeys")) $("setKeys").innerHTML = keyRows(); }
+// Connect Claude: Lithnode's MCP server (mcp_server.py), so Claude can build and run flows from any chat
+async function loadMcp() {
+  try { mcp = await (await fetch("/api/mcp", { cache: "no-store" })).json(); } catch (e) { mcp = null; }
+  renderMcp();
+}
+function mcpRows() {
+  if (!mcp) return `<div class="row"><div><small>Loading…</small></div></div>`;
+  const cc = mcpBusy ? `<span class="spin" aria-label="Working"></span>`
+    : mcp.added ? `<span class="st ok"><i></i>Added</span><button type="button" class="btn ghost" data-act="mcp-remove">Remove</button>`
+    : mcp.claude_code ? `<button type="button" class="btn" data-act="mcp-add">Add to Claude Code</button>`
+    : `<a class="btn" href="https://claude.com/claude-code" target="_blank" rel="noopener">Get Claude Code</a>`;
+  const logo = (src) => `<span class="elogo claude"><img src="/static/${src}" alt=""></span>`;
+  return `<div class="row eng" style="--ec:#D97757">${logo("engine-claude.svg")}
+      <div><b>Claude Code</b><small>${mcpErr ? `<span class="bad">${esc(mcpErr)}</span>` : mcp.added
+        ? "Ask Claude to build or run a flow from any project, in the terminal or the desktop app's Code tab."
+        : "One click adds Lithnode's tools to Claude Code, for every project."}</small></div>${cc}</div>
+    <div class="row eng" style="--ec:#D97757">${logo("engine-claude.svg")}
+      <div><b>Claude desktop app chat</b><small>Paste into Settings › Developer › Edit Config, then restart Claude.</small></div>
+      <button type="button" class="btn" data-act="mcp-copy" data-what="desktop">Copy config</button></div>
+    <div class="mcmd"><code>${esc(mcp.cli)}</code><button type="button" class="btn ghost" data-act="mcp-copy" data-what="cli">Copy</button></div>
+    <p class="kintro">Then try: <i>"Use Lithnode to review this repo with the Quick code review flow."</i> Every run shows up live here, and approvals still wait for you.</p>`;
+}
+function renderMcp() { if ($("setMcp")) $("setMcp").innerHTML = mcpRows(); }
+async function mcpAct(path) {
+  mcpBusy = true; mcpErr = ""; renderMcp();
+  try {
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    const x = await r.json().catch(() => ({}));
+    if (!r.ok) mcpErr = x.error || "That didn't work.";
+  } catch (e) { mcpErr = "Couldn't reach Lithnode's server."; }
+  mcpBusy = false;
+  await loadMcp();
+}
 async function keysChanged() {
   await loadKeys();
   try { engineList = (await (await fetch("/api/engines?refresh=1", { cache: "no-store" })).json()).engines || engineList; } catch (e) {}
@@ -756,6 +802,9 @@ function renderSettings() {
     ${h("key", "API keys")}
     <p class="kintro">Optional. Run teams on your own provider keys, billed per token. Keys are encrypted on this PC and never leave it except to that provider.</p>
     <div id="setKeys">${keyRows()}</div>
+    ${h("plug", "Connect Claude")}
+    <p class="kintro">Let Claude build, run and check your flows from a chat. It uses Lithnode while it's open on this computer.</p>
+    <div id="setMcp">${mcpRows()}</div>
     ${h("team", "New teams")}
     <div class="row"><div><b>Engine</b><small>What a team runs on when you add it. You can still switch any team.</small></div>
       <div class="epick" role="radiogroup" aria-label="Engine for new teams">${ENGINE_IDS.map((id) => `<button type="button" role="radio" aria-checked="${p.engine === id}" class="${p.engine === id ? "on" : ""}" data-engine-pick="${id}" title="${LABEL[id]}" style="--ec:${ENGINE_COLOR[id]}"><img src="/static/${ENGINE_LOGO[id]}" alt="${LABEL[id]}"></button>`).join("")}</div></div>
@@ -780,7 +829,7 @@ function renderSettings() {
     ${h("chart", "Token usage")}
     <div id="setUse">${usageRows()}</div>
     ${h("kbd", "Shortcuts")}
-    <div class="keys">${SHORTCUTS.map(([what, ks, col]) => `<div class="krow" style="--kc:${col}"><span>${what}</span><span>${ks.map((k) => `<kbd>${k}</kbd>`).join("<i>+</i>")}</span></div>`).join("")}</div>
+    <div class="keys">${SHORTCUTS.map(([what, ks, col]) => `<div class="krow" style="--kc:${col}"><span>${what}</span><span>${ks.map((k) => `<kbd>${KEY(k)}</kbd>`).join(MAC ? "" : "<i>+</i>")}</span></div>`).join("")}</div>
     ${h("update", "Updates")}
     <div class="row"><div><b>Tell me when a new version is out</b><small>Asks GitHub every few hours. Nothing about you is sent.</small></div>${sw("check_updates", p.check_updates, "Check for updates")}</div>
     <div class="row"><div><b>Count my install</b><small>Once per version, tells lithnode.com "installed" or "updated", with the version and Windows, Mac or Linux. Nothing about you.</small></div>${sw("count_install", p.count_install, "Count my install")}</div>
@@ -867,6 +916,12 @@ $("settings").addEventListener("click", async (e) => {
   if (t.dataset.act === "keys") $("setKeys")?.scrollIntoView({ behavior: "smooth", block: "start" });
   if (t.dataset.act === "key-save") saveKey(t.dataset.provider);
   if (t.dataset.act === "key-remove") removeKey(t.dataset.provider);
+  if (t.dataset.act === "mcp-add") mcpAct("/api/mcp/add");
+  if (t.dataset.act === "mcp-remove") mcpAct("/api/mcp/remove");
+  if (t.dataset.act === "mcp-copy" && mcp) {
+    try { await navigator.clipboard.writeText(mcp[t.dataset.what]); t.textContent = "Copied"; setTimeout(() => { t.textContent = t.dataset.what === "cli" ? "Copy" : "Copy config"; }, 1400); }
+    catch (e) { t.textContent = "Couldn't copy"; }
+  }
   if (t.dataset.enginePick && t.dataset.enginePick !== prefs?.settings?.engine) { await saveSetting("model", ""); saveSetting("engine", t.dataset.enginePick); }
   if (t.dataset.dir) saveSetting("dir", t.dataset.dir);
   if (t.dataset.view) { fapi()?.setView?.(t.dataset.view); renderSettings(); }

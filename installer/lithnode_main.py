@@ -6,6 +6,7 @@ lithnode-cli.exe  (console)      `hook <Event>`  Claude Pet's Claude Code hook (
                                  `pick-folder`   the folder dialog the app opens
                                  `install-pet` / `uninstall-pet`  add or remove the pet's hooks (the installer runs these)
                                  `shot <file or URL> [seconds]`   a screenshot for agents to look at (lithnode-shot)
+                                 `mcp`           Lithnode's MCP server, so Claude can build and run flows (mcp_server.py)
 """
 import json
 import os
@@ -125,6 +126,9 @@ def main():
     elif cli and args[:1] == ["shot"]:
         import shot
         sys.exit(shot.main(args[1:]))
+    elif cli and args[:1] == ["mcp"]:
+        import mcp_server
+        mcp_server.main()
     elif not cli and args[:1] == ["pet"]:
         sys.argv = ["pet.py"]
         runpy.run_module("pet", run_name="__main__")

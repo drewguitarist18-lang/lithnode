@@ -14,7 +14,7 @@ a = Analysis(
     [str(HERE / "lithnode_main.py")],
     pathex=[str(ROOT), str(PET)] if WINDOWS else [str(ROOT)],
     datas=[(str(ROOT / "static"), "static")],
-    hiddenimports=["hq", "flows", "agents", "claude_code", "engines", "office_feed", "shot", "updates", "version", "settings", "apikeys"]
+    hiddenimports=["hq", "flows", "agents", "claude_code", "engines", "office_feed", "shot", "updates", "version", "settings", "apikeys", "mcp_server"]
                   + (["hook", "pet", "shared", "tkinter", "tkinter.filedialog", "winsound"] if WINDOWS else []),
     excludes=["test", "unittest", "pydoc_data"] + ([] if WINDOWS else ["tkinter"]),
 )

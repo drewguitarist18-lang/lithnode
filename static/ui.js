@@ -129,6 +129,7 @@
     info: ['<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8h.01"/>', "#8b7cff"],
     code: ['<path d="m8.5 7-5 5 5 5M15.5 7l5 5-5 5"/>', "#c084fc"],
     key: ['<circle cx="8" cy="12" r="3.5"/><path d="M11.5 12H20M17 12v3M20 12v2.5"/>', "#ff6b8b"],
+    plug: ['<path d="M9 3.5v4M15 3.5v4"/><path d="M6.5 7.5h11v3a5.5 5.5 0 0 1-11 0z"/><path d="M12 16v4.5"/>', "#D97757"],
     quit: ['<path d="M12 3.5v8"/><path d="M7 6.3a7.5 7.5 0 1 0 10 0"/>', "#ff6b8b"],
   };
   const icon = (k, color) => MI[k] ? { svg: MI[k][0], color: color || MI[k][1] } : "";

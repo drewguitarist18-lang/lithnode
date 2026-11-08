@@ -360,22 +360,18 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .src .cmd code { flex: 1; min-width: 0; font: 500 12.5px var(--mono); color: var(--ink); white-space: nowrap; overflow-x: auto; user-select: all; scrollbar-width: none; }
   .src .cmd button { flex: none; height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: var(--ink); color: var(--void); font: 600 12px var(--mono); cursor: pointer; }
   @media (max-width: 760px) { .src { grid-template-columns: 1fr; } }
-  .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; text-align: left; }
-  .facts div { --c: var(--amber); display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 20px 22px; color: var(--soft); font-size: 13.9px; }
-  .facts div + div { --c: var(--red); }
-  .facts div::before { content: "!"; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font: 700 16px var(--pixel); color: var(--c);
-                       background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); }
-  .facts div:first-child::before { content: "$"; }
-  .facts b { display: block; color: var(--ink); margin-bottom: 4px; font-weight: 600; }
-  @media (max-width: 720px) { .facts { grid-template-columns: 1fr; } }
-  .getpet { --c: #d97757; margin-top: 14px; padding: 18px 20px; text-align: left; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 20px; align-items: center; text-decoration: none; color: inherit; }
-  .getpet canvas { width: 54px; height: 45px; image-rendering: pixelated; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--c) 45%, transparent)); }
-  .getpet p { margin: 0; color: var(--soft); font-size: 13.9px; } .getpet p b { color: var(--ink); font-weight: 600; display: block; margin-bottom: 2px; }
-  .getpet em { font: 600 12.5px var(--mono); font-style: normal; color: var(--c); white-space: nowrap; }
-  .getpet:hover em { text-decoration: underline; }
-  @media (max-width: 620px) { .getpet { grid-template-columns: auto minmax(0, 1fr); } .getpet em { grid-column: 2; } }
-  .getpet.tip { --c: #e6b450; } .getpet.shop { --c: #3cc2ac; }
-  .getpet .cup { width: 48px; height: 48px; margin-inline: 3px; color: var(--c); filter: drop-shadow(0 0 14px color-mix(in srgb, var(--c) 45%, transparent)); }
+  .fine { max-width: 640px; margin: 22px auto 0; color: var(--muted, #8a8a93); font-size: 12.5px; line-height: 1.6; }
+  .morehead { margin: 88px 0 22px; font: 600 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--soft); }
+  .more3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; text-align: left; }
+  .tile { display: flex; flex-direction: column; gap: 8px; padding: 26px 24px 22px; text-decoration: none; color: inherit; transition: transform .2s; }
+  .tile:hover { transform: translateY(-3px); }
+  .tile canvas, .tile .ico { width: 48px; height: 40px; margin-bottom: 10px; image-rendering: pixelated; color: var(--c); filter: drop-shadow(0 0 14px color-mix(in srgb, var(--c) 45%, transparent)); }
+  .tile .ico { width: 40px; height: 40px; }
+  .tile b { color: var(--ink); font-weight: 600; font-size: 15px; }
+  .tile p { margin: 0; flex: 1; color: var(--soft); font-size: 13.5px; line-height: 1.6; }
+  .tile em { margin-top: 8px; font: 600 12.5px var(--mono); font-style: normal; color: var(--c); }
+  .tile:hover em { text-decoration: underline; }
+  @media (max-width: 760px) { .more3 { grid-template-columns: 1fr; } .morehead { margin-top: 64px; } }
 
   /* after you press Download: the steps for your computer, next to where the browser shows its downloads */
   .help { position: fixed; top: 84px; right: 20px; z-index: 20; width: min(400px, calc(100% - 32px)); max-height: calc(100svh - 104px); overflow: auto;
@@ -585,16 +581,17 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   </div>
   <div class="src glass rv"><p><b>Rather read it first?</b>Run it from source. Plain Python, no packages.</p>
     <div class="cmd"><code>git clone https://github.com/drewguitarist18-lang/lithnode &amp;&amp; python3 lithnode/hq.py</code><button type="button" data-copy>Copy</button></div></div>
-  <div class="facts">
-    <div class="glass rv"><span><b>Your plan, your usage</b>Every agent uses your own Claude, ChatGPT or Cursor plan. Lithnode never charges you, so it can't refund usage.</span></div>
-    <div class="glass rv"><span><b>Use at your own risk</b>Builder agents can edit files in the folder you pick. Start with a test folder or a project in git.</span></div>
+  <p class="fine rv">Agents run on your own Claude, ChatGPT or Cursor plan, so Lithnode never charges you (and can't refund usage).
+    Builder agents can edit files in the folder you pick: start with a test folder or a project in git.</p>
+  <h3 class="morehead rv">More for your agents</h3>
+  <div class="more3">
+    <a class="tile glass rv" style="--c:#3cc2ac" href="https://shop.lithnode.com"><canvas width="12" height="10" data-sprite="scout" data-color="#3cc2ac" title="Pet me"></canvas>
+      <b>Ready-made teams</b><p>Money Saver, Side Hustle Finder, Job Hunt and Trip Planner. Import one and press Run.</p><em>Browse the shop →</em></a>
+    <a class="tile glass rv" style="--c:#d97757" href="/connect/"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3.5v4M15 3.5v4"/><path d="M6.5 7.5h11v3a5.5 5.5 0 0 1-11 0z"/><path d="M12 16v4.5"/></svg>
+      <b>Connect Claude</b><p>Ask Claude to build and run your flows from a chat, through Lithnode's MCP server.</p><em>Set it up →</em></a>
+    <a class="tile glass rv" style="--c:#e8916f" href="https://pet.lithnode.com" target="_blank" rel="noopener"><canvas width="12" height="10" data-sprite="clawd" data-color="#d97757" title="Pet me"></canvas>
+      <b>Claude Pet</b><p>A tiny desktop pet that types while Claude works and waves when it needs you. Free.</p><em>Get Claude Pet →</em></a>
   </div>
-  <a class="getpet shop glass rv" href="https://shop.lithnode.com"><canvas width="12" height="10" data-sprite="scout" data-color="#3cc2ac" title="Pet me"></canvas>
-    <p><b>Ready-made teams</b>Teams already tuned on real runs: Money Saver, Side Hustle Finder, Job Hunt and Trip Planner. Import one and press Run.</p><em>Browse the shop →</em></a>
-  <a class="getpet glass rv" href="https://pet.lithnode.com" target="_blank" rel="noopener"><canvas width="12" height="10" data-sprite="clawd" data-color="#d97757" title="Pet me"></canvas>
-    <p><b>Get Claude Pet</b>A tiny pixel pet for your desktop: Windows, Mac or Linux. He types while Claude works, waves when it needs you, and turns into the crab while Lithnode is open. Free.</p><em>Get Claude Pet →</em></a>
-  <a class="getpet tip glass rv" href="https://ko-fi.com/lithnode" target="_blank" rel="noopener"><svg class="cup" viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M5 1h1v2H5zM8 1h1v2H8zM2 4h10v1H2zM2 5h1v6H2zM11 5h1v6h-1zM3 11h8v1H3zM4 12h6v1H4zM12 6h2v1h-2zM14 7h1v2h-1zM12 9h2v1h-2zM3 5h8v6H3z" opacity=".25"/><path d="M5 1h1v2H5zM8 1h1v2H8zM2 4h10v1H2zM2 5h1v6H2zM11 5h1v6h-1zM3 11h8v1H3zM4 12h6v1H4zM12 6h2v1h-2zM14 7h1v2h-1zM12 9h2v1h-2zM6 7h1v1H6zM8 7h1v1H8zM5 6h1v1H5zM7 6h1v1H7zM9 6h1v1H9zM6 8h3v1H6zM7 9h1v1H7z"/></svg>
-    <p><b>Tip jar</b>Lithnode is free and always will be. If it saves you time, a coffee keeps the agents working.</p><em>Leave a tip →</em></a>
 </div></section>
 </main>
 

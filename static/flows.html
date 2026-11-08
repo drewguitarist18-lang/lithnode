@@ -117,7 +117,7 @@
     <div id="runWarn" class="hint" style="color:var(--failed)"></div>
   </div>
   <footer class="rfoot"><span id="runEst" class="hint"></span>
-    <div class="acts"><button data-close>Cancel</button><button class="primary go" id="goBtn">▶ Start run <kbd>Ctrl ↵</kbd></button></div></footer>
+    <div class="acts"><button data-close>Cancel</button><button class="primary go" id="goBtn">▶ Start run <kbd id="goKey">Ctrl ↵</kbd></button></div></footer>
 </dialog>
 
 <dialog id="usageDlg" class="usagedlg">
@@ -1094,6 +1094,9 @@ function deleteSelected() {
   if (sel.kind === "edge") return disconnect(sel.id);
   deleteNode(sel.id);
 }
+let MAC = false;   // the shell decides (it knows the app's platform); Mac shows ⌘ in labels
+try { MAC = !!parent.lithnodeMac; } catch (e) { /* opened on its own */ }
+if (MAC) $("goKey").textContent = "⌘ ↩";
 document.addEventListener("keydown", (e) => {
   const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName), ctrl = e.ctrlKey || e.metaKey;
   if ((e.key === "Delete" || e.key === "Backspace") && !typing) { e.preventDefault(); deleteSelected(); }
@@ -1814,7 +1817,7 @@ $("stopBtn").onclick = async () => { if (await ui.confirm({ title: "Stop this ru
 $("editBtn").onclick = () => { const id = run && run.flow_id; closeRun(); if (id && id !== flow.id && flows.some((f) => f.id === id)) openFlow(id); };
 
 async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); toast("Copied."); } catch (e) { toast("Couldn't copy. Select the text and press Ctrl+C."); }
+  try { await navigator.clipboard.writeText(text); toast("Copied."); } catch (e) { toast(`Couldn't copy. Select the text and press ${MAC ? "⌘C" : "Ctrl+C"}.`); }
 }
 function md(src) {   // Markdown for reports: headings, lists, code blocks, tables, bold, italics, links
   const inline = (t) => esc(t)
