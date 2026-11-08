@@ -453,7 +453,8 @@ try:
     s, en = call("/api/engines")
     check("engines are listed with their sign-in", [(e["id"], e["installed"], e["signed_in"]) for e in en["engines"]]
           [:3] == [("claude", True, True), ("codex", True, True), ("cursor", True, True)] and en["engines"][1]["sandbox"] is True
-          and en["engines"][3]["id"] == "ollama" and en["engines"][3]["signed_in"] is False, en)   # no Ollama server in tests
+          and [e["id"] for e in en["engines"]] == ["claude", "codex", "cursor", "antigravity", "ollama"]
+          and en["engines"][4]["signed_in"] is False, en)   # no Ollama server in tests
     _, made = call("/api/flows", {}, "POST")
     mixed = {"name": "Mixed engines", "nodes": [{"id": "master", "type": "master", "x": 0, "y": 0, "mode": "pass"},
              {"id": "cx", "type": "cluster", "x": 0, "y": 0, "name": "Codex team", "engine": "codex", "tools": "edit", "count": 1,

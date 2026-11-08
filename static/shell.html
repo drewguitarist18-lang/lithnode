@@ -96,10 +96,21 @@
   .acct .engine .logo { position: relative; width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center; overflow: hidden; background: #161616; }
   .acct .engine .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .acct .engine .logo.codex img { width: 70%; height: 70%; object-fit: contain; }
+  .acct .engine .logo.antigravity img { width: 78%; height: 78%; object-fit: contain; }
   .acct .engine .logo .dot { position: absolute; right: 2px; bottom: 2px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--pad, var(--panel)); }
   .acct .engine:not(.on) .logo img { opacity: .55; filter: grayscale(.6); }
   .acct .engine .free { margin-left: 5px; padding: 0 5px; border-radius: 5px; font: 600 10px/16px inherit; color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent); vertical-align: 1px; }
   .acct .engine main { flex: 1; min-width: 0; }
+  .acct .engine button.ghost { border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); border-radius: 99px; padding: 3px 10px;
+    background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); font-weight: 600; }
+  .acct .engine button.ghost:hover { background: var(--warn); border-color: var(--warn); color: #fff; }
+  .acct .engine .sub { display: block; margin-top: 3px; font-size: 11px; line-height: 1.35; color: var(--muted); }
+  .acct .engine a.sub { color: var(--ink); text-decoration: none; }
+  .acct .engine a.sub:hover { text-decoration: underline; }
+  .acct .engine .sub.bad { color: var(--warn); }
+  .acct .engine .bar { display: block; height: 3px; margin-top: 5px; border-radius: 99px; background: linear-gradient(90deg, var(--ok) var(--p), var(--line) var(--p)); }
+  .acct .engine .spin { flex: none; width: 16px; height: 16px; margin-right: 6px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--ink); animation: acctspin .8s linear infinite; }
+  @keyframes acctspin { to { transform: rotate(360deg); } }
   .acct .engine b { display: block; font-size: 12.5px; color: var(--ink); }
   .acct .engine small { margin: 0; font-size: 11.5px; }
   .acct .engine button { flex: none; height: 28px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: 600 11.5px inherit; cursor: pointer; }
@@ -293,25 +304,37 @@ async function poll() {
 poll(); setInterval(poll, 2000);
 
 // Lithnode has no account of its own. Each engine uses the account already signed in to its own CLI.
-const LABEL = { claude: "Claude Code", codex: "Codex", cursor: "Cursor", ollama: "Ollama" };
-const ENGINE_LOGO = { claude: "engine-claude.svg", codex: "engine-codex.png", cursor: "engine-cursor.png", ollama: "engine-ollama.png" };
+const LABEL = { claude: "Claude Code", codex: "Codex", cursor: "Cursor", antigravity: "Antigravity", ollama: "Ollama" };
+const ENGINE_LOGO = { claude: "engine-claude.svg", codex: "engine-codex.png", cursor: "engine-cursor.png", antigravity: "engine-antigravity.png", ollama: "engine-ollama.png" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function renderAcct() {
   const cc = account, si = signin, a = $("acct");
   const typed = $("codeIn")?.value || "", focused = document.activeElement?.id === "codeIn";   // a poll mustn't eat a half-pasted code
   a.className = "acct" + (Object.values(engineStatus).some((e) => e.installed && e.signed_in) ? " ok" : si.active ? " wait" : "");
   const err = si.error ? `<p class="err">${esc(si.error)}</p>` : "";
-  const rows = ["claude", "codex", "cursor", "ollama"].map((id) => {
-    const e = engineStatus[id] || {}, on = e.installed && e.signed_in;
-    const action = on ? ""
+  const rows = ["claude", "codex", "cursor", "antigravity", "ollama"].map((id) => {
+    const e = engineStatus[id] || {}, on = e.installed && e.signed_in, job = e.job || {};
+    const claudeWaiting = id === "claude" && si.active && !on;
+    const busy = job.busy || claudeWaiting || pending[id];
+    const action = busy ? `<span class="spin" aria-label="Working"></span>`
+      : on ? (id === "ollama" ? "" : `<button class="ghost" data-act="signout" data-engine="${id}">Sign out</button>`)
       : id === "claude" ? (e.installed ? `<button data-act="login">Sign in</button>` : `<a href="https://claude.com/claude-code" target="_blank" rel="noopener">Install</a>`)
       : id === "ollama" ? `<button data-act="engine-install" data-engine="ollama">${!e.installed ? "Install" : /not running/i.test(e.note || "") ? "Start" : "Get a model"}</button>`
       : e.installed ? `<button data-act="engine-login" data-engine="${id}">Sign in</button>` : `<button data-act="engine-install" data-engine="${id}">Install</button>`;
-    const state = on ? (id === "ollama" ? "Ready · runs on this PC" : "Signed in")
+    const state = pending[id] === "signout" ? "Signing out…"
+      : job.busy && job.kind === "login" ? "Finish signing in in your browser"
+      : job.busy ? (id === "ollama" && e.installed ? "Downloading a model" : "Installing") + (job.pct != null ? ` · ${job.pct}%` : "…")
+      : claudeWaiting ? "Finish signing in in your browser"
+      : pending[id] ? "Starting…"
+      : on ? (id === "ollama" ? "Ready · runs on this PC" : "Signed in")
       : !e.installed ? (/Cursor app/.test(e.note || "") ? "Cursor app found · its CLI isn't" : "Not installed")
       : id === "ollama" ? (/not running/i.test(e.note || "") ? "Installed · not running" : "No model downloaded yet") : "Needs sign-in";
+    const extra = job.busy && job.url ? `<a class="sub" href="${esc(job.url)}" target="_blank" rel="noopener">Browser didn't open? Open the sign-in page</a>`
+      : job.error || errs[id] ? `<span class="sub bad">${esc(errs[id] || job.error)}</span>`
+      : hints[id] && !on ? `<span class="sub">${esc(hints[id])}</span>` : "";
+    const bar = job.busy && job.pct != null ? `<i class="bar" style="--p:${job.pct}%"></i>` : "";
     const tip = esc(e.note || "");
-    return `<div class="engine ${on ? "on" : ""}" title="${tip}"><span class="logo ${id}"><img src="/static/${ENGINE_LOGO[id]}" alt=""><i class="dot"></i></span><main><b>${LABEL[id]}${id === "ollama" ? `<span class="free">FREE</span>` : ""}</b><small>${esc(state)}</small></main>${action}</div>`;
+    return `<div class="engine ${on ? "on" : ""}${busy ? " busy" : ""}" title="${tip}"><span class="logo ${id}"><img src="/static/${ENGINE_LOGO[id]}" alt=""><i class="dot"></i></span><main><b>${LABEL[id]}${id === "ollama" ? `<span class="free">FREE</span>` : ""}</b><small>${esc(state)}</small>${bar}${extra}</main>${action}</div>`;
   }).join("");
   const claudeHelp = !cc.logged_in && cc.available && si.active ? `
     <p>Finish Claude Code sign-in in your browser.</p>
@@ -340,30 +363,27 @@ async function checkNow() {
   await poll();
   if (!$("acct").hidden) renderAcct();
 }
-async function startEngineSignin(engine, button) {
-  button.disabled = true; button.textContent = "Opening…";
+// install, sign in and sign out all happen in the background: the card shows how it's going, no terminal
+const pending = {}, errs = {}, hints = {};
+async function engineAction(engine, path, kind) {
+  pending[engine] = kind; delete errs[engine]; renderAcct();
   try {
-    const r = await fetch("/api/engine-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ engine }) });
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ engine }) });
     const d = await r.json();
-    if (!r.ok) throw new Error(d.message || "Couldn't start sign-in.");
-    button.textContent = "Finish in terminal";
-  } catch (e) {
-    button.disabled = false; button.textContent = "Sign in";
-    alert(e.message || "Couldn't start sign-in.");
-  }
-}
-async function startEngineInstall(engine, button) {
-  button.disabled = true; button.textContent = "Opening…";
-  try {
-    const r = await fetch("/api/engine-install", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ engine }) });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.message || "Couldn't start the install.");
-    button.textContent = /starting/i.test(d.message || "") ? "Starting…" : engine === "ollama" ? "Downloading…" : "Installing…";
+    if (!r.ok) errs[engine] = d.message || "That didn't work.";
+    else if (engine === "antigravity" && kind === "login") hints[engine] = d.message;   // agy signs in from its own window
     if (/starting/i.test(d.message || "")) setTimeout(checkNow, 4000);
-  } catch (e) {
-    button.disabled = false; button.textContent = "Install";
-    alert(e.message || "Couldn't start the install.");
-  }
+  } catch (e) { errs[engine] = "Lithnode's server didn't answer."; }
+  if (kind === "signout") { try { await fetch("/api/hq?fresh=1", { cache: "no-store" }); } catch (e) {} }
+  delete pending[engine];
+  await poll(); renderAcct();
+}
+const startEngineSignin = (engine) => engineAction(engine, "/api/engine-login", "login");
+const startEngineInstall = (engine) => engineAction(engine, "/api/engine-install", "install");
+function signOutEngine(engine) {
+  const also = engine === "antigravity" ? " This also signs you out of the Antigravity app." : "";
+  if (!confirm(`Sign out of ${LABEL[engine]}? Teams set to ${LABEL[engine]} won't run until you sign in again.${also}`)) return;
+  engineAction(engine, "/api/engine-signout", "signout");
 }
 function toggleAcct(open = $("acct").hidden) {
   $("acct").hidden = !open; $("status").setAttribute("aria-expanded", String(open));
@@ -380,8 +400,9 @@ $("acct").addEventListener("click", (e) => {
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (act) e.preventDefault();
   if (act === "login") startSignin();
-  if (act === "engine-install") startEngineInstall(e.target.closest("[data-engine]").dataset.engine, e.target.closest("button"));
-  if (act === "engine-login") startEngineSignin(e.target.closest("[data-engine]").dataset.engine, e.target.closest("button"));
+  if (act === "engine-install") startEngineInstall(e.target.closest("[data-engine]").dataset.engine);
+  if (act === "engine-login") startEngineSignin(e.target.closest("[data-engine]").dataset.engine);
+  if (act === "signout") signOutEngine(e.target.closest("[data-engine]").dataset.engine);
   if (act === "trouble") { trouble = true; renderAcct(); $("codeIn")?.focus(); }
   if (act === "check") { e.target.textContent = "Checking…"; checkNow(); }
 });

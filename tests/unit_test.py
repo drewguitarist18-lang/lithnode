@@ -7,6 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import agents  # noqa: E402
+import engines  # noqa: E402
 import flows  # noqa: E402
 import settings  # noqa: E402
 import updates  # noqa: E402
@@ -63,6 +64,18 @@ check("a Codex role takes the flow's pick for that role", _cf["c"]["engine_model
 check("a role with no pick uses the CLI's own default", _cf["k"]["engine_model"] == "", _cf["k"])
 check("a model picked by hand is kept", _cf["h"]["engine_model"] == "gpt-hand", _cf["h"])
 check("a bad role model is dropped", flows.clean_flow(_teams)["engine_models"]["codex"]["build"] == "")
+# every engine, every role: the flow's pick for that role reaches the CLI's command line
+_picks = {"codex": {"think": "gpt-6-luna", "build": "gpt-5.6-terra", "run": "gpt-5.6-luna"},
+          "cursor": {"think": "claude-4.5-opus-thinking", "build": "gpt-5.1-codex", "run": "composer-1"},
+          "ollama": {"think": "qwen3:14b", "build": "llama3.2:latest", "run": "hf.co/unsloth/gemma-3:Q4"}}
+_all = flows.clean_flow({"engine_models": _picks, "nodes": [{"id": f"{e}-{r}", "type": "cluster", "role": r, "engine": e}
+                                                            for e in _picks for r in ("think", "build", "run")]})
+_got = {n["id"]: n["engine_model"] for n in _all["nodes"]}
+check("roles: each engine's team gets its role's model", all(_got[f"{e}-{r}"] == m for e in _picks for r, m in _picks[e].items()), _got)
+check("roles: Codex and Cursor get it as --model", all(
+    engines.build_args(e, ["x"], tools="read", model=_got[f"{e}-{r}"])[-3:-1] == ["--model", _picks[e][r]] if e == "codex"
+    else engines.build_args(e, ["x"], tools="read", model=_got[f"{e}-{r}"])[-2:] == ["--model", _picks[e][r]]
+    for e in ("codex", "cursor") for r in ("think", "build", "run")))
 _off = flows.clean_flow({"roles": False, "nodes": [{"id": "t", "type": "cluster", "role": "think", "model": "claude-haiku-4-5"}]})
 check("with roles off a team keeps its own model and has no role", _off["roles"] is False
       and (_off["nodes"][0]["role"], _off["nodes"][0]["model"]) == ("", "claude-haiku-4-5"), _off["nodes"][0])
@@ -90,8 +103,6 @@ check("design: a Codex-built flow keeps Codex for every agent stage",
 import json  # noqa: E402
 import threading  # noqa: E402
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # noqa: E402
-
-import engines  # noqa: E402
 
 _asked = []
 
@@ -125,10 +136,86 @@ _ag = agents.Agent(model="", effort="low", tools="none", system="Be terse.", pro
 check("ollama: a session streams the model's answer into the report", _ag.run() and _ag.text == "Red, blue, yellow.", (_ag.text, _ag.error))
 check("ollama: it uses the first downloaded model, with the role as the system message",
       _asked and _asked[0]["model"] == "tiny:latest" and _asked[0]["messages"][0] == {"role": "system", "content": "Be terse."}, _asked)
+_ag = agents.Agent(model="", effort="low", tools="none", system="x", prompt="y", cwd=".", on_update=lambda: None, engine="ollama",
+                   engine_model="qwen3:14b")
+check("ollama: a role's model is the one asked", _ag.run() and _asked[-1]["model"] == "qwen3:14b", _asked[-1])
 _srv.shutdown()
 engines.OLLAMA_URL = "http://127.0.0.1:9"
 _st = engines.status("ollama", force=True)
 check("ollama: no server means not ready", not _st["signed_in"] and _st["note"], _st)
+
+# ---- engine jobs: install / sign-in run hidden in the background; the card reads their link, progress and errors ---
+import os  # noqa: E402
+import time  # noqa: E402
+
+_py = sys.executable
+engines._start_job("codex", "login", [_py, "-c", "import time; print('Open https://auth.example.com/x?y=1 to sign in'); "
+                                                 "print('pulling 42%', end='\\r', flush=True); time.sleep(5)"])
+time.sleep(0.8)
+_js = engines.job_state("codex")
+check("jobs: a running sign-in shows its link and progress", _js["busy"] and _js["url"] == "https://auth.example.com/x?y=1" and _js["pct"] == 42, _js)
+check("jobs: the engines status carries the job", engines.all_status()["codex"].get("job", {}).get("busy") is True)
+for _ in range(50):
+    if not engines.job_state("codex")["busy"]:
+        break
+    time.sleep(0.1)
+check("jobs: a finished sign-in leaves no error", engines.job_state("codex") == {"kind": "login", "busy": False, "url": "", "pct": None, "error": ""},
+      engines.job_state("codex"))
+engines._start_job("cursor", "install", [_py, "-c", "import sys; print('network is down'); sys.exit(3)"])
+for _ in range(50):
+    if not engines.job_state("cursor")["busy"]:
+        break
+    time.sleep(0.1)
+check("jobs: a failed install says what it last printed", engines.job_state("cursor")["error"] == "The install didn't finish: network is down",
+      engines.job_state("cursor"))
+os.environ["LITHNODE_CODEX_CMD"] = json.dumps([_py, "-c", "import sys; sys.exit(0 if sys.argv[1:] == ['logout'] else 1)"])
+check("sign out: runs the CLI's own logout", engines.sign_out("codex") == (True, "Signed out of Codex.") and engines.job_state("codex") is None)
+os.environ["LITHNODE_CODEX_CMD"] = json.dumps([_py, "-c", "import sys; print('no session'); sys.exit(1)"])
+check("sign out: a failure says why", engines.sign_out("codex") == (False, "Couldn't sign out of Codex: no session"))
+del os.environ["LITHNODE_CODEX_CMD"]
+check("sign out: Ollama has no account", not engines.sign_out("ollama")[0])
+
+# ---- Antigravity: agy reads one JSON message on stdin and streams step_update events, then a result ---------------
+import tempfile  # noqa: E402
+
+_fake_agy = Path(tempfile.mkdtemp()) / "agy.py"
+_fake_agy.write_text(r'''
+import json, sys
+if sys.argv[1:] == ["models"]:
+    print("Fetching available models...\ngemini-x-high\tGemini X (High)\nclaude-y\tClaude Y"); sys.exit(0)
+msg = json.loads(sys.stdin.readline())
+open(sys.argv[0] + ".seen", "w").write(json.dumps({"args": sys.argv[1:], "msg": msg}))
+ev = lambda **k: print(json.dumps(k), flush=True)
+ev(event="init", init={"cwd": "."})
+ev(event="step_update", step_update={"step_type": "tool", "state": "ACTIVE", "tool_name": "read_file", "tool_info": {"parameters": {"Path": "C:\\w\\notes.md"}}})
+ev(event="step_update", step_update={"step_type": "agent_response", "state": "ACTIVE", "text_delta": "All "})
+ev(event="step_update", step_update={"step_type": "agent_response", "state": "DONE", "text_delta": "good."})
+ev(event="result", result={"status": "SUCCESS", "response": "All good.\n"})
+''')
+os.environ["LITHNODE_AGY_CMD"] = json.dumps([_py, str(_fake_agy)])
+check("antigravity: its models come from `agy models`", engines.models("antigravity", force=True)
+      == [{"id": "gemini-x-high", "label": "Gemini X (High)"}, {"id": "claude-y", "label": "Claude Y"}])
+_steps = []
+_ag = agents.Agent(model="", effort="low", tools="read", system="Review it.", prompt="Check notes.md", cwd=".",
+                   on_update=lambda: _steps.append(_ag.step), engine="antigravity", engine_model="gemini-x-high")
+check("antigravity: a session's answer is the report", _ag.run() and _ag.text == "All good.", (_ag.text, _ag.error))
+_seen = json.loads(Path(str(_fake_agy) + ".seen").read_text())
+check("antigravity: the prompt goes in as one JSON user message, role first",
+      _seen["msg"]["event"] == "user" and _seen["msg"]["message"]["content"].startswith("# Your instructions\nReview it."), _seen["msg"])
+check("antigravity: the role's model is passed", _seen["args"][-2:] == ["--model", "gemini-x-high"], _seen["args"])
+_rules = json.loads(_seen["args"][_seen["args"].index("--settings") + 1])["permissions"]
+check("antigravity: a read-only team can't write, run commands or browse", {"write_file(*)", "command(*)", "read_url(*)"} <= set(_rules["deny"])
+      and "--dangerously-skip-permissions" not in _seen["args"], _seen["args"])
+check("antigravity: its tool use shows as a step", "Reading notes.md" in _steps, _steps)
+_full = engines.build_args("antigravity", ["agy"], tools="all")
+check("antigravity: an all-tools team runs without prompts and no deny rules", "--dangerously-skip-permissions" in _full and "--settings" not in _full, _full)
+check("antigravity: an edit team auto-accepts edits but can't run commands",
+      "accept-edits" in engines.build_args("antigravity", ["agy"], tools="edit") and "command(*)" in engines.AGY_RULES["edit"]["deny"])
+_out = {"texts": [], "final": None, "error": ""}
+engines.agy_event({"event": "result", "result": {"status": "ERROR", "error": "authentication required"}}, _out)
+check("antigravity: a failed run reports its error, in plain words when signed out",
+      "isn't signed in" in engines.friendly_error("antigravity", _out["error"]), _out)
+del os.environ["LITHNODE_AGY_CMD"]
 
 # ---- updates: is the release on GitHub newer than this one ---------------------------------------------------
 check("updates: versions read as numbers", updates.parse("v0.1.21") == (0, 1, 21) and updates.parse("0.2") == (0, 2))

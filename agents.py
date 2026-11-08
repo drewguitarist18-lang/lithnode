@@ -355,7 +355,7 @@ class Agent:
         return not self.error
 
     def _run_other(self) -> bool:
-        """The same session on Codex or Cursor: their own command line and JSON events, same steps and report."""
+        """The same session on Codex, Cursor or Antigravity: their own command line and JSON events, same steps and report."""
         name = engines.LABELS[self.engine]
         command = engines.FINDERS[self.engine]()
         if not command:
@@ -367,7 +367,7 @@ class Agent:
             self.error = f"Couldn't use the folder {self.cwd}: {exc}"
             return False
         args = engines.build_args(self.engine, command, tools=self.tools, model=self.engine_model)
-        self.prompt = engines.wrap_prompt(self.system, self.prompt)
+        self.prompt = engines.wrap_prompt(self.system, self.prompt, self.engine)
         with self._lock:
             if self.stopped:
                 return False

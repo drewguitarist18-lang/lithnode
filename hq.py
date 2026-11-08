@@ -729,8 +729,14 @@ class Handler(BaseHTTPRequestHandler):
         ok, message = engines.start_login(engine)
         self.send_json({"ok": ok, "message": message}, 200 if ok else 400)
 
+    def POST_api_engine_signout(self) -> None:
+        """Signs an engine's CLI out of its account, so you can sign in with another one."""
+        engine = str(self.read_json().get("engine") or "")
+        ok, message = engines.sign_out(engine)
+        self.send_json({"ok": ok, "message": message}, 200 if ok else 400)
+
     def POST_api_engine_install(self) -> None:
-        """Opens a terminal running an engine's official installer (for Ollama with no model: downloads one)."""
+        """Runs an engine's official installer in the background (for Ollama with no model: downloads one)."""
         engine = str(self.read_json().get("engine") or "")
         ok, message = engines.start_install(engine)
         self.send_json({"ok": ok, "message": message}, 200 if ok else 400)
