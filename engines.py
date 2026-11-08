@@ -459,7 +459,8 @@ def wrap_prompt(system: str, prompt: str, engine: str = "") -> str:
 
 
 def short(path: Any) -> str:
-    return Path(str(path)).name or str(path)
+    """A file's name, whichever slashes its path uses (the CLIs report Windows paths with backslashes)."""
+    return re.split(r"[\\/]", str(path).rstrip("\\/"))[-1] or str(path)
 
 
 def codex_event(obj: dict[str, Any], out: dict[str, Any]) -> str | None:
