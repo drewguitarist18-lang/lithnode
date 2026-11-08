@@ -116,9 +116,9 @@ Codex reviews, a Cursor team on Grok double-checks. Every engine uses your own s
 | **Cursor** | the Cursor CLI from cursor.com/cli, then `cursor-agent login` | every model your Cursor plan offers (GPT, Claude, Grok, Gemini, ...) |
 
 Lithnode shows whether each one is installed and signed in, and lists its models for free (no tokens). Access
-levels map to Codex's sandbox (read-only, workspace-write, full access) and to Cursor's `--force`. Connectors and
-command-line tool lists are Claude Code features. On some Windows computers Codex's own sandbox doesn't start (a
-known Codex bug); Lithnode detects that, runs Codex teams with full access, and asks you to confirm first.
+levels map to Codex's file access settings (read-only, selected-folder access, full access) and to Cursor's `--force`. Connectors and
+command-line tool lists are Claude Code features. On some Windows computers Codex can't be restricted to the selected folder;
+Lithnode detects that, runs Codex teams with full access to the computer, and asks you to confirm first.
 
 ### Connectors
 

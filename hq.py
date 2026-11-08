@@ -120,9 +120,9 @@ def plan_problems(flow: dict[str, Any]) -> list[str]:
     """Stages set to a Claude model this plan can't use, said plainly so the run never starts and fails."""
     ok = {m["id"] for m in usable_models()}
     names = {m["id"]: m["label"] for m in MODELS}
-    stuck = [n for n in flow.get("nodes", []) if n.get("model") in names and n["model"] not in ok
+    stuck = [n for n in flow.get("nodes", []) if n.get("engine", "claude") == "claude" and n.get("model") in names and n["model"] not in ok
              and not (n["type"] == "master" and n.get("mode") == "pass") and not (n["type"] == "checkpoint" and n.get("mode") != "summarize")
-             and not (n["type"] == "cluster" and n.get("engine", "claude") != "claude")]
+             ]
     if not stuck:
         return []
     model = names[stuck[0]["model"]].split(" ")[0]
@@ -474,8 +474,10 @@ class Handler(BaseHTTPRequestHandler):
         active = RUNNER.active()
         waiting = sum(1 for r in active for st in r.nodes.values() if st["status"] == "approval")
         working = sum(1 for r in active for st in r.nodes.values() for a in st["agents"] if a["status"] == "running")
+        force = "fresh=1" in self.path
         self.send_json({"runs": len(active), "approvals": waiting, "agents": working,
-                        "claude_code": claude_code.auth_status(force="fresh=1" in self.path), "signin": claude_code.login_state()})
+                        "claude_code": claude_code.auth_status(force=force), "signin": claude_code.login_state(),
+                        "engines": engines.all_status(force=force)})
 
     # -- flows -------------------------------------------------------------------
     def flow_payload(self, flow: dict[str, Any]) -> dict[str, Any]:
@@ -506,20 +508,23 @@ class Handler(BaseHTTPRequestHandler):
         prompt = str(self.read_json().get("prompt") or "").strip()[:4000]
         if not prompt:
             return self.send_json({"error": "Describe the team you want first."}, 400)
+        engine = engines.available_engine()
+        if not engine:
+            return self.send_json({"error": "Sign in to Claude Code, Codex, or Cursor before building a flow."}, 409)
         bots = [public_bot(b) for b in load_bots()]
         agent = flows.agents.Agent(model=flows.DESIGNER_MODEL, effort="low", tools="none",
                                    system=flows.designer_system(bots, usable_models()), prompt=prompt,
-                                   cwd=HQ_STORE.work_dir / "_designer", on_update=lambda: None)
+                                   cwd=HQ_STORE.work_dir / "_designer", on_update=lambda: None, engine=engine)
         if not agent.run():
             return self.send_json({"error": agent.error or "The designer failed."}, 502)
         try:
-            flow = flows.build_design(flows.parse_design(agent.text), bots)
+            flow = flows.build_design(flows.parse_design(agent.text), bots, engine=engine)
         except (ValueError, TypeError, KeyError) as exc:
             return self.send_json({"error": str(exc)}, 422)
         flow["id"] = uuid.uuid4().hex[:12]
         flow["task"] = ""   # what the team is, not a job for it: the Run menu asks for the job itself
         HQ_STORE.save_flow(flow)
-        self.send_json({**self.flow_payload(flow), "cost": round(agent.cost, 4)})
+        self.send_json({**self.flow_payload(flow), "cost": round(agent.cost, 4), "engine": engine})
 
     def POST_api_flows_import(self) -> None:
         """A team file someone shared. With check, says what the team can do; otherwise saves it as a new flow."""
@@ -718,6 +723,11 @@ class Handler(BaseHTTPRequestHandler):
         if claude_code.send_login_code(code):
             return self.send_json({"ok": True})
         self.send_json({"error": "The sign-in isn't waiting for a code. Click Sign in to start again."}, 409)
+
+    def POST_api_engine_login(self) -> None:
+        engine = str(self.read_json().get("engine") or "")
+        ok, message = engines.start_login(engine)
+        self.send_json({"ok": ok, "message": message}, 200 if ok else 400)
 
     def POST_api_quit(self) -> None:
         claude_code.stop_login()

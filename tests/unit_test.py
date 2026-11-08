@@ -77,6 +77,14 @@ check("items: a fenced list is read", flows.parse_items(f"x\n{fence}items\n[{{\"
 check("items: the fence is stripped from the text", flows.strip_items(f"hi\n{fence}items\n[]\n{fence}") == "hi")
 check("webhooks: https is fine, file: isn't", flows.webhook_ok("https://ntfy.sh/x") and not flows.webhook_ok("file:///c:/x"))
 check("design: no JSON is a friendly error", raises(lambda: flows.parse_design("no json here")))
+_codex_design = flows.build_design({"name": "Codex flow", "nodes": [
+    {"id": "master", "type": "master", "mode": "brief"},
+    {"id": "work", "type": "cluster", "name": "Work", "instructions": "Do the job."},
+    {"id": "merge", "type": "checkpoint", "mode": "summarize"},
+    {"id": "done", "type": "done"}],
+    "edges": [["master", "work"], ["work", "merge"], ["merge", "done"]]}, [], engine="codex")
+check("design: a Codex-built flow keeps Codex for every agent stage",
+      all(n.get("engine") == "codex" for n in _codex_design["nodes"] if n["type"] in ("master", "cluster", "checkpoint")), _codex_design)
 
 # ---- updates: is the release on GitHub newer than this one ---------------------------------------------------
 check("updates: versions read as numbers", updates.parse("v0.1.21") == (0, 1, 21) and updates.parse("0.2") == (0, 2))

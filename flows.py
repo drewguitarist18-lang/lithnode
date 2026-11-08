@@ -195,6 +195,8 @@ def clean_node(raw: Any) -> dict[str, Any]:
         node.update(model=_model(raw, DEFAULT_MODEL), tools=tools, effort=effort,
                     instructions=_text(raw, "instructions", 8000),
                     max_turns=max(0, min(200, int(raw.get("max_turns") or 0))))
+        node["engine"] = raw.get("engine") if raw.get("engine") in engines.ENGINES else "claude"
+        node["engine_model"] = _text(raw, "engine_model", 60) if MODEL_RE.match(_text(raw, "engine_model", 60)) else ""
     if kind == "master":
         node["mode"] = raw.get("mode") if raw.get("mode") in ("brief", "pass") else "brief"
     if kind == "cluster":
@@ -210,12 +212,13 @@ def clean_node(raw: Any) -> dict[str, Any]:
                     bot=_text(raw, "bot", 40),
                     connectors=_connectors(raw.get("connectors")), clis=_clis(raw.get("clis")),
                     split=raw.get("split") is True,
-                    engine=raw.get("engine") if raw.get("engine") in engines.ENGINES else "claude",
-                    engine_model=_text(raw, "engine_model", 60) if MODEL_RE.match(_text(raw, "engine_model", 60)) else "")
+                    engine=node["engine"], engine_model=node["engine_model"])
     if kind == "checkpoint":
         node.update(mode=raw.get("mode") if raw.get("mode") in ("pass", "summarize") else "pass",
                     model=_model(raw, SUMMARY_MODEL),
-                    on_error=raw.get("on_error") if raw.get("on_error") in ("stop", "continue") else "stop")
+                    on_error=raw.get("on_error") if raw.get("on_error") in ("stop", "continue") else "stop",
+                    engine=raw.get("engine") if raw.get("engine") in engines.ENGINES else "claude",
+                    engine_model=_text(raw, "engine_model", 60) if MODEL_RE.match(_text(raw, "engine_model", 60)) else "")
     if kind == "approval":
         hook = _text(raw, "webhook", 500)
         if hook and not webhook_ok(hook):
@@ -675,7 +678,7 @@ def from_template(template_id: str) -> dict[str, Any] | None:
 # Type what you want ("plan it, build it, then 3 reviewers check for bugs") and one agent drafts the flow.
 
 DESIGNER_MODEL = "claude-sonnet-5-5"
-DESIGNER_SYSTEM = """You are the flow designer for Lithnode, an app that runs teams of Claude Code agents as a node graph.
+DESIGNER_SYSTEM = """You are the flow designer for Lithnode, an app that runs teams of AI coding agents as a node graph.
 Turn the user's description into a flow. Reply with ONLY one JSON object, no prose and no code fences:
 {"name": "...", "nodes": [...], "edges": [["from-id", "to-id"], ...]}
 
@@ -731,7 +734,7 @@ def parse_design(text: str) -> Any:
         raise ValueError("The designer's flow wasn't valid. Try again, or describe it a bit differently.") from None
 
 
-def build_design(raw: Any, bots: list[dict[str, Any]]) -> dict[str, Any]:
+def build_design(raw: Any, bots: list[dict[str, Any]], engine: str = "claude") -> dict[str, Any]:
     """Turn a designer draft into a clean, laid-out flow. Raises ValueError with a readable reason."""
     if not isinstance(raw, dict) or not isinstance(raw.get("nodes"), list):
         raise ValueError("The designer's flow had no nodes. Try again.")
@@ -745,6 +748,8 @@ def build_design(raw: Any, bots: list[dict[str, Any]]) -> dict[str, Any]:
             nid = f"{nid}-{i}"
         rename[str(n.get("id"))] = nid
         node = {**n, "id": nid}
+        if engine != "claude" and node["type"] in ("master", "cluster", "checkpoint"):
+            node["engine"] = engine
         if node["type"] in ("master", "cluster", "checkpoint") and not node.get("model") and node.get("role") not in ROLES:
             node["role"] = "run" if node["type"] == "checkpoint" else "build"   # a stage with neither still gets a role
         bot = by_bot.get(n.get("bot"))
@@ -755,7 +760,7 @@ def build_design(raw: Any, bots: list[dict[str, Any]]) -> dict[str, Any]:
         nodes.append(node)
     if sum(n["type"] == "master" for n in nodes) != 1:
         nodes = [n for n in nodes if n["type"] != "master"]
-        nodes.insert(0, {"id": "master", "type": "master", "name": "Start", "mode": "pass"})
+        nodes.insert(0, {"id": "master", "type": "master", "name": "Start", "mode": "pass", **({"engine": engine} if engine != "claude" else {})})
         rename.setdefault("master", "master")
     edges = []
     for e in raw.get("edges") or []:
@@ -1212,7 +1217,8 @@ class Run:
         rec = self._agent(node, st, "Planner", model=node["model"], effort=node.get("effort", "low"),
                           tools=node.get("tools", "read"), system=system,
                           prompt=f"# Task\n{self.task}\n\nWrite the brief.", max_turns=node.get("max_turns", 0),
-                          shape="crab", color="#ecebe6")
+                          shape="crab", color="#ecebe6", engine=node.get("engine", "claude"),
+                          engine_model=node.get("engine_model", ""))
         if rec["status"] == "done":
             with self.lock:
                 self.brief = rec["report"]
@@ -1242,7 +1248,7 @@ class Run:
         clis = self._clis_for(node, st)
         engine = node.get("engine", "claude")
         if engine == "codex" and engines.status("codex").get("sandbox") is False and node["tools"] not in ("full", "all"):
-            st["note"] = (st.get("note", "") + " Codex's sandbox doesn't work on this computer, so this team ran with full access.").strip()
+            st["note"] = (st.get("note", "") + " This Windows setup can't restrict Codex to the selected folder, so this team ran with full access to your computer.").strip()
 
         def one(i: int, teammates: str = "") -> dict[str, Any]:
             return self._agent(node, st, f"{node['name']} {i}" if n > 1 else node["name"],
@@ -1311,7 +1317,8 @@ class Run:
                   "Output nothing else: start your reply with \"REPORT:\" on its own line, then the note.")
         rec = self._agent(node, st, "Merger", model=node.get("model", SUMMARY_MODEL), effort="low", tools="none",
                           system=system, prompt=f"# Task\n{self.task}\n\n# Reports\n{handoff}",
-                          shape="muse", color="#8d93a8")
+                          shape="muse", color="#8d93a8", engine=node.get("engine", "claude"),
+                          engine_model=node.get("engine_model", ""))
         if rec["status"] == "done":
             st["output"], st["status"] = rec["report"], "done"
         elif node.get("on_error") == "continue" and rec["status"] == "failed":

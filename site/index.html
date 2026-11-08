@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lithnode · Your AI team, managed</title>
-<meta name="description" content="Hand any job to a team of AI agents: research, ads, content, checks. They split the work, check each other, and wait for your go. Free and open source.">
+<title>Lithnode · Build agentic workflows and run them locally</title>
+<meta name="description" content="Build teams of Claude Code, Codex, and Cursor agents on your computer. Lithnode splits work, checks results, and pauses for your approval. Free and open source.">
 <meta property="og:title" content="Lithnode">
-<meta property="og:description" content="Your AI team, managed. Hand any job to a team of AI agents that check each other's work. Free and open source.">
+<meta property="og:description" content="Build teams of Claude Code, Codex, and Cursor agents on your computer. Split work, check results, and approve before anything ships. Free and open source.">
 <meta property="og:image" content="https://lithnode.com/media/film-poster.jpg">
 <meta property="og:image:width" content="1600">
 <meta property="og:image:height" content="900">
@@ -21,11 +21,11 @@
 <meta name="theme-color" content="#08080a">
 <meta name="robots" content="index, follow">
 <meta name="twitter:title" content="Lithnode">
-<meta name="twitter:description" content="Your AI team, managed. Hand any job to a team of AI agents that check each other's work. Free and open source.">
+<meta name="twitter:description" content="Build teams of Claude Code, Codex, and Cursor agents on your computer. Split work, check results, and approve before anything ships. Free and open source.">
 <meta name="twitter:image" content="https://lithnode.com/media/film-poster.jpg">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Lithnode","url":"https://lithnode.com/",
- "description":"Hand any job to a team of AI agents: research, ads, content, checks. They split the work, check each other, and wait for your go.",
+ "description":"Build teams of Claude Code, Codex, and Cursor agents on your computer. Lithnode splits work, checks results, and pauses for your approval.",
  "applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux",
  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
  "downloadUrl":"https://github.com/drewguitarist18-lang/lithnode/releases/latest",
@@ -103,7 +103,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .hero { min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; text-align: center;
           padding: 128px 0 max(24px, calc(12svh - 44px)); }
   .hero .wrap { position: relative; width: calc(100% - 40px); }
-  #crab { width: 64px; height: 64px; image-rendering: pixelated; margin: 0 auto 18px; display: block; }
+  #crab { width: 96px; height: 96px; image-rendering: pixelated; margin: 0 auto 18px; display: block; }
   h1 { font: 600 clamp(28px, 8.8vw, 128px)/.98 var(--sans); letter-spacing: -.04em; margin: 0; padding-bottom: .16em; text-wrap: balance; }
   h1 .dim { color: var(--ink); font-weight: 600; }
   .sub { font-family: var(--sans); color: var(--ink); max-width: 34ch; margin: 24px auto 0; font-size: 18px; line-height: 1.55; text-wrap: balance; }
@@ -135,15 +135,14 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .live .lead { margin-inline: auto; }
   @media (max-width: 1180px) { .live { height: 680px; } }   /* two rows of steps */
   @media (max-width: 600px) { .live { height: 600px; } }
-  /* try it: a fixed prompt, Enter runs a replay of a real run, and it stops for your approval */
+  /* try it: choose a sample workflow, watch the preview, then approve it */
   .try { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); width: min(620px, calc(100% - 32px)); z-index: 1; }
   .try .tbar { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 999px; background: rgba(18, 18, 21, .82);
                border: 1px solid var(--edge); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
   .try .tbar > svg { width: 16px; height: 16px; flex: none; color: var(--faint); }
-  .try .tprompt { flex: 1; min-width: 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .try .tprompt::after { content: ""; display: inline-block; width: 7px; height: 15px; margin-left: 3px; vertical-align: -2px; background: var(--ink); animation: blink 1s steps(1) infinite; }
-  .try[data-s="run"] .tprompt::after, .try[data-s="ask"] .tprompt::after, .try[data-s="done"] .tprompt::after { display: none; }
-  @keyframes blink { 50% { opacity: 0; } }
+  .try .tprompt { flex: 1; min-width: 0; font: 13.5px var(--mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 0; outline: 0; background: transparent; }
+  .try .tprompt:focus-visible { outline: 1px solid var(--soft); outline-offset: 4px; border-radius: 3px; }
+  .try .tprompt:disabled { opacity: .75; }
   .try button { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 999px; cursor: pointer;
                 font: 600 13px var(--mono); background: var(--ink); color: var(--void); border: 1px solid var(--ink); transition: background .2s, transform .1s; }
   .try button:hover { background: #fff; }
@@ -462,8 +461,8 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
 <main>
 <header class="hero"><div class="wrap">
   <canvas id="crab" width="16" height="16" aria-label="Lithnode's pixel crab mascot. Click to pet it." role="img" title="Pet me"></canvas>
-  <h1>Your AI team.<br><span class="dim">Managed.</span></h1>
-  <p class="sub">Hand any job to a team of AI agents: research, ads, content, checks. They split it, check each other, then wait for your go.</p>
+  <h1>Build agentic workflows.<br><span class="dim">Run them locally.</span></h1>
+  <p class="sub">Connect Claude Code, Codex, and Cursor agents into a team on your computer. Lithnode splits the work, checks the results, and waits for your approval before anything ships.</p>
   <div class="ctas">
     <a class="btn main desk-only" id="dlMain" data-dl href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/LithnodeSetup.exe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg><span>Download for Windows</span></a>
     <button class="btn main phone-only" id="send" type="button" data-send><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 14.5V3.5m0 0L7.5 8M12 3.5 16.5 8M8 11H6.5A1.5 1.5 0 0 0 5 12.5v6A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-6a1.5 1.5 0 0 0-1.5-1.5H16"/></svg><span>Send me the link</span></button>
@@ -475,13 +474,17 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
 
 <section class="live" id="live" aria-label="A run, drawn live">
   <canvas id="flowCanvas" aria-hidden="true"></canvas>
-  <div class="wrap"><h2 class="rv">One job. A whole team on it.</h2>
-    <p class="lead rv">Three agents split the job, a checker verifies every part, and it waits for you before it ships.</p></div>
+  <div class="wrap"><h2 class="rv">Choose a task. Watch the team work.</h2>
+    <p class="lead rv">See workers split the task, a checker review the result, and the workflow pause for your approval.</p></div>
   <div class="try" id="try" data-s="idle">
     <div class="tbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 17 6-5-6-5M12 19h8"/></svg>
-      <span class="tprompt" id="tPrompt">Clean the 100,000-row sales export, check it, then publish the report</span>
+      <select class="tprompt" id="tPrompt" aria-label="Choose a sample workflow">
+        <option value="sales">Clean a sales export and prepare a report</option>
+        <option value="code">Review a code change and open a pull request</option>
+        <option value="research">Research competitors and write a brief</option>
+      </select>
       <button type="button" id="tGo">Run <kbd>↵</kbd></button></div>
-    <p class="tlog" id="tLog" aria-live="polite">Press Enter to try it. A replay of a real run, sped up. No sign-in, no credits.</p>
+    <p class="tlog" id="tLog" aria-live="polite">Interactive preview. Run the 10-second replay, then approve it to continue.</p>
   </div>
 </section>
 
@@ -504,8 +507,8 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
 </div></section>
 
 <section id="how"><div class="neb" style="left:-380px; top:40px; --n: rgba(122,156,240,.12)"></div><div class="wrap">
-  <h2 class="rv">Three moves.</h2>
-  <p class="lead rv">Draw the team, let it run, say go. That's the whole app.</p>
+  <h2 class="rv">Build a workflow. Run it. Approve the result.</h2>
+  <p class="lead rv">Set up a team of agents on your computer, watch the work, and decide what ships.</p>
   <div class="moves">
     <article class="move glass spot rv" style="--c: var(--blue)">
       <div class="stage" aria-hidden="true">
@@ -515,7 +518,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
         <div class="nd c" style="--k: var(--purple)"><span class="ic"><canvas width="12" height="10" data-sprite="rocket" data-color="#b79cf2"></canvas></span>Ship</div>
       </div>
       <div class="txt"><span class="n">01</span><h3>Draw</h3>
-        <p>Drop in bots, give each team a job and the tools it may use, and wire them up. Or describe the team in one line and it gets drawn for you.</p></div>
+        <p>Connect agent teams into a workflow. Give each team a role and the tools it may use, or describe the workflow and let Lithnode draft it.</p></div>
     </article>
     <article class="move glass spot rv" style="--c: var(--green)">
       <div class="stage" aria-hidden="true"><div class="term">
@@ -526,7 +529,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
         <div class="tl" style="--k: var(--ink)"><span>~/my-app $ <span class="cur"></span></span></div>
       </div></div>
       <div class="txt"><span class="n">02</span><h3>Run</h3>
-        <p>Every agent is a real Claude Code, Codex or Cursor session on your machine. Watch each one work, live, in the folder you picked.</p></div>
+        <p>Lithnode launches real Claude Code, Codex, or Cursor sessions in the project folder you choose. Watch agents work side by side on your computer.</p></div>
     </article>
     <article class="move glass spot rv" style="--c: var(--amber)">
       <div class="stage" aria-hidden="true">
@@ -537,7 +540,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
         <svg class="ptr" viewBox="0 0 8 10" shape-rendering="crispEdges"><path fill="#08080a" d="M0 0h1v1h1v1h1v1h1v1h1v1h1v1h1v1h-3v1h1v2h-1v-1h-1v-1h-1v1h-1z"/><path fill="#ecebe6" d="M1 2h1v1h1v1h1v1h1v1h1v1h-2v1h-1v-1h-1v1h-1z"/></svg>
       </div>
       <div class="txt"><span class="n">03</span><h3>Approve</h3>
-        <p>Put an approval step anywhere. The run waits for you before anything ships, and the result lands in one report.</p></div>
+        <p>Add approval steps before work moves on. Review the agents' results, then let the workflow continue when you approve.</p></div>
     </article>
   </div>
 </div></section>
@@ -877,6 +880,11 @@ const OS_ICON = {"win": "<svg class=\"os-i\" viewBox=\"0 0 24 24\" fill=\"curren
     { kind: "team", name: "Publisher", job: "Ships it with gh", step: "gh release create", shape: "rocket", color: "#b79cf2", count: 1, model: "Haiku 4.5", how: "1 agent" },
     { kind: "done", name: "Done" },
   ];
+  const EXAMPLES = {
+    sales: { workerJob: "Clean 100,000 rows", workerStep: "rows 33,335-66,667", checkerJob: "Check every part", checkerStep: "part 3 checked", publisherJob: "Prepare the report", publisherStep: "report ready" },
+    code: { workerJob: "Review changed files", workerStep: "src/parser.py", checkerJob: "Run tests and inspect diff", checkerStep: "24 tests passed", publisherJob: "Prepare pull request", publisherStep: "PR draft ready" },
+    research: { workerJob: "Research 3 competitors", workerStep: "sources collected", checkerJob: "Verify claims and sources", checkerStep: "sources verified", publisherJob: "Write research brief", publisherStep: "brief ready" },
+  };
   const PH = [0, .6, 3.0, 5.2, 6.8, 8.6, 9.0];
   const pillW = (g, n) => { g.font = `600 10px ${MONO}`; return Math.ceil(g.measureText(n.name).width + (n.kind === "approval" ? 86 : 40)); };
   const nodeW = (g, n) => (n.kind === "team" ? W : pillW(g, n));
@@ -930,12 +938,22 @@ const OS_ICON = {"win": "<svg class=\"os-i\" viewBox=\"0 0 24 24\" fill=\"curren
   }
   size(); addEventListener("resize", size);
   addEventListener("pointermove", (e) => { tmx = e.clientX / innerWidth - .5; tmy = e.clientY / innerHeight - .5; }, { passive: true });
-  // try it: Enter starts the replay, it stops at "You" until Approve, then ships. The clock leaves out the wait for you
-  const box = document.getElementById("try"), go = document.getElementById("tGo"), log = document.getElementById("tLog");
+  // try it: choose a sample workflow, watch the preview, then approve it to continue
+  const box = document.getElementById("try"), go = document.getElementById("tGo"), log = document.getElementById("tLog"), task = document.getElementById("tPrompt");
   let S = "idle", t0 = 0, approved = false, shown = "", raf = 0;
-  if (document.documentElement.classList.contains("phone")) log.textContent = log.textContent.replace("Press Enter", "Tap Run");
+  function chooseTask() {
+    const e = EXAMPLES[task.value];
+    Object.assign(N[1], { job: e.workerJob, step: e.workerStep });
+    Object.assign(N[2], { job: e.checkerJob, step: e.checkerStep });
+    Object.assign(N[4], { job: e.publisherJob, step: e.publisherStep });
+    if (S === "done") { setS("idle", "Run <kbd>↵</kbd>"); }
+    log.textContent = "Interactive preview. Run the 10-second replay, then approve it to continue.";
+    shown = log.innerHTML;
+    kick();
+  }
+  task.addEventListener("change", chooseTask);
   const work = (L) => (L < PH[3] ? L : L < PH[4] ? PH[3] : L - (PH[4] - PH[3]));
-  const setS = (s, label) => { S = s; box.dataset.s = s; go.disabled = s === "run"; go.innerHTML = label; };
+  const setS = (s, label) => { S = s; box.dataset.s = s; go.disabled = s === "run"; task.disabled = s === "run" || s === "ask"; go.innerHTML = label; };
   function clock(now) {
     if (S === "idle") return -1;
     if (S === "done") return PH[6] + 1;
@@ -948,9 +966,9 @@ const OS_ICON = {"win": "<svg class=\"os-i\" viewBox=\"0 0 24 24\" fill=\"curren
   function say(L) {
     const secs = `<b>${work(Math.max(0, Math.min(L, PH[6]))).toFixed(1)}s</b>`;
     const html = S === "idle" ? log.innerHTML
-      : S === "ask" ? `<span>Paused at You. Nothing ships until you approve.</span>${secs}`
-      : S === "done" ? `<span>Done: 5 agents, one approval from you.</span>${secs}`
-      : `<span>${L < PH[1] ? "Start: the job goes in" : L < PH[2] ? "3 Workers split the rows, side by side · Haiku" : L < PH[3] ? "Checker verifies every part · Sonnet" : L < PH[5] ? "Approved. Publisher ships it · Haiku" : "Wrapping up"}</span>${secs}`;
+      : S === "ask" ? `<span>Paused at You. Approve to let the workflow continue.</span>${secs}`
+      : S === "done" ? `<span>Workflow preview complete. You approved the result.</span>${secs}`
+      : `<span>${L < PH[1] ? "Start: the task goes in" : L < PH[2] ? "3 Workers split the task, side by side · Haiku" : L < PH[3] ? "Checker verifies the result · Sonnet" : L < PH[5] ? "Approved. Publisher prepares the result · Haiku" : "Wrapping up"}</span>${secs}`;
     if (html !== shown) { log.innerHTML = shown = html; }
   }
   function press() {

@@ -64,8 +64,8 @@ def _run(cmd: list[str], *args: str, timeout: float = 40) -> tuple[int, str]:
 
 def status(engine: str, force: bool = False) -> dict[str, Any]:
     """{"installed", "signed_in", "note"} for codex or cursor: free local checks, cached for a minute.
-    For Codex it also says whether its Windows sandbox works ("sandbox"): when it doesn't, Codex can only run
-    commands with full access."""
+    For Codex it also says whether Windows can restrict it to the selected folder ("sandbox"): if not, Codex
+    runs with full access to the computer."""
     with _status_lock:
         hit = _status.get(engine)
         if hit and not force and time.time() - hit[0] < STATUS_TTL:
@@ -85,8 +85,8 @@ def status(engine: str, force: bool = False) -> dict[str, Any]:
                 # runner (node_repl.exe) while that runner is already running, and fails. Its own check
                 # (`codex sandbox`) can pass anyway, so don't trust it. LITHNODE_CODEX_SANDBOX=1 tries the sandbox.
                 value["sandbox"] = False
-                value["note"] = ("Codex's Windows sandbox can't run commands yet (a Codex bug), so Codex teams "
-                                 "run with full access. Lithnode asks you to confirm first.")
+                value["note"] = ("This Windows setup can't restrict Codex to the selected folder. Codex teams "
+                                 "run with full access to your computer, and Lithnode asks you to confirm first.")
             else:
                 value["sandbox"] = True
         else:
@@ -128,8 +128,32 @@ def models(engine: str, force: bool = False) -> list[dict[str, Any]]:
 
 
 def all_status(force: bool = False) -> dict[str, dict[str, Any]]:
-    return {"claude": {"installed": bool(claude_code.find_command()), "signed_in": True, "note": ""},
+    claude = claude_code.auth_status(force=force)
+    return {"claude": {"installed": bool(claude.get("available")), "signed_in": bool(claude.get("logged_in")), "note": ""},
             **{e: status(e, force) for e in ("codex", "cursor")}}
+
+
+def available_engine(force: bool = False) -> str | None:
+    """The first engine ready to design or run a flow on this computer."""
+    info = all_status(force)
+    return next((engine for engine in ENGINES if info[engine]["installed"] and info[engine]["signed_in"]), None)
+
+
+def start_login(engine: str) -> tuple[bool, str]:
+    """Open an interactive Codex or Cursor sign-in on platforms where Lithnode can do so."""
+    if engine not in FINDERS:
+        return False, "Choose Codex or Cursor."
+    command = FINDERS[engine]()
+    if not command:
+        return False, f"{LABELS[engine]} isn't installed on this computer."
+    if os.name != "nt":
+        return False, f"Run `{'codex login' if engine == 'codex' else 'cursor-agent login'}` in a terminal, then check again."
+    try:
+        login = subprocess.list2cmdline([*command, "login"])
+        subprocess.Popen(["cmd.exe", "/k", login], cwd=str(Path.home()))
+        return True, "A terminal opened for sign-in. Finish there, then click Check again."
+    except OSError as exc:
+        return False, f"Couldn't open {LABELS[engine]} sign-in: {exc}"
 
 
 # ------------------------------------------------------------------- one session

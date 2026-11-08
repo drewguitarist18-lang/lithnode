@@ -1169,7 +1169,7 @@ function engineCards(n) {
   }).join("");
   const plan = { claude: "your Claude plan", codex: "your ChatGPT plan", cursor: "your Cursor plan" }[cur];
   const stat = !engines ? `<i class="bad"></i>Checking…` : !ready(info) ? `<i class="bad"></i>${esc(info.note || `${ENGINE_NAME[cur]} isn't ready on this computer`)}`
-    : info.sandbox === false ? `<i class="bad"></i><span title="${esc(info.note)}">Full access: Codex's sandbox is broken on Windows</span>`
+    : info.sandbox === false ? `<i class="bad"></i><span title="${esc(info.note)}">Codex can change files and run commands anywhere on this PC</span>`
     : info.note ? `<i class="bad"></i>${esc(info.note)}` : `<i></i>Ready · ${plan.replace(/^your /, "")}`;
   return `<div class="eseg" role="group" aria-label="Runs on">${seg}</div><div class="estat">${stat}<a href="#" id="engRefresh">Check again</a></div>`;
 }
@@ -1476,7 +1476,7 @@ $("runBtn").onclick = () => {
       : `${writers.map((w) => w.name).join(", ")} can change files in the folder. Use a folder whose work is committed to git, so you can undo anything.`,
     actors.length ? `${actors.map((n) => n.name).join(", ")} can read and change things in ${apps.join(", ")} for real.` : "",
     cliTeams.length ? cliTeams.map((n) => `${n.name} can run ${n.clis.join(", ")} on this computer.`).join(" ") : "",
-    codexOpen.length ? `${codexOpen.map((n) => n.name).join(", ")} run${codexOpen.length === 1 ? "s" : ""} on Codex with full access, because Codex's sandbox doesn't work on this computer.` : "",
+    codexOpen.length ? `${codexOpen.map((n) => n.name).join(", ")} can read, change, or delete files and run commands anywhere on this PC. The selected folder won't limit Codex on this Windows setup.` : "",
   ].filter(Boolean).join(" ");
   ready = () => {
     const task = realTask($("taskIn").value);
@@ -2028,7 +2028,8 @@ $("ask").addEventListener("submit", async (e) => {
     const d = await api("/api/flows/design", { method: "POST", body: { prompt } });
     $("askIn").value = "";
     await refreshFlows(); await openFlow(d.flow.id);
-    toast(`Built "${d.flow.name}" with ${d.flow.nodes.length} nodes. Tweak anything, then press Run.`);
+    const engine = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" }[d.engine] || "your signed-in engine";
+    toast(`Built "${d.flow.name}" with ${d.flow.nodes.length} nodes on ${engine}. Tweak anything, then press Run.`);
   } catch (err) { toast(err.message); }
   $("ask").classList.remove("busy"); $("askBtn").disabled = false; $("askIn").disabled = false;
   $("askBtn").textContent = "Build flow";

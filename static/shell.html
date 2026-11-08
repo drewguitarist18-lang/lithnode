@@ -89,6 +89,15 @@
   .acct .code { display: flex; gap: 8px; margin: 0 0 10px; }
   .acct .code input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: transparent;
                       color: var(--ink); font: 12px var(--mono); outline: none; }
+  .acct .engine { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .acct .engine:first-of-type { border-top: 0; }
+  .acct .engine .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none; }
+  .acct .engine.on .dot { background: var(--ok); }
+  .acct .engine main { flex: 1; min-width: 0; }
+  .acct .engine b { display: block; font-size: 12.5px; color: var(--ink); }
+  .acct .engine small { margin: 0; font-size: 11.5px; }
+  .acct .engine button { flex: none; height: 28px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: 600 11.5px inherit; cursor: pointer; }
+  .acct .engine button:hover { background: var(--hover); }
   .acct .code input:focus { border-color: var(--accent); }
   .acct .code button { height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--ink); background: var(--ink); color: var(--bg);
                        font: 600 12.5px inherit; cursor: pointer; }
@@ -172,8 +181,8 @@
     <a href="#flows" data-tab="flows" title="Draw a team of agents and run it">Flows <b class="badge" id="b-flows"></b></a>
     <a href="#office" data-tab="office" title="Every agent at work right now">Office <b class="badge" id="b-office"></b></a>
   </nav>
-  <button class="status" id="status" aria-expanded="false" title="How Lithnode signs in"><i></i><span>Checking Claude Code…</span></button>
-  <button class="signin" id="signinBtn" hidden title="Opens Claude Code's sign-in in your browser">Sign in</button>
+  <button class="status" id="status" aria-expanded="false" title="Your agent engines"><i></i><span>Checking engines…</span></button>
+  <button class="signin" id="signinBtn" hidden title="Sign in to an agent engine">Sign in</button>
   <div class="acct" id="acct" hidden role="dialog" aria-label="Sign-in"></div>
   <button class="icon theme" id="themeBtn" title="Theme" aria-label="Switch theme"></button>
   <button class="icon quit" id="quitBtn" title="Quit Lithnode" aria-label="Quit Lithnode"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></button>
@@ -249,7 +258,7 @@ show(first);
 function badge(id, n, warn) {
   const b = $(id); b.textContent = n; b.classList.toggle("show", n > 0); b.classList.toggle("warn", !!warn);
 }
-let account = {}, signin = {}, greeted = false, trouble = false, polls = 0;
+let account = {}, engineStatus = {}, signin = {}, greeted = false, trouble = false, polls = 0;
 async function poll() {
   try {
     // signed out: ask Claude Code again now and then, so signing in elsewhere shows up by itself
@@ -257,19 +266,18 @@ async function poll() {
     const d = await (await fetch("/api/hq" + (fresh ? "?fresh=1" : ""), { cache: "no-store" })).json();
     badge("b-flows", d.approvals || d.runs, d.approvals > 0);
     badge("b-office", d.agents);
-    const cc = d.claude_code || {}, si = d.signin || {}, st = $("status");
-    const changed = JSON.stringify([cc, si]) !== JSON.stringify([account, signin]);
-    account = cc; signin = si;
-    st.className = "status " + (cc.logged_in ? "ok" : "bad");
-    st.querySelector("span").textContent = cc.logged_in ? "Claude Code signed in"
-      : cc.available ? "Claude Code isn't signed in" : "Claude Code not found";
-    const b = $("signinBtn");
-    b.hidden = !!cc.logged_in || !cc.available;
-    b.textContent = si.active ? "Finish signing in…" : "Sign in";
+    const cc = d.claude_code || {}, es = d.engines || {}, si = d.signin || {}, st = $("status");
+    const changed = JSON.stringify([cc, es, si]) !== JSON.stringify([account, engineStatus, signin]);
+    account = cc; engineStatus = es; signin = si;
+    const signed = Object.entries(es).filter(([, v]) => v.installed && v.signed_in).map(([id]) => ({ claude: "Claude Code", codex: "Codex", cursor: "Cursor" })[id]);
+    st.className = "status " + (signed.length ? "ok" : "bad");
+    st.querySelector("span").textContent = signed.length === 1 ? `${signed[0]} signed in`
+      : signed.length ? `${signed.length} engines signed in` : "No engine signed in";
+    $("signinBtn").hidden = true;
     // first look at a signed-out Lithnode: open the card so signing in is one click away, once the first-launch notice
     // (flows.html's usage dialog) is out of the way, so there's one thing on screen at a time
     let noticed = true; try { noticed = localStorage.getItem("hq-usage-ok-2") === "1"; } catch (e) {}
-    if (!greeted && noticed) { greeted = true; if (cc.available && !cc.logged_in) toggleAcct(true); }
+    if (!greeted && noticed) { greeted = true; if (!signed.length) toggleAcct(true); }
     if (changed && !$("acct").hidden) renderAcct();
     document.title = (d.approvals ? "(!) " : "") + "Lithnode" + (d.agents ? ` · ${d.agents} working` : "");
   } catch (e) {
@@ -278,35 +286,24 @@ async function poll() {
 }
 poll(); setInterval(poll, 2000);
 
-// Lithnode has no account of its own: agents run as Claude Code, so "signed in" means Claude Code is.
-// The card under the status pill says so, and makes signing in one button.
+// Lithnode has no account of its own. Each engine uses the account already signed in to its own CLI.
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function renderAcct() {
   const cc = account, si = signin, a = $("acct");
   const typed = $("codeIn")?.value || "", focused = document.activeElement?.id === "codeIn";   // a poll mustn't eat a half-pasted code
-  a.className = "acct" + (cc.logged_in ? " ok" : si.active ? " wait" : "");
-  const how = { "oauth_token": "a Claude sign-in token", "api_key": "an Anthropic API key", "apiKey": "an Anthropic API key" }[cc.method] || "your Claude account";
+  a.className = "acct" + (Object.values(engineStatus).some((e) => e.installed && e.signed_in) ? " ok" : si.active ? " wait" : "");
   const err = si.error ? `<p class="err">${esc(si.error)}</p>` : "";
-  a.innerHTML = cc.logged_in ? `
-    <h3><i></i>Signed in</h3>
-    <p>${cc.email ? `as <b>${esc(cc.email)}</b>` : `with <b>${how}</b>`}. Your agents run on this account's plan.</p>
-    <div class="row"><button data-act="login">Switch account</button></div>`
-  : cc.available && si.active ? `
-    <h3><i></i>Approve in your browser</h3>
-    <p>Waiting for you to approve. This turns green by itself.</p>
-    ${trouble || si.error ? `
-    <p>${si.url ? `<a href="${esc(si.url)}" target="_blank" rel="noopener">Open the sign-in page</a>, then paste` : "Paste"} the code it shows:</p>
-    <form class="code"><input id="codeIn" placeholder="Paste the code" autocomplete="off" spellcheck="false" aria-label="Sign-in code"><button>Sign in</button></form>
-    ${err}<small><a href="#" data-act="login">Start over</a></small>`
-    : `<small><a href="#" data-act="trouble">Having trouble?</a></small>`}`
-  : cc.available ? `
-    <h3><i></i>Sign in to start</h3>
-    <p>Lithnode uses your Claude account.</p>
-    ${err}<div class="row"><button class="go" data-act="login">Sign in with Claude</button></div>`
-  : `
-    <h3><i></i>Claude Code not found</h3>
-    <p>Lithnode runs its agents on Claude Code and couldn't find it on this computer. Install it, or open the Claude desktop app once: Lithnode can use the Claude Code inside it.</p>
-    <div class="row"><a class="go" href="https://claude.com/claude-code" target="_blank" rel="noopener">Get Claude Code</a><button data-act="check">Check again</button></div>`;
+  const label = { claude: "Claude Code", codex: "Codex", cursor: "Cursor" };
+  const rows = ["claude", "codex", "cursor"].map((id) => {
+    const e = engineStatus[id] || {}, on = e.installed && e.signed_in;
+    const action = id === "claude" ? (on ? "" : e.installed ? `<button data-act="login">Sign in</button>` : `<a href="https://claude.com/claude-code" target="_blank" rel="noopener">Install</a>`)
+      : (on ? "" : e.installed ? `<button data-act="engine-login" data-engine="${id}">Sign in</button>` : `<small>Not installed</small>`);
+    return `<div class="engine ${on ? "on" : ""}"><i class="dot"></i><main><b>${label[id]}</b><small>${on ? "Signed in" : e.installed ? "Needs sign-in" : "Not installed"}</small></main>${action}</div>`;
+  }).join("");
+  const claudeHelp = !cc.logged_in && cc.available && si.active ? `
+    <p>Finish Claude Code sign-in in your browser.</p>
+    ${trouble || si.error ? `<p>${si.url ? `<a href="${esc(si.url)}" target="_blank" rel="noopener">Open the sign-in page</a>, then paste` : "Paste"} the code it shows:</p><form class="code"><input id="codeIn" placeholder="Paste the code" autocomplete="off" spellcheck="false" aria-label="Sign-in code"><button>Sign in</button></form>${err}` : `<small><a href="#" data-act="trouble">Having trouble?</a></small>`}` : "";
+  a.innerHTML = `<h3><i></i>Agent engines</h3><p>Flows use any engine signed in on this computer. Build flow chooses the first available one.</p>${rows}${claudeHelp}<div class="row"><button data-act="check">Check again</button></div>`;
   const input = $("codeIn");
   if (input) { input.value = typed; if (focused) input.focus(); }
 }
@@ -330,6 +327,18 @@ async function checkNow() {
   await poll();
   if (!$("acct").hidden) renderAcct();
 }
+async function startEngineSignin(engine, button) {
+  button.disabled = true; button.textContent = "Opening…";
+  try {
+    const r = await fetch("/api/engine-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ engine }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.message || "Couldn't start sign-in.");
+    button.textContent = "Finish in terminal";
+  } catch (e) {
+    button.disabled = false; button.textContent = "Sign in";
+    alert(e.message || "Couldn't start sign-in.");
+  }
+}
 function toggleAcct(open = $("acct").hidden) {
   $("acct").hidden = !open; $("status").setAttribute("aria-expanded", String(open));
   if (open) renderAcct();
@@ -345,6 +354,7 @@ $("acct").addEventListener("click", (e) => {
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (act) e.preventDefault();
   if (act === "login") startSignin();
+  if (act === "engine-login") startEngineSignin(e.target.closest("[data-engine]").dataset.engine, e.target.closest("button"));
   if (act === "trouble") { trouble = true; renderAcct(); $("codeIn")?.focus(); }
   if (act === "check") { e.target.textContent = "Checking…"; checkNow(); }
 });
