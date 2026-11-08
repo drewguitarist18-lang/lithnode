@@ -53,6 +53,8 @@ Name: "{autoprograms}\Lithnode"; Filename: "{app}\Lithnode.exe"
 Filename: "{app}\server\lithnode-cli.exe"; Parameters: "install-pet"; Check: WantPet; Flags: runhidden; StatusMsg: "Adding Claude Pet to Claude Code..."
 Filename: "{app}\server\lithnode-cli.exe"; Parameters: "uninstall-pet"; Check: not WantPet; Flags: runhidden
 Filename: "{app}\Lithnode.exe"; Flags: nowait postinstall skipifsilent
+; Update now in the app runs this setup with /VERYSILENT /RELAUNCH=1: no windows, then Lithnode opens again
+Filename: "{app}\Lithnode.exe"; Flags: nowait skipifnotsilent; Check: Relaunch
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM Lithnode.exe /IM lithnode-server.exe"; Flags: runhidden; RunOnceId: "StopLithnode"

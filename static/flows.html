@@ -56,6 +56,11 @@
       <button class="primary" id="askBtn">Build flow</button></form>
     <div id="tray" class="hud" aria-label="Items from this run"></div>
     <div id="banner" class="hud"><i></i><span id="bannerText">Running</span><button id="stopBtn" class="danger">Stop</button><button id="editBtn">Back to editing</button></div>
+    <div id="viewSw" class="hud" role="tablist" aria-label="How to show the flow">
+      <button type="button" role="tab" data-view="nodes" title="The flow as nodes and wires"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="2.5"/><circle cx="18.5" cy="6" r="2.5"/><circle cx="18.5" cy="18" r="2.5"/><path d="M8 12h3.5M11.5 6v12M11.5 6H16M11.5 18H16"/></svg>Nodes</button>
+      <button type="button" role="tab" data-view="steps" title="The flow as a numbered list you can edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10M4 6h1.5M4 12h1.5M4 18h1.5"/></svg>Steps</button>
+    </div>
+    <div id="stepsView" aria-label="Steps"></div>
     <div id="emptyHint"><div><b>Empty flow</b>Describe a team in the box below, drag blocks in from the left, or start from a template in the flow menu.</div></div>
     <div class="zoom hud" role="toolbar" aria-label="View">
       <button id="zAuto" class="edit-only" title="Auto-arrange: keep the flow neatly laid out as you edit it" aria-label="Auto-arrange"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9.5" width="5" height="5" rx="1.2"/><rect x="16" y="4" width="5" height="5" rx="1.2"/><rect x="16" y="15" width="5" height="5" rx="1.2"/><path d="M8 12h4M12 6.5v11M12 6.5h4M12 17.5h4"/></svg></button>
@@ -825,6 +830,7 @@ function renderNodes() {
   const g = ghostAt();
   $("ghost").classList.toggle("off", !g);
   if (g) { $("ghost").style.left = g.x + "px"; $("ghost").style.top = g.y + "px"; }
+  renderSteps();
 }
 // A flow with no team yet shows where one goes: a dashed slot between Start and Done, with its in and out ends.
 function ghostAt() {
@@ -2081,7 +2087,7 @@ $("newDlg").addEventListener("click", async (e) => {
   $("newDlg").close(); if (!(await leaveFlow())) return; dirty = false; await createFlow(t.dataset.tpl || null);
 });
 // The flow menu, from the arrow by the flow's name: just your flows, to switch between them.
-// Everything else (new, export, import, tidy, delete, the tour) lives in the File / Edit / View / Help bar at the top.
+// Everything else (new, export, import, tidy, delete, the tour) lives in the File / Edit bar and the cog menu at the top.
 function flowMenu(r) {
   ui.menu(r.left, r.bottom + 6, [
     { head: "Your flows" },
@@ -2100,7 +2106,142 @@ async function duplicateFlow() {
   await refreshFlows(); await openFlow(copy.id);
   toast(`Made "${copy.name}".`);
 }
-// What the top bar's File / Edit / View menus (shell.html) do on this page.
+// ------------------------------------------------------------------ steps view
+// The same flow as a numbered list: one row per stage, teams that run side by side share a row.
+// It edits the flow the canvas draws, so the two views never disagree. A run always shows on the canvas.
+var viewMode = "nodes", lastSteps = "";   // var: renderNodes can run before this part of the script does
+try { viewMode = localStorage.getItem("hq-view") === "steps" ? "steps" : "nodes"; } catch (e) {}
+function stepsOn() { return viewMode === "steps" && !locked(); }
+function setView(v) {
+  viewMode = v === "steps" ? "steps" : "nodes";
+  try { localStorage.setItem("hq-view", viewMode); } catch (e) {}
+  lastSteps = ""; renderSteps();
+  if (viewMode === "nodes") requestAnimationFrame(() => { renderWires(); if (autoFit) fit(); });
+}
+$("viewSw").onclick = (e) => { const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view); };
+var STEP_ABOUT = { master: "Your task goes in here", done: "Where the final result lands",
+                     approval: "Pauses until you say go", checkpoint: "Waits for everything before it" };
+function stepRows(f) {
+  const depth = flowDepth(f), wiredIn = new Set(f.edges.map((e) => e.to));
+  const loose = f.nodes.filter((n) => n.type !== "master" && !wiredIn.has(n.id));
+  const rows = [];
+  for (const n of flowOrder(f)) {
+    if (loose.includes(n)) continue;
+    (rows[depth[n.id]] ||= []).push(n);
+  }
+  return { rows: rows.filter(Boolean), loose };
+}
+const kids = (id) => flow.edges.filter((e) => e.from === id).map((e) => e.to);
+const parents = (id) => flow.edges.filter((e) => e.to === id).map((e) => e.from);
+// Two steps in a plain chain (a's only next step is b, b's only input is a) can trade places.
+function swappable(a, b) {
+  const A = nodeById(a), B = nodeById(b);
+  if (!A || !B || [A.type, B.type].some((t) => t === "master" || t === "done")) return false;
+  return kids(a).length === 1 && kids(a)[0] === b && parents(b).length === 1;
+}
+function swapSteps(a, b) {   // a -> b becomes b -> a, keeping everything around them wired
+  flow.edges = flow.edges.flatMap((e) => {
+    if (e.from === a && e.to === b) return [{ from: b, to: a }];
+    if (e.to === a) return [{ from: e.from, to: b }];
+    if (e.from === b) return [{ from: a, to: e.to }];
+    return [e];
+  });
+  changed();
+}
+function wire(a, b) { if (!flow.edges.some((e) => e.from === a && e.to === b)) flow.edges.push({ from: a, to: b }); }
+// A new team right after a row: whatever that row fed now goes through the new team first.
+function insertAfter(ids) {
+  const near = nodeById(ids[ids.length - 1]);
+  const n = addNode("cluster", near.x + 40, near.y + 40);
+  if (!n) return;
+  if (flow.edges.some((e) => e.to === n.id)) return focusStep(n.id);   // the first team: addNode wired it already
+  const outs = flow.edges.filter((e) => ids.includes(e.from));
+  flow.edges = flow.edges.filter((e) => !ids.includes(e.from));
+  for (const id of ids) wire(id, n.id);
+  for (const e of outs) wire(n.id, e.to);
+  changed(); focusStep(n.id);
+}
+// Deleting from the list keeps the chain whole: what fed the step now feeds what came after it.
+function deleteStep(id) {
+  const ps = parents(id), cs = kids(id);
+  deleteNode(id);
+  if (nodeById(id)) return;
+  for (const p of ps) for (const c of cs) wire(p, c);
+  changed();
+}
+function wireIn(id) {   // a loose step goes on the end, just before Done
+  const d = flow.nodes.find((n) => n.type === "done"), s = flow.nodes.find((n) => n.type === "master");
+  const last = d ? parents(d.id) : [];
+  if (d) { flow.edges = flow.edges.filter((e) => e.to !== d.id); wire(id, d.id); }
+  for (const p of last.length ? last : s ? [s.id] : []) wire(p, id);
+  changed(); focusStep(id);
+}
+function focusStep(id) {
+  select({ kind: "node", id });
+  if (!panes()[1]) setPanes(panes()[0], true);   // the step's settings are in the side panel
+}
+function renderSteps() {
+  const box = $("stepsView"), on = stepsOn();
+  $("canvas").classList.toggle("listview", on);
+  $("viewSw").querySelectorAll("[data-view]").forEach((b) => {
+    const cur = b.dataset.view === (on ? "steps" : "nodes");
+    b.classList.toggle("on", cur); b.setAttribute("aria-selected", cur);
+  });
+  if (!on) { if (lastSteps) { box.innerHTML = ""; lastSteps = ""; } return; }
+  const { rows, loose } = stepRows(flow), selId = sel && sel.kind === "node" ? sel.id : "";
+  const look = (n) => { const l = lookOf(n); return l.icon ? `data-icon="${l.icon}"` : `data-shape="${esc(l.shape)}" data-color="${esc(l.color)}"`; };
+  const about = (n) => {
+    if (n.type !== "cluster") return n.type === "checkpoint" && n.mode === "summarize" ? "Merges the reports into one" : STEP_ABOUT[n.type] || "";
+    return summaryOf(n) || "Click to give this team a job";
+  };
+  const meta = (n) => n.type !== "cluster" ? "" :
+    `<span class="smeta">${(n.count || 1) < 2 ? "1 agent" : n.count + " agents"} · ${esc(teamModel(n))}</span>`;
+  const card = (n, row, ri) => {
+    const up = ri > 0 && rows[ri - 1].length === 1 && row.length === 1 && swappable(rows[ri - 1][0].id, n.id);
+    const down = ri < rows.length - 1 && rows[ri + 1].length === 1 && row.length === 1 && swappable(n.id, rows[ri + 1][0].id);
+    const tools = n.type === "master" ? "" : `<span class="sacts">`
+      + (up ? `<button type="button" class="ib" data-up="${esc(n.id)}" title="Move up" aria-label="Move ${esc(n.name)} up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></button>` : "")
+      + (down ? `<button type="button" class="ib" data-down="${esc(n.id)}" title="Move down" aria-label="Move ${esc(n.name)} down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 10 6 6 6-6"/></svg></button>` : "")
+      + `<button type="button" class="ib" data-del="${esc(n.id)}" title="Delete step" aria-label="Delete ${esc(n.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span>`;
+    const warn = n.type === "cluster" && !summaryOf(n) ? " warn" : "";
+    return `<div class="scard ${n.type}${n.id === selId ? " sel" : ""}" data-id="${esc(n.id)}" tabindex="0" style="--tc:${esc(n.color || "#ecebe6")}">
+      <span class="sava"><canvas width="96" height="72" ${look(n)}></canvas></span>
+      <span class="stxt"><b>${esc(n.name)}</b><small class="${warn}">${esc(about(n))}</small>${meta(n)}</span>${tools}</div>`;
+  };
+  const plus = (row) => `<button type="button" class="sadd" data-after="${esc(row.map((n) => n.id).join(" "))}" title="Add a team here"><span>+</span>Add a team here</button>`;
+  let html = `<div class="slist">`;
+  rows.forEach((row, ri) => {
+    const num = row[0].type === "master" ? "" : row[0].type === "done" && row.length === 1 ? "" : String(ri);
+    html += `<div class="srow${row.length > 1 ? " par" : ""}"><span class="snum${num ? "" : " end"}">${num || (row[0].type === "master" ? ICON.play : ICON.flag)}</span>
+      <div class="scards">${row.length > 1 ? `<small class="spar">${row.length} at once</small>` : ""}${row.map((n) => card(n, row, ri)).join("")}</div></div>`;
+    if (!row.some((n) => n.type === "done")) html += plus(row);
+  });
+  if (loose.length) html += `<div class="sloose"><small>Not wired in yet</small>${loose.map((n) =>
+    `<div class="srow"><span class="snum end">·</span><div class="scards">${card(n, [n], -1)}<button type="button" class="wirein" data-wire="${esc(n.id)}">Add to the end</button></div></div>`).join("")}</div>`;
+  html += `</div>`;
+  if (html === lastSteps) return;
+  const top = box.scrollTop, first = !lastSteps;
+  box.innerHTML = html; lastSteps = html; box.scrollTop = top;
+  if (first) box.firstChild.classList.add("intro");   // rows slide in when the view opens, not on every edit
+  drawLooks(box);
+}
+$("stepsView").addEventListener("click", (e) => {
+  const t = e.target.closest("button, .scard");
+  if (!t || locked()) return;
+  if (t.dataset.after) return insertAfter(t.dataset.after.split(" "));
+  if (t.dataset.del) return deleteStep(t.dataset.del);
+  if (t.dataset.wire) return wireIn(t.dataset.wire);
+  if (t.dataset.up) { const id = t.dataset.up; return swapSteps(parents(id)[0], id); }
+  if (t.dataset.down) { const id = t.dataset.down; return swapSteps(id, kids(id)[0]); }
+  if (t.dataset.id) focusStep(t.dataset.id);
+});
+$("stepsView").addEventListener("keydown", (e) => {
+  const c = e.target.closest(".scard");
+  if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); focusStep(c.dataset.id); }
+});
+$("stepsView").addEventListener("click", (e) => { if (e.target === $("stepsView") || e.target.classList.contains("slist")) select(null); });
+
+// What the top bar's File / Edit menus and the cog menu (shell.html) do on this page.
 const panes = () => [$("paneL").getAttribute("aria-pressed") === "true", $("paneR").getAttribute("aria-pressed") === "true"];
 const zoomBy = (k) => { autoFit = false; const r = $("canvas").getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, k ? view.k * k : 1); };
 window.flowsApi = {
@@ -2146,24 +2287,133 @@ async function deleteFlow() {
   if (flows.length) openFlow(flows[0].id); else createFlow("ship-it");
 };
 document.querySelectorAll("dialog [data-close]").forEach((b) => b.onclick = () => b.closest("dialog").close());
+// In the tour: types example requests into a box, holds each, then erases it, like someone trying it out.
+// Never submits anything. Returns the clean-up, which puts back what was there before.
+// The tour's time lapse: a made-up flow builds itself, then runs, sped up. It never touches your flows.
+const TL_W = 540, TL_H = 252, TL_LOOP = 11;
+const TL_NODES = [
+  { id: "s", pill: "play", label: "Start", x: 36, y: 132, at: 0.3 },
+  { id: "p", label: "Planner", shape: "owl", color: "#7aa2f7", x: 138, y: 132, at: 0.8, run: [4.4, 5.3] },
+  { id: "f", label: "Frontend", shape: "crab", color: "#ff8a65", x: 262, y: 60, at: 1.4, run: [5.5, 6.9] },
+  { id: "b", label: "Backend", shape: "golem", color: "#36d39a", x: 262, y: 132, at: 1.65, run: [5.5, 7.4] },
+  { id: "t", label: "Tests", shape: "bug", color: "#c084fc", x: 262, y: 204, at: 1.9, run: [5.5, 7.1] },
+  { id: "r", label: "Reviewer", shape: "guard", color: "#ffb547", x: 384, y: 132, at: 2.6, run: [7.6, 8.5] },
+  { id: "d", pill: "flag", label: "Done", x: 490, y: 132, at: 3.2, run: [8.7, 8.8] },
+];
+const TL_EDGES = [["s", "p"], ["p", "f"], ["p", "b"], ["p", "t"], ["f", "r"], ["b", "r"], ["t", "r"], ["r", "d"]];
+const tlMedia = () => {
+  const by = Object.fromEntries(TL_NODES.map((n) => [n.id, n])), half = (n) => (n.pill ? 32 : 24);
+  const wires = TL_EDGES.map(([a, b]) => {
+    const A = by[a], B = by[b], x1 = A.x + half(A), x2 = B.x - half(B), m = (x1 + x2) / 2;
+    const d = `M${x1} ${A.y}C${m} ${A.y} ${m} ${B.y} ${x2} ${B.y}`;
+    return `<g data-to="${b}"><path class="w" pathLength="1" d="${d}"/><path class="live" d="${d}"/></g>`;
+  }).join("");
+  const nodes = TL_NODES.map((n) => n.pill
+    ? `<div class="tl-n pill" data-id="${n.id}" style="left:${n.x}px;top:${n.y}px">${ICON[n.pill]}<span>${n.label}</span></div>`
+    : `<div class="tl-n team" data-id="${n.id}" style="left:${n.x}px;top:${n.y}px;--tc:${n.color}"><span class="orb"><canvas width="48" height="36"></canvas><i>${ICON.check}</i></span><small>${n.label}</small></div>`).join("");
+  return `<div class="tl" aria-hidden="true"><div class="tl-stage" style="width:${TL_W}px;height:${TL_H}px">
+    <div class="tl-top"><span class="tl-cap"></span><span class="tl-clock"><b>0:00</b> time lapse</span></div>
+    <svg viewBox="0 0 ${TL_W} ${TL_H}">${wires}</svg>${nodes}<div class="tl-bar"><i></i></div></div></div>`;
+};
+function timeLapse(root) {
+  const box = root.querySelector(".tl"), stage = box && box.querySelector(".tl-stage");
+  if (!stage) return null;
+  stage.style.transform = `scale(${Math.min(1, box.clientWidth / TL_W)})`;
+  box.style.height = TL_H * Math.min(1, box.clientWidth / TL_W) + "px";
+  const els = Object.fromEntries(TL_NODES.map((n) => [n.id, stage.querySelector(`[data-id="${n.id}"]`)]));
+  const wires = [...stage.querySelectorAll("g[data-to]")];
+  const cap = stage.querySelector(".tl-cap"), clock = stage.querySelector(".tl-clock b"), bar = stage.querySelector(".tl-bar i");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let t0 = performance.now(), raf = 0, phase = "";
+  const frame = (now) => {
+    let t = (now - t0) / 1000;
+    if (still) t = 9;
+    if (t >= TL_LOOP) {   // start over: snap everything back with no transitions, then build again
+      t0 = now; t = 0;
+      stage.classList.add("reset");
+      stage.querySelectorAll(".in, .run, .ok").forEach((e) => e.classList.remove("in", "run", "ok"));
+      void stage.offsetWidth; stage.classList.remove("reset");
+    }
+    stage.classList.toggle("out", t > TL_LOOP - 0.8);
+    for (const n of TL_NODES) {
+      const el = els[n.id], running = n.run && t >= n.run[0] && t < n.run[1], ok = n.id === "s" ? t >= 4 : n.run && t >= n.run[1];
+      el.classList.toggle("in", t >= n.at); el.classList.toggle("run", running); el.classList.toggle("ok", !!ok);
+      const cv = el.querySelector("canvas");
+      if (cv) {
+        const g = cv.getContext("2d"); g.clearRect(0, 0, 48, 36);
+        drawBot(g, { shape: n.shape, color: n.color }, 6, 8, 3, { state: running ? "working" : "idle", t: now / 1000 });
+      }
+    }
+    for (const w of wires) {
+      const to = TL_NODES.find((n) => n.id === w.dataset.to);
+      w.classList.toggle("in", t >= to.at + 0.05);
+      w.classList.toggle("on", !!to.run && t >= to.run[0] - 0.2 && t < to.run[1]);
+      w.classList.toggle("ok", !!to.run && t >= to.run[1]);
+    }
+    const p = t < 3.7 ? "Building the flow" : t < 8.8 ? "Running" : "Report ready";
+    if (p !== phase) { phase = p; cap.textContent = p; cap.className = "tl-cap " + (t < 3.7 ? "build" : t < 8.8 ? "go" : "fin"); }
+    const mins = t < 3.7 ? (t / 3.7) * 2 : t < 8.8 ? 2 + ((t - 3.7) / 5.1) * 16 : 18;   // about 18 minutes, squeezed into 9 seconds
+    clock.textContent = `${Math.floor(mins)}:${String(Math.floor((mins % 1) * 60)).padStart(2, "0")}`;
+    bar.style.width = Math.min(100, (t / 8.8) * 100) + "%";
+    if (!still) raf = requestAnimationFrame(frame);
+  };
+  raf = requestAnimationFrame(frame);
+  return () => cancelAnimationFrame(raf);
+}
+const ASK_DEMOS = [
+  "Make me a team that finds bugs in my checkout code",
+  "Build a landing page, then have 3 reviewers check it",
+  "Find me a cheaper phone plan and cut any with hidden fees",
+];
+function typeDemo(input, lines) {
+  const before = input.value, ph = input.placeholder;
+  let alive = true, timer = 0;
+  const wait = (ms) => new Promise((ok) => { timer = setTimeout(ok, ms); });
+  input.placeholder = "";
+  input.classList.add("demo-typing");
+  (async () => {
+    for (let n = 0; alive; n++) {
+      const line = lines[n % lines.length];
+      for (let c = 1; alive && c <= line.length; c++) { input.value = line.slice(0, c); await wait(38 + Math.random() * 40); }
+      await wait(1400);
+      for (let c = line.length; alive && c >= 0; c--) { input.value = line.slice(0, c); await wait(14); }
+      await wait(350);
+    }
+  })();
+  return () => { alive = false; clearTimeout(timer); input.value = before; input.placeholder = ph; input.classList.remove("demo-typing"); };
+}
+
 // The welcome tour, from the flow menu and once on first launch: what each part of the page is for.
 const TOUR = [
-  { title: "Welcome to Lithnode", ok: "Show me",
-    text: "Lithnode runs teams of AI agents on your own Claude Code. Each team has one job, and they pass their work along like a relay. Here's a quick look around." },
-  { at: "#ask", title: "Describe a team",
+  { title: "Welcome to Lithnode", ok: "Show me around",
+    text: "Lithnode runs teams of AI agents on your own Claude Code. Each team has one job, and they pass their work along like a relay." },
+  { title: "Watch one work", wide: true, media: tlMedia(), enter: () => timeLapse(document.querySelector(".tour-pop")),
+    icon: '<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.5M10 3.5h4"/>',
+    text: "Here's a flow sped up: a planner splits the job, three teams build at once, a reviewer checks it all, and the report lands in Done." },
+  { at: "#ask", title: "Describe a team", enter: () => typeDemo($("askIn"), ASK_DEMOS),
+    icon: '<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
     text: "Type what you want done, like \"find me a cheaper phone plan and cut any with hidden fees\". Lithnode builds the team for you." },
   { at: "#palette", title: "Or build it yourself",
+    icon: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M10.5 7h3a3 3 0 0 1 3 3v3.5"/>',
     text: "Click or drag a bot onto the canvas, then connect a node's right dot to the next one's left dot. Approval steps pause until you say go." },
-  { at: "#world .node.nd-team", title: "A team",
+  { at: "#world .node.nd-team, #stepsView .scard.cluster", title: "A team",
+    icon: '<circle cx="9" cy="8.5" r="3"/><circle cx="17" cy="9.5" r="2.3"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5M15 14.6c2.5-.3 4.6 1 5.2 3.9"/>',
     text: "Each box is a team of agents with one job. Click one to pick its model, how many agents it has and what it can touch." },
+  { at: "#viewSw", title: "Nodes or steps",
+    icon: '<path d="M10 6h10M10 12h10M10 18h10M4 6h1.5M4 12h1.5M4 18h1.5"/>',
+    text: "Prefer a list? Steps shows the same flow as numbered steps. Add, reorder or delete them there, and the canvas follows." },
   { at: "#runBtn, #floatRun", title: "Run it",
-    text: "Press Run, write the job in your own words and pick a folder. The Run menu shows how many agents it will start before anything happens." },
+    icon: '<path d="M7 4.5v15l12.5-7.5z"/>',
+    text: "Press Run, write the job in your own words and pick a folder. You'll see how many agents it starts before anything happens." },
   { at: "#rside", title: "Results",
+    icon: '<path d="M6 3.5h9l4 4v13H6z"/><path d="M14.5 3.5v4.5H19M9.5 12.5h6M9.5 16h4"/>',
     text: "Reports and the things your agents found land here as they finish. Runs, top right, lists every past run." },
   { at: ".fname", title: "Your flows",
-    text: "Switch flows, start from a template, or export a team file to share. You can take this tour again from this menu." },
-  { title: "Meet the Office",
-    text: "The Office tab at the top shows every agent at its desk while it works, plus your open Claude Code sessions. That's it. Have fun!" },
+    icon: '<path d="M3.5 6.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+    text: "Switch flows, start from a template, or export a team file to share." },
+  { title: "Meet the Office", ok: "Let's go",
+    icon: '<rect x="3" y="11" width="18" height="2.5" rx="1"/><path d="M5.5 13.5V20M18.5 13.5V20"/><rect x="8" y="4" width="8" height="5.5" rx="1"/><path d="M12 9.5V11"/>',
+    text: "The Office tab shows every agent at its desk while it works, plus your open Claude Code sessions. Take this tour again any time from the cog menu." },
 ];
 function welcomeTour() {
   tour.start(TOUR, () => { try { localStorage.setItem("hq-tour-1", "1"); } catch (e) {} });

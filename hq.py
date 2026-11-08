@@ -427,6 +427,17 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"version": updates.VERSION, "latest": "", "newer": False, "checked": 0, "off": True})
         self.send_json(updates.status(force=force))
 
+    def POST_api_update(self) -> None:
+        """One click: download the new installer and run it with no windows; it closes and reopens Lithnode."""
+        if RUNNER.active():
+            return self.send_json({"ok": False, "message": "Wait for your running flows to finish, or stop them, then update."}, 409)
+        st = updates.status()
+        ok, message = updates.start_update(st.get("download", "") if st.get("newer") else "")
+        self.send_json({"ok": ok, "message": message}, 200 if ok else 400)
+
+    def GET_api_update(self) -> None:
+        self.send_json(updates.job())
+
     # -- settings ----------------------------------------------------------------
     def GET_api_settings(self) -> None:
         self.send_json({"settings": settings.load(HQ_STORE.root), "limits": settings.LIMITS,

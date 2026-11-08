@@ -129,6 +129,7 @@
   .icon:hover { color: var(--ink); background: var(--hover); }
   .icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .quit:hover { color: var(--warn); }
+  .icon.on { color: var(--ink); background: var(--hover); }
   /* File / Edit / View / Help, like any desktop app */
   .menubar { display: flex; gap: 1px; margin-right: 6px; }
   .menubar button { height: 28px; padding: 0 9px; border-radius: 7px; border: 0; background: transparent; color: var(--muted);
@@ -192,7 +193,7 @@
 <header>
   <div class="brand" title="Lithnode · teams of agents on Claude Code, Codex and Cursor"><canvas id="logo" width="96" height="72"></canvas><span class="word">Lithnode</span></div>
   <div class="menubar" id="menubar" role="menubar">
-    <button data-menu="file" role="menuitem" aria-haspopup="menu">File</button><button data-menu="edit" role="menuitem" aria-haspopup="menu">Edit</button><button data-menu="view" role="menuitem" aria-haspopup="menu">View</button><button data-menu="help" role="menuitem" aria-haspopup="menu">Help</button>
+    <button data-menu="file" role="menuitem" aria-haspopup="menu">File</button><button data-menu="edit" role="menuitem" aria-haspopup="menu">Edit</button>
   </div>
   <nav>
     <a href="#flows" data-tab="flows" title="Draw a team of agents and run it">Flows <b class="badge" id="b-flows"></b></a>
@@ -202,6 +203,7 @@
   <button class="signin" id="signinBtn" hidden title="Sign in to an agent engine">Sign in</button>
   <div class="acct" id="acct" hidden role="dialog" aria-label="Sign-in"></div>
   <button class="icon theme" id="themeBtn" title="Theme" aria-label="Switch theme"></button>
+  <button class="icon cog" id="cogBtn" title="Settings and more" aria-label="Settings and more" aria-haspopup="menu"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   <button class="icon quit" id="quitBtn" title="Quit Lithnode" aria-label="Quit Lithnode"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></button>
 </header>
 <div class="update" id="update" hidden role="status"></div>
@@ -427,13 +429,7 @@ const MENUS = {
     { icon: "⤒", label: "Import team file…", hint: "Ctrl+O", action: flowsDo((a) => a.importTeam()) },
     { icon: "⤓", label: "Export team file", hint: "Ctrl+E", action: flowsDo((a) => a.exportTeam()) },
     { sep: true },
-    { icon: "▶", label: "Run flow…", action: flowsDo((a) => a.run()) },
-    { icon: "↺", label: "Past runs", action: flowsDo((a) => a.runs()) },
-    { sep: true },
-    { icon: "⚙", label: "Settings…", hint: "Ctrl+,", action: () => openSettings() },
-    { sep: true },
     { icon: "✕", label: "Delete flow", danger: true, action: flowsDo((a) => a.deleteFlow()) },
-    { icon: "⏻", label: "Quit Lithnode", action: () => $("quitBtn").click() },
   ],
   edit: () => {
     const a = onTab() === "flows" ? fapi() : null;
@@ -447,32 +443,6 @@ const MENUS = {
       { icon: "⇄", label: "Tidy up left to right", action: flowsDo((x) => x.tidy("lr")) },
     ];
   },
-  view: () => {
-    const a = fapi(), [l, r] = a ? a.panes() : [true, true], flowsOn = onTab() === "flows";
-    return [
-      { icon: flowsOn ? "✓" : "", label: "Flows", on: flowsOn, action: () => goTab("flows") },
-      { icon: flowsOn ? "" : "✓", label: "Office", on: !flowsOn, action: () => goTab("office") },
-      { sep: true },
-      { icon: l ? "✓" : "", label: "Building blocks", action: flowsDo((x) => x.toggleLeft()) },
-      { icon: r ? "✓" : "", label: "Side panel", action: flowsDo((x) => x.toggleRight()) },
-      { sep: true },
-      { icon: "＋", label: "Zoom in", action: flowsDo((x) => x.zoomIn()) },
-      { icon: "－", label: "Zoom out", action: flowsDo((x) => x.zoomOut()) },
-      { icon: "1", label: "Actual size", action: flowsDo((x) => x.zoomReset()) },
-      { icon: "⤢", label: "Fit to screen", action: flowsDo((x) => x.fit()) },
-      { sep: true },
-      ...Object.entries(THEMES).map(([k, [, name]]) => ({ icon: themeMode === k ? "✓" : "", label: name === "Same as your computer" ? "Theme: same as your computer" : `Theme: ${name.toLowerCase()}`,
-        action: () => { themeMode = k; try { localStorage.setItem("hq-theme", k); } catch (e) {} applyAll(); } })),
-    ];
-  },
-  help: () => [
-    { icon: "?", label: "Take the tour", action: flowsDo((a) => a.tour()) },
-    { icon: "↻", label: "Check for updates", hint: release.version ? `v${release.version}` : "", action: () => checkUpdates(true) },
-    { sep: true },
-    { icon: "↗", label: "Lithnode website", action: () => window.open("https://lithnode.com", "_blank", "noopener") },
-    { icon: "↗", label: "Report a problem", action: () => window.open("https://github.com/drewguitarist18-lang/lithnode/issues", "_blank", "noopener") },
-    { icon: "↗", label: "Source code on GitHub", hint: "MIT", action: () => window.open("https://github.com/drewguitarist18-lang/lithnode", "_blank", "noopener") },
-  ],
 };
 let openMenu = null;
 function showMenu(btn) {
@@ -490,6 +460,29 @@ document.querySelectorAll(".menubar button").forEach((b) => {
   });
   b.addEventListener("mouseenter", () => { if (openMenu && openMenu !== b.dataset.menu) showMenu(b); });   // slide across, like a desktop menu bar
 });
+// the cog: a short menu of app-wide things, under the button (a second press closes it)
+let cogWasOpen = false;
+window.addEventListener("mousedown", (e) => { cogWasOpen = !!(e.target.closest("#cogBtn") && $("cogBtn").classList.contains("on")); }, true);
+$("cogBtn").onclick = () => {
+  if (cogWasOpen) return;
+  const b = $("cogBtn"), r = b.getBoundingClientRect();
+  ui.menu(r.right - 230, r.bottom + 4, [
+    { icon: "⚙", label: "Settings…", hint: "Ctrl+,", action: () => openSettings() },
+    { sep: true },
+    { head: "Theme" },
+    ...Object.entries(THEMES).map(([k, [, name]]) => ({ icon: themeMode === k ? "✓" : "", label: name,
+      action: () => { themeMode = k; try { localStorage.setItem("hq-theme", k); } catch (e) {} applyAll(); } })),
+    { sep: true },
+    { icon: "↻", label: "Check for updates", hint: release.version ? `v${release.version}` : "", action: () => checkUpdates(true) },
+    { icon: "?", label: "Take the tour", action: flowsDo((a) => a.tour()) },
+    { icon: "↗", label: "Lithnode website", action: () => window.open("https://lithnode.com", "_blank", "noopener") },
+    { icon: "↗", label: "Report a problem", action: () => window.open("https://github.com/drewguitarist18-lang/lithnode/issues", "_blank", "noopener") },
+    { sep: true },
+    { icon: "⏻", label: "Quit Lithnode", action: () => $("quitBtn").click() },
+  ]);
+  b.classList.add("on");
+  const watch = setInterval(() => { if (!document.querySelector(".ui-menu")) { clearInterval(watch); b.classList.remove("on"); } }, 100);
+};
 $("quitBtn").onclick = async () => {
   const ok = await ui.confirm({ title: "Quit Lithnode?", text: "This closes the app and stops any running flows.", ok: "Quit", danger: true });
   if (!ok) return;
@@ -505,11 +498,28 @@ function showUpdate() {
   u.hidden = !(r.newer && r.latest !== skipped);
   if (u.hidden) return;
   u.innerHTML = `<i></i><span><b>Lithnode ${esc(r.latest)} is out.</b> <em>You have ${esc(r.version)}.</em></span>
-    <a class="go" href="${esc(r.download)}" target="_blank" rel="noopener">Download</a>
+    ${r.self_update ? `<button class="go" data-act="update">Update now</button>` : `<a class="go" href="${esc(r.download)}" target="_blank" rel="noopener">Download</a>`}
     ${r.notes ? `<a href="${esc(r.notes)}" target="_blank" rel="noopener">What's new</a>` : ""}
     <button class="x" data-act="skip" title="Hide until the next version" aria-label="Hide">×</button>`;
 }
+// Update now: the server downloads the installer and runs it with no windows; it closes this app and reopens it
+async function updateNow() {
+  const u = $("update"), say = (html) => { u.innerHTML = `<i></i><span>${html}</span>`; };
+  let res = {};
+  try { res = await (await fetch("/api/update", { method: "POST" })).json(); } catch (e) {}
+  if (!res.ok) { await ui.confirm({ title: "Couldn't update", text: res.message || "Lithnode couldn't start the update.", ok: "OK", cancel: "" }); return; }
+  say(`<b>Updating to ${esc(release.latest)}…</b> <em>Downloading</em>`);
+  for (;;) {
+    await new Promise((ok) => setTimeout(ok, 500));
+    let j = {};
+    try { j = await (await fetch("/api/update", { cache: "no-store" })).json(); } catch (e) { j = { state: "installing" }; }   // the app closing for the install
+    if (j.state === "downloading") say(`<b>Updating to ${esc(release.latest)}…</b> <em>Downloading ${j.pct}%</em>`);
+    else if (j.state === "installing") { say(`<b>Installing ${esc(release.latest)}…</b> <em>Lithnode will close and reopen by itself.</em>`); return; }
+    else if (j.state === "failed") { showUpdate(); await ui.confirm({ title: "Couldn't update", text: j.error, ok: "OK", cancel: "" }); return; }
+  }
+}
 $("update").addEventListener("click", (e) => {
+  if (e.target.closest("[data-act=update]")) return updateNow();
   if (e.target.closest("[data-act=skip]")) {
     try { localStorage.setItem("hq-update-skip", release.latest); } catch (e) {}
     $("update").hidden = true;

@@ -246,6 +246,20 @@ _URL_RE = re.compile(r"https://[^\s\x07\x1b\"'<>]+")
 _PCT_RE = re.compile(r"(\d{1,3})(?:\.\d+)?%")
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 
+# a sign-in shows only its own link: Cursor's CLI updates itself first and can print others (a Git for Windows notice)
+LOGIN_HOSTS = {"cursor": ("cursor.com",)}
+
+
+def _job_link(engine: str, kind: str, text: str) -> str:
+    hosts = LOGIN_HOSTS.get(engine) if kind == "login" else None
+    for m in _URL_RE.finditer(text):
+        url = m.group(0).rstrip(".,)")
+        host = url.split("/")[2].split(":")[0].lower()
+        if not hosts or any(host == h or host.endswith("." + h) for h in hosts):
+            return url
+    return ""
+
+
 # one background job per engine (an install, a model download or a sign-in), run with no window of its own:
 # the engines card shows how it's going instead of a terminal
 _jobs: dict[str, dict[str, Any]] = {}
@@ -283,8 +297,8 @@ def _watch_job(engine: str, job: dict[str, Any]) -> None:
         clean = _ANSI_RE.sub("", buf)
         lines = [x.strip() for x in re.split(r"[\r\n]+", clean) if x.strip()]
         with _jobs_lock:
-            if not job["url"] and (m := _URL_RE.search(clean)):
-                job["url"] = m.group(0).rstrip(".,)")
+            if not job["url"]:
+                job["url"] = _job_link(engine, job["kind"], clean)
             if pcts := _PCT_RE.findall(clean[-300:]):
                 job["pct"] = min(100, int(pcts[-1]))
             job["tail"] = lines[-1][:200] if lines else ""

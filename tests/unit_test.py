@@ -225,6 +225,60 @@ check("updates: junk tags are never newer", not updates.newer("nightly", "0.1.21
 check("updates: each OS gets its own installer", updates.download_url("v1.0.0", "win32").endswith("/v1.0.0/LithnodeSetup.exe")
       and updates.download_url("v1.0.0", "darwin").endswith(".dmg") and updates.download_url("v1.0.0", "linux").endswith(".flatpak"))
 
+# ---- Update now (Windows): download the installer, then run it with no windows; it reopens Lithnode -------------
+import io  # noqa: E402
+import subprocess  # noqa: E402
+
+GOOD = f"https://github.com/{updates.REPO}/releases/download/v9.9.9/LithnodeSetup.exe"
+check("update: a copy that isn't the Windows install says to download instead", not updates.start_update(GOOD)[0])
+real_can, real_open, real_popen, launched = updates.can_self_update, updates.urlrequest.urlopen, subprocess.Popen, []
+
+
+class FakeResp(io.BytesIO):
+    headers = {"Content-Length": "0"}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def run_update(body, url=GOOD):
+    launched.clear()
+    updates._job.update(state="", pct=0, error="")
+    resp = FakeResp(body)
+    resp.headers = {"Content-Length": str(len(body))}
+    updates.urlrequest.urlopen = lambda req, timeout=0: resp
+    ok, _ = updates.start_update(url)
+    for _ in range(100):
+        if updates.job()["state"] not in ("downloading",):
+            break
+        time.sleep(0.05)
+    return ok, updates.job()
+
+
+try:
+    updates.can_self_update = lambda: True
+    subprocess.Popen = lambda argv, **kw: launched.append(argv)
+    ok, j = run_update(b"MZ" + b"\0" * 5000)
+    check("update: downloads the installer and runs it silently, reopening Lithnode", ok and j["state"] == "installing"
+          and launched and {"/VERYSILENT", "/SUPPRESSMSGBOXES", "/RELAUNCH=1"} <= set(launched[0])
+          and any(a in ("/PET=yes", "/PET=no") for a in launched[0]), (j, launched))
+    ok, j = run_update(b"<html>not an installer</html>")
+    check("update: a download that isn't a program is never run", j["state"] == "failed" and not launched, (j, launched))
+    check("update: only Lithnode's own GitHub releases", not updates.start_update("https://evil.example/LithnodeSetup.exe")[0])
+finally:
+    updates.can_self_update, updates.urlrequest.urlopen, subprocess.Popen = real_can, real_open, real_popen
+    updates._job.update(state="", pct=0, error="")
+
+# ---- sign-in links: Cursor's CLI updates itself first and may print a Git for Windows link before its own ---------
+said = ("Done\nGit for Windows is required. Install it from https://git-scm.com/download/win and include Git Bash.\n"
+        "Open a browser and navigate to this link: https://cursor.com/loginDeepControl?challenge=x&uuid=y")
+check("cursor sign-in: shows the cursor.com link, not the Git one",
+      engines._job_link("cursor", "login", said) == "https://cursor.com/loginDeepControl?challenge=x&uuid=y")
+check("cursor sign-in: no link yet while only the Git notice is out", engines._job_link("cursor", "login", said.split("Open")[0]) == "")
+
 # ---- settings: what the Settings window saves --------------------------------------------------------------------
 check("settings: nothing saved means the defaults", settings.clean(None) == settings.DEFAULTS)
 check("settings: junk is dropped, a sane value is kept", settings.clean({"limit": "x", "roles": "yes", "check_updates": False, "evil": 1})

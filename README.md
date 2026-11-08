@@ -234,7 +234,7 @@ reports are kept.
   Flatpak manifest and desktop files; `check_installed.py` runs a whole flow through a built app.
 - `.github/workflows/build.yml`: tests on Linux and Mac, builds the Flatpak and the Mac app, and publishes releases.
   Bump `version.py` first: the release refuses a number that doesn't match, and the app compares it with the latest
-  GitHub release to tell people when an update is out (`updates.py`, Help → Check for updates).
+  GitHub release to tell people when an update is out (`updates.py`, the cog menu → Check for updates).
 - `site/`: lithnode.com, a static page deployed on Vercel.
 - `marketing/`: the ad animations (HTML, rendered to MP4).
 

@@ -31,9 +31,16 @@ function SetWindowRgn(hwnd: HWND; rgn: THandle; redraw: BOOL): Integer;
 function ReleaseCapture: BOOL; external 'ReleaseCapture@user32.dll stdcall';
 function GetSystemMetrics(index: Integer): Integer; external 'GetSystemMetrics@user32.dll stdcall';
 
+{ a silent update (Update now in the app) passes /PET=yes or no, so Claude Pet stays as it was }
 function WantPet: Boolean;
 begin
-  Result := WantPetChoice;
+  if WizardSilent then Result := ExpandConstant('{param:PET|yes}') <> 'no'
+  else Result := WantPetChoice;
+end;
+
+function Relaunch: Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
 end;
 
 { the art comes in a few sizes so the pixels stay whole at any display scale }

@@ -96,4 +96,72 @@ def status(force: bool = False) -> dict:
         up = newer(tag)
         return {"version": VERSION, "latest": tag.lstrip("v") if tag else "", "newer": up,
                 "download": download_url(tag) if up else "", "notes": page if up else "",
-                "checked": bool(tag), "error": _cache.get("error", "")}
+                "checked": bool(tag), "error": _cache.get("error", ""), "self_update": up and can_self_update()}
+
+
+# ---- one-click update on Windows: download the new installer and run it with no windows; it reopens Lithnode
+_job: dict = {"state": "", "pct": 0, "error": ""}   # state: "" | downloading | installing | failed
+
+
+def can_self_update() -> bool:
+    r"""Only the Windows installer's own copy ({app}\server\lithnode-server.exe next to {app}\Lithnode.exe)."""
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return False
+    exe = Path(sys.executable)
+    return exe.parent.name.lower() == "server" and (exe.parent.parent / "Lithnode.exe").exists()
+
+
+def _pet_on() -> bool:
+    """Keep Claude Pet as it is: on if Claude Code's settings have the lithnode-cli hook."""
+    try:
+        text = (Path.home() / ".claude" / "settings.json").read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return "lithnode-cli" in text.lower()
+
+
+def job() -> dict:
+    with _lock:
+        return dict(_job)
+
+
+def start_update(url: str) -> tuple[bool, str]:
+    if not can_self_update():
+        return False, "This copy of Lithnode can't update itself. Download the new version instead."
+    if not url.startswith(f"https://github.com/{REPO}/releases/download/"):
+        return False, "No update to install."
+    with _lock:
+        if _job["state"] in ("downloading", "installing"):
+            return True, "Already updating."
+        _job.update(state="downloading", pct=0, error="")
+    threading.Thread(target=_update, args=(url,), daemon=True).start()
+    return True, "Updating."
+
+
+def _update(url: str) -> None:
+    import subprocess
+    import tempfile
+    try:
+        folder = Path(tempfile.mkdtemp(prefix="lithnode-update-"))
+        dest = folder / "LithnodeSetup.exe"
+        req = urlrequest.Request(url, headers={"User-Agent": f"Lithnode/{VERSION}"})
+        with urlrequest.urlopen(req, timeout=30) as r, open(dest, "wb") as f:
+            total, got = int(r.headers.get("Content-Length") or 0), 0
+            while chunk := r.read(1 << 16):
+                f.write(chunk)
+                got += len(chunk)
+                if total:
+                    with _lock:
+                        _job["pct"] = min(99, got * 100 // total)
+        with open(dest, "rb") as f:
+            if f.read(2) != b"MZ" or (total and got != total):
+                raise ValueError("the download was incomplete")
+        with _lock:
+            _job.update(state="installing", pct=100)
+        # the installer closes this Lithnode itself, then reopens it (/RELAUNCH); /PET keeps Claude Pet as it was
+        flags = 0x00000008 | 0x00000200   # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP: it outlives this app
+        subprocess.Popen([str(dest), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/RELAUNCH=1",
+                          f"/PET={'yes' if _pet_on() else 'no'}"], creationflags=flags, close_fds=True)
+    except Exception as e:
+        with _lock:
+            _job.update(state="failed", error=f"Couldn't update ({type(e).__name__}). Try again, or download it instead.")
