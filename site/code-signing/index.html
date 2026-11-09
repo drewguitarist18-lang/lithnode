@@ -85,12 +85,13 @@
   <p class="quote">This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.</p>
   <p>The only network traffic Lithnode makes is what you set up:</p>
   <ul>
-    <li><b>Your engines.</b> Lithnode runs Claude Code, Codex or Cursor, whichever you've installed and signed in to. They talk to Anthropic, OpenAI or Cursor
-      under those companies' own privacy policies, exactly as when you run them yourself.</li>
+    <li><b>Your engines.</b> Lithnode runs Claude Code, Codex, Cursor or Antigravity, whichever you've installed and signed in to. They talk to Anthropic, OpenAI, Cursor or Google
+      under those companies' own privacy policies, exactly as when you run them yourself. Ollama runs models on your own computer.</li>
+    <li><b>Your API keys.</b> If you add one, agents send their requests to that key's provider (for example OpenAI, Anthropic or Google), under its own terms.</li>
     <li><b>Update check.</b> Every few hours Lithnode asks GitHub's public releases page whether there's a newer version. It sends nothing about you.
-      Turn it off in <b>File → Settings</b>.</li>
+      Turn it off in <b>Settings</b> (the cog).</li>
     <li><b>Install count.</b> The first time each version opens, Lithnode tells lithnode.com once whether it's a new install or an update,
-      with the version number and Windows, Mac or Linux. No ID, no name, no IP address is kept. Turn it off in <b>File → Settings → Count my install</b>.</li>
+      with the version number and Windows, Mac or Linux. No ID, no name, no IP address is kept. Turn it off in <b>Settings → Count my install</b>.</li>
     <li><b>Things you add.</b> Webhooks, connectors and the web tools you give a team only send what that team produces, to where you pointed them.</li>
   </ul>
   <p>Apart from that one install count, the app has no analytics or tracking. Your flows, runs and logs stay in the Lithnode folder on your computer.
