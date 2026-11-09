@@ -1,7 +1,7 @@
 {
   "name": "lithnode",
   "productName": "Lithnode",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "description": "Lithnode: draw teams of Claude Code agents and run them",
   "main": "main.js",
   "private": true,

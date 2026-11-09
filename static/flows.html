@@ -2158,12 +2158,13 @@ var STEP_ABOUT = { master: "Your task goes in here", done: "Where the final resu
 function stepRows(f) {
   const depth = flowDepth(f), wiredIn = new Set(f.edges.map((e) => e.to));
   const loose = f.nodes.filter((n) => n.type !== "master" && !wiredIn.has(n.id));
-  const rows = [];
+  const rows = [], done = [];
   for (const n of flowOrder(f)) {
     if (loose.includes(n)) continue;
+    if (n.type === "done") { done.push(n); continue; }   // the end is always its own last row, never "at once" with a team
     (rows[depth[n.id]] ||= []).push(n);
   }
-  return { rows: rows.filter(Boolean), loose };
+  return { rows: [...rows.filter(Boolean), ...(done.length ? [done] : [])], loose };
 }
 const kids = (id) => flow.edges.filter((e) => e.from === id).map((e) => e.to);
 const parents = (id) => flow.edges.filter((e) => e.to === id).map((e) => e.from);
