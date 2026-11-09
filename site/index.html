@@ -111,7 +111,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .hero .ctas { margin-top: 36px; }
   .hero .ctas .btn { height: 48px; padding: 0 22px; }
   .fine { font-family: var(--sans); margin-top: 18px; color: var(--faint); font-size: 13.4px; }
-  .hero .fine { margin: 20px 0 0; font-size: 15px; line-height: 1.55; }
+  .hero .fine { margin: 20px auto 0; max-width: 680px; font-size: 15px; line-height: 1.55; text-wrap: balance; }
   @media (min-width: 640px) { .sub { font-size: 21px; } }
   @media (max-height: 500px) {
     h1 { font-size: clamp(40px, 15svh, 64px); }
@@ -360,7 +360,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   .src .cmd code { flex: 1; min-width: 0; font: 500 12.5px var(--mono); color: var(--ink); white-space: nowrap; overflow-x: auto; user-select: all; scrollbar-width: none; }
   .src .cmd button { flex: none; height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: var(--ink); color: var(--void); font: 600 12px var(--mono); cursor: pointer; }
   @media (max-width: 760px) { .src { grid-template-columns: 1fr; } }
-  .fine { max-width: 640px; margin: 22px auto 0; color: var(--muted, #8a8a93); font-size: 12.5px; line-height: 1.6; }
+  .dlfine { max-width: 640px; margin: 22px auto 0; color: var(--muted, #8a8a93); font-size: 12.5px; line-height: 1.6; }
   .morehead { margin: 88px 0 22px; font: 600 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--soft); }
   .more3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; text-align: left; }
   .tile { display: flex; flex-direction: column; gap: 8px; padding: 26px 24px 22px; text-decoration: none; color: inherit; transition: transform .2s; }
@@ -464,7 +464,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
     <button class="btn main phone-only" id="send" type="button" data-send><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 14.5V3.5m0 0L7.5 8M12 3.5 16.5 8M8 11H6.5A1.5 1.5 0 0 0 5 12.5v6A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-6a1.5 1.5 0 0 0-1.5-1.5H16"/></svg><span>Send me the link</span></button>
     <a class="btn" id="discord" hidden href="#"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.6 5.3A16.6 16.6 0 0 0 15.5 4l-.5 1a15.4 15.4 0 0 0-6 0l-.5-1a16.6 16.6 0 0 0-4.1 1.3C1.8 9.2 1.1 13 1.4 16.7a16.7 16.7 0 0 0 5 2.5l1.1-1.7c-.6-.2-1.2-.5-1.7-.9l.4-.3a11.9 11.9 0 0 0 11.6 0l.4.3c-.5.4-1.1.7-1.7.9l1.1 1.7a16.6 16.6 0 0 0 5-2.5c.4-4.3-.6-8-2.9-11.4ZM8.7 14.5c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm6.6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg>Join our Discord</a>
   </div>
-  <p class="fine desk-only">Free and open source. It runs on the Claude, Codex or Cursor plan you already have. <span id="also">Also for <a href="#download">Mac</a> and <a href="#download">Linux</a>.</span></p>
+  <p class="fine desk-only">Free and open source. It runs on the Claude, Codex, Cursor or Antigravity plan you already have, local models with Ollama, or your own API key. <span id="also">Also for <a href="#download">Mac</a> and <a href="#download">Linux</a>.</span></p>
   <p class="fine phone-only">Lithnode is an app for your computer: Windows, Mac or Linux. Send yourself the link, then download it there. Free and open source.</p>
 </div></header>
 
@@ -570,7 +570,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
 <section id="download"><div class="neb" style="left:50%; top:-80px; margin-left:-450px; --n: rgba(183,156,242,.1)"></div><div class="wrap center">
   <div class="ring" aria-hidden="true"></div>
   <h2 class="rv">Download.</h2>
-  <p class="lead rv">Free and MIT licensed. Needs Claude Code, Codex or Cursor installed and signed in. <a href="/code-signing/">Code signing policy</a>.<span class="phone-only"> On a phone? It installs on a computer, so send yourself the link.</span></p>
+  <p class="lead rv">Free and MIT licensed. Needs one of Claude Code, Codex, Cursor or Antigravity signed in, Ollama, or an API key. <a href="/code-signing/">Code signing policy</a>.<span class="phone-only"> On a phone? It installs on a computer, so send yourself the link.</span></p>
   <div class="plats">
     <a class="os glass rv" data-os="win" href="https://github.com/drewguitarist18-lang/lithnode/releases/latest/download/LithnodeSetup.exe">
       <span class="yours">Your system</span><svg class="os-i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8.4v8.4H3zM12.6 3H21v8.4h-8.4zM3 12.6h8.4V21H3zM12.6 12.6H21V21h-8.4z"/></svg><b>Windows</b><span class="meta">Windows 10 or 11</span><span class="meta">LithnodeSetup.exe, 99 MB</span><em>Download</em></a>
@@ -581,7 +581,7 @@ if (/iphone|ipad|ipod|android/i.test(navigator.userAgent) || (navigator.platform
   </div>
   <div class="src glass rv"><p><b>Rather read it first?</b>Run it from source. Plain Python, no packages.</p>
     <div class="cmd"><code>git clone https://github.com/drewguitarist18-lang/lithnode &amp;&amp; python3 lithnode/hq.py</code><button type="button" data-copy>Copy</button></div></div>
-  <p class="fine rv">Agents run on your own Claude, ChatGPT or Cursor plan, so Lithnode never charges you (and can't refund usage).
+  <p class="dlfine rv">Agents run on your own plan, local models or API key, so Lithnode never charges you (and can't refund usage).
     Builder agents can edit files in the folder you pick: start with a test folder or a project in git.</p>
   <h3 class="morehead rv">More for your agents</h3>
   <div class="more3">
