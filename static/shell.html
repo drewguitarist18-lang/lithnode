@@ -576,7 +576,7 @@ $("cogBtn").onclick = () => {
     ...Object.entries(THEMES).map(([k, [, name]]) => ({ icon: { svg: THEMES[k][0], color: THEME_COLOR[k] }, label: name, on: themeMode === k, hint: themeMode === k ? "✓" : "",
       action: () => { themeMode = k; try { localStorage.setItem("hq-theme", k); } catch (e) {} applyAll(); } })),
     { sep: true },
-    { icon: mi("update"), label: "Check for updates", hint: release.version ? `v${release.version}` : "", action: () => checkUpdates(true) },
+    { icon: mi("update"), label: "Check for updates", hint: K("Ctrl+R"), action: () => checkUpdates(true) },
     { icon: mi("tour"), label: "Take the tour", action: flowsDo((a) => a.tour()) },
     { icon: mi("web"), label: "Lithnode website", action: () => window.open("https://lithnode.com", "_blank", "noopener") },
     { icon: mi("bug"), label: "Report a problem", action: () => window.open("https://github.com/drewguitarist18-lang/lithnode/issues", "_blank", "noopener") },
@@ -637,7 +637,31 @@ async function checkUpdates(asked) {
     ? { title: "You're up to date", text: `Lithnode ${release.version} is the newest version.`, ok: "OK", cancel: "" }
     : { title: "Couldn't check", text: `Lithnode ${release.version || ""} couldn't reach GitHub. Check your connection and try again.`, ok: "OK", cancel: "" });
 }
-setTimeout(() => checkUpdates(false), 4000);       // after the app has settled
+// Ctrl+R / Cmd+R: ask GitHub for a newer version, save the open flow, then reload. The update bar shows right after if there's one.
+let reloading = false;
+async function checkAndReload() {
+  if (reloading) return;
+  reloading = true;
+  const u = $("update");
+  u.hidden = false; u.innerHTML = `<i></i><span><b>Checking for updates…</b> <em>then reloading</em></span>`;
+  try { await fetch("/api/version?refresh=1", { cache: "no-store" }); } catch (e) {}
+  try { await fapi()?.save?.(); } catch (e) {}
+  try { sessionStorage.setItem("hq-reloaded", "1"); } catch (e) {}
+  location.reload();
+}
+window.checkAndReload = checkAndReload;   // flows.html's Ctrl+R calls it too
+let justReloaded = false;
+try { justReloaded = sessionStorage.getItem("hq-reloaded") === "1"; sessionStorage.removeItem("hq-reloaded"); } catch (e) {}
+if (justReloaded) checkUpdates(false).then(() => {
+  if (release.newer) { try { localStorage.removeItem("hq-update-skip"); } catch (e) {} showUpdate(); }
+  else {
+    const u = $("update");
+    u.hidden = false;
+    u.innerHTML = `<i></i><span><b>${release.checked ? "You're up to date." : "Couldn't reach GitHub."}</b> <em>Lithnode ${esc(release.version || "")}, reloaded.</em></span>`;
+    setTimeout(() => { if (!release.newer) u.hidden = true; }, 3000);
+  }
+});
+else setTimeout(() => checkUpdates(false), 4000);  // after the app has settled
 setInterval(() => checkUpdates(false), 3600000);   // the server only asks GitHub every few hours
 
 // ---- Settings: theme, the engines and their sign-in, what new flows start with, updates, where Lithnode keeps its files
@@ -948,6 +972,7 @@ $("settings").addEventListener("change", (e) => {
 window.openSettings = openSettings;   // flows.html's Ctrl+, opens it too
 document.addEventListener("keydown", (e) => {
   if (e.key === "," && (e.ctrlKey || e.metaKey)) { e.preventDefault(); openSettings(); }
+  if (e.key.toLowerCase() === "r" && (e.ctrlKey || e.metaKey) && !e.shiftKey) { e.preventDefault(); checkAndReload(); }
   if (e.key === "s" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (location.hash !== "#office") fapi()?.exportTeam?.(); }   // not the browser's Save page
 });
 

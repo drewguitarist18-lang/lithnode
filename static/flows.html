@@ -1104,6 +1104,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "s" && ctrl) { e.preventDefault(); flowsApi.exportTeam(); }   // saves, then downloads the layout as a team file
   if (e.key === "o" && ctrl) { e.preventDefault(); flowsApi.importTeam(); }
   if (e.key === "," && ctrl) { e.preventDefault(); parent.openSettings?.(); }
+  if (e.key.toLowerCase() === "r" && ctrl && !e.shiftKey) { e.preventDefault(); parent.checkAndReload?.(); }
   if (e.key === "e" && ctrl) { e.preventDefault(); flowsApi.exportTeam(); }
   if (e.key === "d" && ctrl && !typing) { e.preventDefault(); flowsApi.duplicateSel(); }
   if (e.key === "F2") { e.preventDefault(); flowsApi.rename(); }
@@ -2282,7 +2283,7 @@ const zoomBy = (k) => { autoFit = false; const r = $("canvas").getBoundingClient
 window.flowsApi = {
   newFlow: () => $("newBtn").click(), newFromTemplate: () => $("newDlg").showModal(), duplicate: () => duplicateFlow(),
   importTeam: () => $("importIn").click(), exportTeam: () => exportFlow(), deleteFlow: () => deleteFlow(),
-  run: () => $("runBtn").click(), runs: () => $("runsBtn").click(),
+  run: () => $("runBtn").click(), runs: () => $("runsBtn").click(), save: () => save(),
   rename: () => { $("flowName").focus(); $("flowName").select(); },
   hasSel: () => !!sel && !locked(), selIsNode: () => !!sel && sel.kind === "node" && !locked(),
   duplicateSel: () => { if (sel && sel.kind === "node" && !locked()) duplicateNode(sel.id); },
