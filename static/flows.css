@@ -374,7 +374,7 @@ a.item:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
 .eico img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .eico.codex img { width: 70%; height: 70%; object-fit: contain; }
 .eico.antigravity img { width: 78%; height: 78%; object-fit: contain; }
-.eseg button { grid-column: span 2; min-width: 0; } .eseg button:nth-child(n+4) { grid-column: span 3; }   /* 3 above, 2 below */
+.eseg button { grid-column: span 2; min-width: 0; }   /* six engines: 3 above, 3 below */
 .eseg button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eico canvas { width: 20px; height: 15px; image-rendering: pixelated; }
 .chipc .eico { width: 15px; height: 15px; border-radius: 4px; }
@@ -1033,3 +1033,13 @@ html body .rp-bottom p { font-family: var(--sans); }
 .tl-clock b { color: var(--ink); font-size: 12.5px; margin-right: 3px; }
 .tl-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .tl-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--done)); }
+
+/* a finished run where some agents failed: said plainly next to the result */
+.trouble, .rp-warn { border: 1px solid color-mix(in srgb, var(--failed) 45%, var(--line)); background: color-mix(in srgb, var(--failed) 8%, var(--pad)); }
+.trouble { margin-top: 10px; font-size: 12.5px; }
+.rp-warn { border-radius: 14px; padding: 14px 20px; margin-bottom: 14px; font-size: 13.5px; }
+.trouble b, .rp-warn b { display: block; color: var(--failed); font-weight: 600; }
+.trouble ul, .rp-warn ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); line-height: 1.5; }
+.trouble li span, .rp-warn li span { color: var(--ink); font-weight: 600; }
+.trouble li, .rp-warn li { overflow-wrap: anywhere; }
+.rp-top .meta .bad { color: var(--failed); font-weight: 600; }

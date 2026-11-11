@@ -133,7 +133,7 @@ def status(engine: str, force: bool = False) -> dict[str, Any]:
             keys = apikeys.saved()
             return {"installed": True, "signed_in": bool(keys), "local": False,
                     "note": f"{len(keys)} key{'s' if len(keys) != 1 else ''} saved. Billed per token by the provider. No tools, files or web."
-                    if keys else "Add a provider's API key in Settings to run teams on it."}
+                    if keys else "Add a provider's API key to run teams on it, billed per token."}
         cmd = FINDERS[engine]()
         value = {"installed": bool(cmd), "signed_in": False, "note": ""}
         if not cmd and engine == "cursor" and cursor_app_installed():

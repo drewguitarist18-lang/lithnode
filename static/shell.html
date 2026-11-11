@@ -536,6 +536,9 @@ const MENUS = {
   edit: () => {
     const a = onTab() === "flows" ? fapi() : null;
     return [
+      { icon: mi("undo"), label: "Undo", hint: K("Ctrl+Z"), disabled: !(a && a.canUndo()), action: flowsDo((x) => x.undo()) },
+      { icon: mi("redo"), label: "Redo", hint: MAC ? "⇧⌘Z" : "Ctrl+Y", disabled: !(a && a.canRedo()), action: flowsDo((x) => x.redo()) },
+      { sep: true },
       { icon: mi("pen"), label: "Rename flow", hint: "F2", action: flowsDo((x) => x.rename()) },
       { sep: true },
       { icon: mi("copy"), label: "Duplicate selected", hint: K("Ctrl+D"), disabled: !(a && a.selIsNode()), action: flowsDo((x) => x.duplicateSel()) },
@@ -797,7 +800,7 @@ function usageRows() {
 }
 const SHORTCUTS = [
   ["Settings", ["Ctrl", ","], "#9aa6c4"], ["Export the layout", ["Ctrl", "S"], "#36d39a"], ["Import a team file", ["Ctrl", "O"], "#47d7e0"],
-  ["Export the layout (also)", ["Ctrl", "E"], "#ffb547"], ["Duplicate selected", ["Ctrl", "D"], "#8b7cff"], ["Rename flow", ["F2"], "#4fa8ff"],
+  ["Export the layout (also)", ["Ctrl", "E"], "#ffb547"], ["Undo", ["Ctrl", "Z"], "#7aa2f7"], ["Redo", ["Ctrl", "Y"], "#7aa2f7"], ["Duplicate selected", ["Ctrl", "D"], "#8b7cff"], ["Rename flow", ["F2"], "#4fa8ff"],
   ["Delete selected", ["Del"], "#ff6b8b"], ["Deselect", ["Esc"], "#c084fc"], ["Start the run", ["Ctrl", "Enter"], "#D97757"],
 ];
 const SEG_SVG = {

@@ -318,7 +318,8 @@ async function openFlow(id) {
   }
   $("flowName").value = flow.name; $("flowName").title = flow.name;
   renderAll(); renderInspector(); autoFit = true; fit();
-  requestAnimationFrame(() => { if (autoFit) fit(); });   // again once the nodes have their real sizes
+  resetHistory();
+  requestAnimationFrame(() => { if (autoFit) fit(); if (!undoStack.length && !burst) lastSnap = snap(); });   // again once the nodes have their real sizes
 }
 document.fonts.ready.then(() => { if (autoFit && flow) fit(); });   // the fonts change how wide the steps are
 async function createFlow(template) {
@@ -332,6 +333,7 @@ async function refreshFlows() { flows = (await api("/api/flows")).flows; }
 let saveTimer = null, saving = null, dirty = false;   // saving: the save in flight, so callers can wait for it
 function changed(structural = true) {
   if (locked()) return;
+  noteEdit();
   dirty = true; $("saved").textContent = "Editing…";
   const arranged = structural && flow.auto !== false;
   if (arranged) layoutFlow(flow.dir === "tb" ? "tb" : "lr");
@@ -358,6 +360,45 @@ async function save() {   // resolves once your latest edits are on the server; 
   saving = null;
   if (!ok) { dirty = true; return false; }   // still unsaved: the next save or Run tries again
   return dirty ? save() : true;
+}
+
+// ------------------------------------------------------------------ undo and redo
+// Each burst of edits (typing a name, dragging a node, one click) is one step. lastSnap is the flow as it stood before the burst.
+const HISTORY = 80;
+let undoStack = [], redoStack = [], lastSnap = "", burst = null;
+const snap = () => JSON.stringify(flow);
+function resetHistory() { clearTimeout(burst); burst = null; undoStack = []; redoStack = []; lastSnap = flow ? snap() : ""; }
+function settle() { if (burst) { clearTimeout(burst); burst = null; lastSnap = snap(); } }
+function noteEdit() {
+  if (!burst) {
+    if (snap() === lastSnap) return;   // nothing really changed (a re-tidy that moved nothing)
+    undoStack.push(lastSnap); redoStack = [];
+    if (undoStack.length > HISTORY) undoStack.shift();
+  }
+  clearTimeout(burst); burst = setTimeout(() => { burst = null; lastSnap = snap(); }, 600);
+}
+function restore(s) {
+  flow = JSON.parse(s); sel = null;
+  dirty = true; $("saved").textContent = "Editing…";
+  renderAll(); renderInspector();
+  if (flow.auto !== false) { layoutFlow(flow.dir === "tb" ? "tb" : "lr"); renderNodes(); renderWires(); }   // arranged for the sizes now on screen
+  lastSnap = snap();
+  if (stepsOn()) renderSteps();
+  requestAnimationFrame(() => { renderWires(); if (autoFit) fit(); });
+  clearTimeout(saveTimer); saveTimer = setTimeout(save, 600);
+}
+const canUndo = () => !locked() && (undoStack.length > 0 || !!burst), canRedo = () => !locked() && redoStack.length > 0 && !burst;
+function undo() {
+  if (locked()) return;
+  settle();
+  if (!undoStack.length) return toast("Nothing to undo.");
+  redoStack.push(lastSnap); restore(undoStack.pop());
+}
+function redo() {
+  if (locked()) return;
+  settle();
+  if (!redoStack.length) return toast("Nothing to redo.");
+  undoStack.push(lastSnap); restore(redoStack.pop());
 }
 
 // ------------------------------------------------------------------ palette
@@ -704,9 +745,18 @@ function layoutAt(direction, f, MAX_ROW_W) {   // same rules as the server's flo
   rowGaps.set(f.id, gaps);
 }
 const rowGaps = new Map();   // by flow id: a run's copy of the flow is swapped for a fresh one every poll
-function gapBetween(ay, by) {   // where a wire to the next row runs: the band between the rows, or halfway if unknown
-  const g = (rowGaps.get(shown().id) || []).find((y) => y > ay && y < by);
-  return g === undefined ? (ay + by) / 2 : g;
+function gapBetween(ay, by) {   // where a wire to the next row runs: the band between the rows
+  const f = shown(), g = f.auto === false ? undefined : (rowGaps.get(f.id) || []).find((y) => y > ay && y < by);
+  if (g !== undefined) return g;
+  // Hand-placed nodes: the middle of the widest empty band between the two ends, so the wire crosses no node.
+  const lo = Math.min(ay, by), hi = Math.max(ay, by);
+  const spans = f.nodes.map((n) => [n.y, n.y + nodeSize(n).h]).filter(([t, e]) => e > lo && t < hi).sort((p, q) => p[0] - q[0]);
+  let edge = lo, best = 0, mid = (ay + by) / 2;
+  for (const [t, e] of [...spans, [hi, hi]]) {
+    if (t - edge > best) { best = t - edge; mid = (edge + t) / 2; }
+    edge = Math.max(edge, e);
+  }
+  return mid;
 }
 $("zAuto").onclick = () => {
   if (flow.auto !== false) { flow.auto = false; changed(false); toast("Drag nodes wherever you like. Click again to tidy up.", AUTO_OFF); }
@@ -886,9 +936,13 @@ function wirePath(a, b) {
     const dy = Math.max(40, Math.abs(b.y - a.y) / 2);
     return `M${a.x},${a.y} C${a.x},${a.y + dy} ${b.x},${b.y - dy} ${b.x},${b.y}`;
   }
-  if (b.x < a.x - 40) {   // to the start of the next row: one smooth curve out to the right, back along the gap between rows, into the node
-    const gy = gapBetween(a.y, b.y), mx = (a.x + b.x) / 2;
-    return `M${a.x},${a.y} C${a.x + 80},${a.y} ${a.x + 80},${gy} ${mx},${gy} S${b.x - 80},${b.y} ${b.x},${b.y}`;
+  if (b.x < a.x - 40) {   // to the start of the next row: out to the right, down to the gap between rows, back along it, then down into the node
+    // Square with round corners, like a carriage return. Wires to a stack of nodes share the lane on the left, so none crosses a node.
+    const gy = gapBetween(a.y, b.y), rx = a.x + 44, lx = b.x - 70;
+    const s1 = gy >= a.y ? 1 : -1, s2 = b.y >= gy ? 1 : -1;
+    const r1 = Math.min(22, Math.abs(gy - a.y) / 2), r2 = Math.min(22, Math.abs(b.y - gy) / 2);
+    return `M${a.x},${a.y} H${rx - r1} Q${rx},${a.y} ${rx},${a.y + s1 * r1} V${gy - s1 * r1} Q${rx},${gy} ${rx - r1},${gy}`
+      + ` H${lx + r2} Q${lx},${gy} ${lx},${gy + s2 * r2} V${b.y - s2 * r2} Q${lx},${b.y} ${lx + r2},${b.y} H${b.x}`;
   }
   const dx = Math.max(50, Math.abs(b.x - a.x) / 2);
   return `M${a.x},${a.y} C${a.x + dx},${a.y} ${b.x - dx},${b.y} ${b.x},${b.y}`;
@@ -915,7 +969,7 @@ function ghostWires() {   // dashed: Start into the empty slot, and the slot on 
   return [[portPos(s.id, "out"), g.in], [g.out, portPos(d.id, "in")]].map(([a, b]) => `<path class="ghostw" d="${wirePath(a, b)}"/>`).join("");
 }
 function wireMid(a, b) {   // the curve's point halfway along (t = 0.5)
-  if (b.x < a.x - 40 && !vertical()) return { x: (a.x + b.x) / 2, y: gapBetween(a.y, b.y) };
+  if (b.x < a.x - 40 && !vertical()) return { x: (a.x + 44 + b.x - 70) / 2, y: gapBetween(a.y, b.y) };
   if (vertical()) return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   const dx = Math.max(50, Math.abs(b.x - a.x) / 2);
   return { x: (a.x + 3 * (a.x + dx) + 3 * (b.x - dx) + b.x) / 8, y: (a.y + b.y) / 2 };
@@ -1108,6 +1162,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "e" && ctrl) { e.preventDefault(); flowsApi.exportTeam(); }
   if (e.key === "d" && ctrl && !typing) { e.preventDefault(); flowsApi.duplicateSel(); }
   if (e.key === "F2") { e.preventDefault(); flowsApi.rename(); }
+  if (ctrl && !typing && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+  if (ctrl && !typing && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); }
 });
 
 // ------------------------------------------------------------------ inspector
@@ -1122,7 +1178,10 @@ function folderField(id, value) {
   return `<div class="folder"><input id="${id}" list="recentFolders" value="${esc(value || "")}" placeholder="Pick or paste a folder">
     <button type="button" data-browse="${id}">Browse…</button></div>`;
 }
+const showTail = (el) => { if (el && document.activeElement !== el) el.scrollLeft = el.scrollWidth; };
 function wireFolder(id, onChange) {
+  const tailEl = $(id);
+  if (tailEl) { showTail(tailEl); tailEl.addEventListener("blur", () => showTail(tailEl)); tailEl.addEventListener("change", () => setTimeout(() => showTail(tailEl), 0)); }
   const inp = $(id);
   inp.oninput = () => onChange(inp.value);
   document.querySelector(`[data-browse="${id}"]`).onclick = async (e) => {
@@ -1130,7 +1189,7 @@ function wireFolder(id, onChange) {
     try {
       const app = window.top.lithnodeApp;   // Lithnode's own window: the system's folder picker
       const { folder } = app && app.pickFolder ? { folder: await app.pickFolder() } : await api("/api/pick-folder", { method: "POST", body: {} });
-      if (folder) { inp.value = folder; onChange(folder); }
+      if (folder) { inp.value = folder; onChange(folder); showTail(inp); }
     } catch (err) { toast(err.message); }
     b.disabled = false; b.textContent = "Browse…";
   };
@@ -1540,11 +1599,13 @@ $("runBtn").onclick = () => {
     cliTeams.length ? cliTeams.map((n) => `${n.name} can run ${n.clis.join(", ")} on this computer.`).join(" ") : "",
     codexOpen.length ? `${codexOpen.map((n) => n.name).join(", ")} can read, change, or delete files and run commands anywhere on this PC. The selected folder won't limit Codex on this Windows setup.` : "",
   ].filter(Boolean).join(" ");
-  ready = () => {
+  let nagged = false;   // the hint turns red only once you've tried something, not the moment the menu opens
+  ready = (touched) => {
+    if (touched) nagged = true;
     const task = realTask($("taskIn").value);
     $("goBtn").disabled = !task || problems.length > 0 || (careful && !$("riskOk").checked);
     $("taskSub").textContent = task ? "" : "Type the job first. The run can't start until it knows what to do.";
-    $("taskSub").classList.toggle("need", !task);
+    $("taskSub").classList.toggle("need", !task && nagged);
   };
   $("riskOk").onchange = ready; ready();
   const lim = String(flow.limit ?? 1000000);
@@ -1681,8 +1742,8 @@ function renderRunTeam() {   // the team in running order, as little avatars
     else drawBot(c, { shape: cv.dataset.shape, color: cv.dataset.color }, 6, 8, 7, { state: "idle", t: 0 });
   });
 }
-$("taskIn").addEventListener("input", () => { draftTask = $("taskIn").value.slice(0, 4000); ready(); });   // a draft survives closing the menu
-$("taskIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !$("goBtn").disabled) $("goBtn").click(); });
+$("taskIn").addEventListener("input", () => { draftTask = $("taskIn").value.slice(0, 4000); ready(true); });   // a draft survives closing the menu
+$("taskIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { if ($("goBtn").disabled) ready(true); else $("goBtn").click(); } });
 let starting = false;   // a double-click must not start two runs
 $("goBtn").onclick = async () => {
   if (starting) return;
@@ -1881,6 +1942,18 @@ function runMeta(r) {
   const agents = states.reduce((n, x) => n + x.agents.length, 0);
   return { states, fin, agents, took: (r.ended || Date.now() / 1000) - r.started };
 }
+// Agents that failed in a run that still finished: the run went on without their reports, so say so next to the result.
+function runTrouble(r) {
+  const out = [];
+  for (const n of r.flow.nodes) for (const a of ((r.nodes[n.id] || {}).agents || []))
+    if (a.status === "failed") out.push({ team: n.name, name: a.name || n.name, error: String(a.error || "It stopped without a report.").split(String.fromCharCode(10))[0].slice(0, 160) });
+  return out;
+}
+function troubleHtml(r, cls) {
+  const t = runTrouble(r); if (!t.length || r.status !== "done") return "";
+  return `<div class="${cls}" role="status"><b>${t.length} agent${t.length === 1 ? "" : "s"} failed, so this result is missing ${t.length === 1 ? "its report" : "their reports"}</b>
+    <ul>${t.map((x) => `<li><span>${esc(x.name === x.team ? x.team : `${x.team} · ${x.name}`)}</span> ${esc(x.error)}</li>`).join("")}</ul></div>`;
+}
 function logClass(text) { return /finished|approved/i.test(text) ? "ok" : /fail|reject|stopped|interrupted/i.test(text) ? "bad" : /waiting/i.test(text) ? "wait" : ""; }
 
 function renderRunPanel() {
@@ -1901,7 +1974,7 @@ function renderRunPanel() {
       <div class="acts" style="margin-top:8px"><button class="danger" data-decide="${esc(nid)}" data-ok="0">Reject</button><button class="primary" data-decide="${esc(nid)}" data-ok="1">Approve</button></div></div>`;
   }
   if (r.final) html += `<div class="card result-card"><h4>✓ Result</h4><div class="peek doc">${md(r.final)}</div>
-      <div class="acts"><button id="copyFinal">Copy</button><button class="primary" id="openFinal">Open result</button></div></div>`;
+      <div class="acts"><button id="copyFinal">Copy</button><button class="primary" id="openFinal">Open result</button></div></div>` + troubleHtml(r, "card trouble");
   else if (!live && r.status !== "done") html += `<div class="card"><h4 style="margin:0 0 6px;font-size:13px">No result</h4>
       <p class="hint" style="margin:0">${esc((r.status === "stopped" && (r.log || []).map((l) => l.text).reverse().find((t) => /^Stopped/.test(t)))
         || Object.values(r.nodes).map((x) => x.error).find(Boolean) || "The run ended before the last step.")}</p></div>`;
@@ -2044,10 +2117,11 @@ function openSheet(r) {
   $("sheet").innerHTML = `<div class="rp-top">
       <button id="sheetClose" title="Back to the flow (Esc)">← Back</button>
       <div class="badge-big${ok ? "" : " failed"}">${ok ? "✓" : "!"}</div>
-      <div class="who"><h2>${esc(r.flow_name)}</h2><div class="meta">${esc(STATUS_WORD[r.status] || r.status)} in ${dur(m.took)}${r.tokens ? ` · ${tokenWord(r.tokens)} tokens` : ""}${folder ? ` · <span class="mono" title="${esc(folder)}">${esc(folder)}</span>` : ""}</div></div>
+      <div class="who"><h2>${esc(r.flow_name)}</h2><div class="meta">${esc(STATUS_WORD[r.status] || r.status)} in ${dur(m.took)}${r.tokens ? ` · ${tokenWord(r.tokens)} tokens` : ""}${ok && runTrouble(r).length ? ` · <span class="bad">${runTrouble(r).length} agent${runTrouble(r).length === 1 ? "" : "s"} failed</span>` : ""}${folder ? ` · <span class="mono" title="${esc(folder)}">${esc(folder)}</span>` : ""}</div></div>
       <div class="tools"><button class="primary" id="sheetCopy">Copy</button></div>
     </div>
     <div class="rp-body"><div class="rp-main"><div class="rp-col">
+      ${troubleHtml(r, "rp-warn")}
       ${resultView(r.final, filesView(r))}
       <details class="rp-details"><summary>Details: ${what.join(", ")}</summary>${more.join("")}</details>
     </div></div></div>`;
@@ -2288,6 +2362,7 @@ window.flowsApi = {
   hasSel: () => !!sel && !locked(), selIsNode: () => !!sel && sel.kind === "node" && !locked(),
   duplicateSel: () => { if (sel && sel.kind === "node" && !locked()) duplicateNode(sel.id); },
   deleteSel: () => deleteSelected(), tidy: (d) => tidy(d),
+  undo: () => undo(), redo: () => redo(), canUndo: () => canUndo(), canRedo: () => canRedo(),
   zoomIn: () => zoomBy(1.2), zoomOut: () => zoomBy(1 / 1.2), zoomReset: () => zoomBy(0), fit: () => { autoFit = true; fit(); },
   panes, toggleLeft: () => setPanes(!panes()[0], panes()[1]), toggleRight: () => setPanes(panes()[0], !panes()[1]),
   tour: () => welcomeTour(),
