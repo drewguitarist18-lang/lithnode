@@ -113,8 +113,10 @@
   @keyframes acctspin { to { transform: rotate(360deg); } }
   .acct .engine b { display: block; font-size: 12.5px; color: var(--ink); }
   .acct .engine small { margin: 0; font-size: 11.5px; }
-  .acct .engine button { flex: none; height: 28px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: 600 11.5px inherit; cursor: pointer; }
-  .acct .engine button:hover { background: var(--hover); }
+  /* Claude Code's Install is a link to its site: it looks like the other engines' Install buttons */
+  .acct .engine button, .acct .engine a:not(.sub) { flex: none; height: 28px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: 600 11.5px inherit; cursor: pointer; }
+  .acct .engine a:not(.sub) { display: inline-flex; align-items: center; box-sizing: border-box; text-decoration: none; }
+  .acct .engine button:hover, .acct .engine a:not(.sub):hover { background: var(--hover); }
   .acct .code input:focus { border-color: var(--accent); }
   .acct .code button { height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--ink); background: var(--ink); color: var(--bg);
                        font: 600 12.5px inherit; cursor: pointer; }

@@ -1,6 +1,6 @@
 # Lithnode
 
-A productivity tool for running complicated work with teams of Claude Code agents. Draw the team as a node graph,
+A productivity tool for running complicated work with teams of AI agents. Draw the team as a node graph,
 give each team the CLIs and connectors it needs, press Run, and watch them work. Split one big job across several
 agents, have another team check their work, and sign off before anything ships.
 
@@ -8,9 +8,9 @@ agents, have another team check their work, and sign off before anything ships.
   nodes for you, or drag them in yourself. Then press Run.
 - **Office**: every open Claude Code session and every running flow agent, each at its own desk.
 
-Windows, Mac or Linux, and [Claude Code](https://claude.com/claude-code) (or Codex or Cursor). Every agent is a
-real session (`claude -p`) on your own sign-in. No API keys.
-Nothing goes through anyone else's server.
+Windows, Mac or Linux, and [Claude Code](https://claude.com/claude-code) (or Codex, Cursor, Antigravity or Ollama).
+Every agent is a real session (`claude -p`, say) on your own sign-in, so you need no API keys; you can add your own
+keys as an extra engine if you want. Nothing goes through anyone else's server.
 
 ## Flows
 
@@ -104,7 +104,7 @@ other command is blocked (simple read-only ones like `ls` still work). A team se
 run anything, so the list doesn't apply to it. Like connectors, CLIs act for real, so the Run menu asks you to
 confirm first.
 
-### Engines: Claude Code, Codex and Cursor
+### Engines: Claude Code, Codex, Cursor and more
 
 Each team picks what it runs on under **Runs on** in the right panel, so one flow can mix them: Claude builds,
 Codex reviews, a Cursor team on Grok double-checks. Every engine uses your own sign-in and plan.
@@ -114,6 +114,14 @@ Codex reviews, a Cursor team on Grok double-checks. Every engine uses your own s
 | **Claude Code** (default) | `claude auth login` | Haiku, Sonnet, Opus, Fable |
 | **Codex** (OpenAI) | `npm i -g @openai/codex`, then `codex login` | the ones your ChatGPT plan offers |
 | **Cursor** | the Cursor CLI from cursor.com/cli, then `cursor-agent login` | every model your Cursor plan offers (GPT, Claude, Grok, Gemini, ...) |
+| **Antigravity** (Google) | Google's Antigravity CLI (`agy`), then sign in with Google | the ones your Google account offers |
+| **Ollama** (free, on your PC) | Ollama from ollama.com | the models you've pulled; Lithnode can pull a starter (`llama3.2`) |
+| **API keys** (add-on) | paste a key in the engines menu | that provider's models: OpenAI, Anthropic, Gemini, OpenRouter, Groq, xAI, DeepSeek |
+
+The engines menu in the top bar can install and sign in to each one for you. Ollama and API-key teams get one
+answer from the model, with no tools, files or web, so use them for thinking, writing and reviewing text you pass
+along. API keys are billed per token by the provider. They stay in Lithnode's folder on your computer (encrypted
+for your Windows account on Windows) and never go into flows or exported team files.
 
 Lithnode shows whether each one is installed and signed in, and lists its models for free (no tokens). Access
 levels map to Codex's file access settings (read-only, selected-folder access, full access) and to Cursor's `--force`. Connectors and
@@ -223,7 +231,7 @@ reports are kept.
 - `agents.py`: one pipeline agent as one `claude -p` session.
 - `office_feed.py`: the Office's session list (hook sessions plus flow agents).
 - `claude_code.py`: finding Claude Code, signing in, and checking which connectors and CLIs are available.
-- `engines.py`: the Codex and Cursor engines: finding them, sign-in, models, command lines and their live output.
+- `engines.py`: the Codex, Cursor, Antigravity and Ollama engines: finding them, sign-in, models, command lines and their live output.
 - `shot.py`: `lithnode-shot`, the screenshot command agents use to look at pages and HTML they make or check.
 - `static/`:
   - pages: `shell.html` (tabs), `flows.html` (styles in `flows.css`), `office.html`

@@ -35,6 +35,12 @@ with LOG.open("a", encoding="utf-8") as f:
                         "agent_env": os.environ.get("LITHNODE_AGENT")}) + "\n")
 stage = prompt.split('" stage of')[0].split('"')[-1] if '" stage of' in prompt else "?"
 report = f"Done.\n\nREPORT: {stage} report from {engine}."
+if stage == "Security review" and os.environ.get("CLAWD_MOCK_RICH"):   # the site film's reviewers
+    report = ("Done.\n\nREPORT: No injection left: every query in `auth.py` is parameterized. "
+              "`/users/<id>` now rejects a missing or expired token. Uploads stop at 10 MB. Safe to ship.")
+if stage == "Code review" and os.environ.get("CLAWD_MOCK_RICH"):
+    report = ("Done.\n\nREPORT: The fixes are small and clear. The 4 new tests cover the bad login, the missing token "
+              "and the big upload, and all 28 pass. Ship it.")
 
 if engine == "codex":
     if "LIMITME" in prompt:

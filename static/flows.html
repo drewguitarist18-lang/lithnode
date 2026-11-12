@@ -1028,6 +1028,9 @@ $("canvas").addEventListener("mousedown", (e) => {
     if (!locked()) { const p = toWorld(e.clientX, e.clientY); drag = { kind: "node", id: n.id, dx: p.x - n.x, dy: p.y - n.y, moved: false }; }
     e.preventDefault(); return;
   }
+  // a drag on the canvas pans or picks; it must never start a text selection over labels and wires
+  e.preventDefault();
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   if (path) { select({ kind: "edge", id: +path.dataset.edge }); return; }
   autoFit = false;   // you moved the view: leave it where you put it
   drag = { kind: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
@@ -1583,7 +1586,14 @@ $("runBtn").onclick = () => {
   renderRunTeam();
   const last = (flow.task || "").trim();   // offered, never filled in: you pick it on purpose
   $("taskIdeas").innerHTML = last && last !== draftTask.trim() ? `<button type="button" data-idea="${esc(last)}" title="${esc(last)}">Use last run's task: ${esc(last.length > 60 ? last.slice(0, 60) + "…" : last)}</button>` : "";
-  $("runWarn").textContent = problems.join(" ");
+  // an engine this flow runs on that isn't installed or signed in: say so here, before a run starts and every agent fails
+  const usesEngine = (n) => n.type === "cluster" || (n.type === "master" && n.mode !== "pass") || (n.type === "checkpoint" && n.mode === "summarize");
+  const notReady = () => !engines ? [] : [...new Set(flow.nodes.filter(usesEngine).map(engineOf))].filter((id) => { const e = engineInfo(id); return !(e.installed && e.signed_in); });
+  const warn = () => {
+    const why = notReady().map((id) => id === "api" ? "No API key is added yet" : `${ENGINE_NAME[id]} isn't ${engineInfo(id).installed ? "signed in" : "installed"} on this computer`);
+    $("runWarn").textContent = [...problems, why.length ? `${why.join(". ")}. Open the engines menu at the top right to fix that, or switch those teams to another engine.` : ""].filter(Boolean).join(" ");
+  };
+  warn();
   const runners = writers.filter((w) => w.tools === "full" || w.tools === "all");
   const actors = flow.nodes.filter((n) => n.type === "cluster" && (n.connectors || []).length);
   const cliTeams = flow.nodes.filter((n) => n.type === "cluster" && n.tools !== "full" && n.tools !== "all" && (n.clis || []).length);
@@ -1603,11 +1613,13 @@ $("runBtn").onclick = () => {
   ready = (touched) => {
     if (touched) nagged = true;
     const task = realTask($("taskIn").value);
-    $("goBtn").disabled = !task || problems.length > 0 || (careful && !$("riskOk").checked);
+    // a missing engine blocks the run; a sign-in check can be wrong (offline, slow), so that one only warns
+    $("goBtn").disabled = !task || problems.length > 0 || notReady().some((id) => !engineInfo(id).installed) || (careful && !$("riskOk").checked);
     $("taskSub").textContent = task ? "" : "Type the job first. The run can't start until it knows what to do.";
     $("taskSub").classList.toggle("need", !task && nagged);
   };
   $("riskOk").onchange = ready; ready();
+  loadEngines(false).then(() => { if ($("runDlg").open) { warn(); ready(); } });   // they may have just signed in
   const lim = String(flow.limit ?? 1000000);
   if (![...$("limitIn").options].some((o) => o.value === lim)) $("limitIn").add(new Option(lim === "0" ? "No limit" : `${tokenWord(+lim)} tokens`, lim));
   $("limitIn").value = lim;
@@ -2498,7 +2510,7 @@ function typeDemo(input, lines) {
 // The welcome tour, from the flow menu and once on first launch: what each part of the page is for.
 const TOUR = [
   { title: "Welcome to Lithnode", ok: "Show me around",
-    text: "Lithnode runs teams of AI agents on your own Claude Code. Each team has one job, and they pass their work along like a relay." },
+    text: "Lithnode runs teams of AI agents on the AI tools you already have, like Claude Code, Codex or Cursor. Each team has one job, and they pass their work along like a relay." },
   { title: "Watch one work", wide: true, media: tlMedia(), enter: () => timeLapse(document.querySelector(".tour-pop")),
     icon: '<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.5M10 3.5h4"/>',
     text: "Here's a flow sped up: a planner splits the job, three teams build at once, a reviewer checks it all, and the report lands in Done." },

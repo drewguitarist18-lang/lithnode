@@ -82,6 +82,9 @@ main:is(.hideL, .running) #palette, main.hideR #rside { visibility: hidden; }
 .psec h3 .count { font-size: 11.5px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
 .psec h3 .newbot { margin-left: auto; }
 .pal { user-select: none; cursor: grab; }
+/* the node-and-wire layer never selects text on a drag; the run tray, steps view and fields still do */
+#world { user-select: none; }
+#world :is(input, textarea) { user-select: text; }
 .pal:active { cursor: grabbing; }
 .pal:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* building blocks look like the nodes they make: a team card, then the round steps */
@@ -99,11 +102,11 @@ main:is(.hideL, .running) #palette, main.hideR #rside { visibility: hidden; }
 .bteam .bdots { display: flex; flex: none; }
 .bteam .bdots i { width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, #5b8def 70%, var(--pad)); box-shadow: 0 0 0 2px var(--pad); }
 .bteam .bdots i + i { margin-left: -3px; }
-.bstep { flex-direction: column; justify-content: center; gap: 1px; padding: 10px 2px 8px; border-radius: 12px; text-align: center; }
+.bstep { flex-direction: column; justify-content: center; gap: 1px; padding: 10px 0 8px; border-radius: 12px; text-align: center; }
 .bstep .bi { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; margin-bottom: 4px;
              color: var(--muted); background: var(--panel); border: 1px solid var(--line); }
 .bstep .bi svg { width: 16px; height: 16px; }
-.bstep b { font-size: 11.5px; letter-spacing: -.01em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.bstep b { font-size: 11.5px; letter-spacing: -.02em;   /* "Checkpoint" has to fit whole */ max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .bstep small { font-size: 11px; max-width: 100%; }
 .blk.used { opacity: .4; }
 .find { position: relative; display: block; margin-bottom: 4px; }

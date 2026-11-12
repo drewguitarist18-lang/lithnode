@@ -11,6 +11,7 @@ A flow is a graph you draw in the Flows tab:
 Every node waits for all of its inputs, so stages run in order and parallel branches run
 side by side. Only short reports travel between stages, which keeps later prompts small.
 """
+import ast
 import ipaddress
 import json
 import math
@@ -138,6 +139,21 @@ def _text(raw: dict[str, Any], key: str, limit: int, default: str = "") -> str:
     return str(raw.get(key) if raw.get(key) is not None else default).strip()[:limit]
 
 
+def _focuses(value: Any) -> str:
+    """A team's focuses, one line per agent. A drafted flow sometimes sends a list instead of lines, and older
+    versions saved that list as its Python text ("['a', 'b']"): both become lines again."""
+    if isinstance(value, str) and value.strip().startswith("[") and value.strip().endswith("]"):
+        try:
+            parsed = ast.literal_eval(value.strip())
+        except (ValueError, SyntaxError, MemoryError, RecursionError):
+            parsed = None
+        if isinstance(parsed, list) and all(isinstance(x, str) for x in parsed):
+            value = parsed
+    if isinstance(value, (list, tuple)):
+        value = "\n".join(" ".join(str(x).split()) for x in value if str(x).strip())
+    return str(value if value is not None else "").strip()[:2000]
+
+
 def _connectors(raw: Any) -> list[str]:
     """A team's connectors: server names like "claude.ai Vercel", as Claude Code lists them."""
     out = []
@@ -207,7 +223,7 @@ def clean_node(raw: Any) -> dict[str, Any]:
             count = 1
         node.update(count=max(1, min(MAX_AGENTS, count)),
                     summary=_text(raw, "summary", 80),   # the one line on the team's card
-                    focuses=_text(raw, "focuses", 2000),
+                    focuses=_focuses(raw.get("focuses")),
                     shape=raw.get("shape") if raw.get("shape") in SHAPES else "crab",
                     color=raw.get("color") if COLOR_RE.match(str(raw.get("color") or "")) else "#ecebe6",
                     bot=_text(raw, "bot", 40),

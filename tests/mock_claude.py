@@ -198,6 +198,18 @@ if "--append-system-prompt" in flags:
                  "summary": "Puts the weekend together" if trip else "Writes how to switch, keeping your number"},
                 {"id": "done", "type": "done", "name": "Done"}],
                 "edges": [["master", "scout"], ["scout", "check"], ["check", "ok"], ["ok", "plan"], ["plan", "done"]]}
+        if "codex" in prompt.lower():   # the site film's team: Claude builds, Codex and Cursor review side by side, you approve
+            draft = {"name": "Review & fix", "nodes": [
+                {"id": "master", "type": "master", "mode": "pass"},
+                {"id": "build", "type": "cluster", "name": "Builder", "count": 1, "bot": "byte", "tools": "edit", "role": "build",
+                 "summary": "Writes the fix"},
+                {"id": "sec", "type": "cluster", "name": "Security review", "count": 1, "bot": "sentinel", "tools": "read", "role": "build",
+                 "engine": "codex", "summary": "Checks for holes"},
+                {"id": "rev", "type": "cluster", "name": "Code review", "count": 1, "bot": "beetle", "tools": "read", "role": "build",
+                 "engine": "cursor", "summary": "Checks the code"},
+                {"id": "ok", "type": "approval", "name": "Your call", "message": "Both reviews passed. Approve to ship it."},
+                {"id": "done", "type": "done", "name": "Done"}],
+                "edges": [["master", "build"], ["build", "sec"], ["build", "rev"], ["sec", "ok"], ["rev", "ok"], ["ok", "done"]]}
         if "side hustle" in prompt.lower():   # the fifth film's team: hustles found, the overdone ones cut, a plan for the winner
             draft = {"name": "Side hustle hunt", "nodes": [
                 {"id": "master", "type": "master", "mode": "pass"},
@@ -270,6 +282,20 @@ if "--append-system-prompt" in flags:
             items = [dict(i, verdict="pass", reason="Listed as draft") for i in items
                      if not any(w in i["title"] for w in ("Posture", "LED", "Earbuds"))]
         text = (f"Done.\n\nREPORT: {stage}: {len(items)} products.\n\n```items\n" + json.dumps(items) + "\n```")
+    if stage == "Builder" and os.environ.get("CLAWD_MOCK_RICH"):   # the site film's builder: reads, fixes three files, runs the tests
+        steps = [("Read", {"file_path": "auth.py"}), ("Edit", {"file_path": "auth.py"}), ("Read", {"file_path": "api/users.py"}),
+                 ("Edit", {"file_path": "api/users.py"}), ("Edit", {"file_path": "upload.py"}), ("Write", {"file_path": "tests/test_auth.py"}),
+                 ("Bash", {"command": "pytest -q", "description": "Run the tests"})]
+        for i, (name, args) in enumerate(steps):
+            time.sleep(pace)
+            out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [
+                {"type": "tool_use", "id": f"toolu_b{i}", "name": name, "input": args}]}, **base})
+        if stage == "Builder":
+            text = ("Done.\n\nREPORT: Fixed 3 serious problems in 5 files.\n\n"
+                    "- `auth.py`: the login query took the name straight from the form. It uses SQL parameters now.\n"
+                    "- `api/users.py`: `/users/<id>` didn't check the token. It does now.\n"
+                    "- `upload.py`: uploads had no size limit. Capped at 10 MB.\n"
+                    "- `tests/`: 4 new tests. All 28 pass.")
     if stage in ("Trend scout", "Scriptwriter", "Producer"):   # the ad team: trends in, scripts out, the weak ones cut
         steps = {"Trend scout": [("WebSearch", {"query": "top coffee ads on tiktok this month"}), ("WebFetch", {"url": "https://ads.tiktok.com/business/creativecenter"}),
                                  ("WebSearch", {"query": "trending hooks food and drink"})],

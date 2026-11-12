@@ -121,25 +121,87 @@ if(document.readyState==='complete')setTimeout(next,300);else addEventListener('
 })();</script>"""
 
 
-def browser():
+def browsers():
+    """Every browser on this computer that could take the picture, best guess first."""
     if FLATPAK:   # the Linux Flatpak: use the browser on your system, outside the sandbox
         import claude_code
         claude_code.fix_path()
-        return next(filter(None, map(claude_code.which, NAMES)), None)
-    for b in BROWSERS:
-        path = os.path.expandvars(b)
-        if "%" not in path and os.path.exists(path):
-            return path
-    for name in NAMES:
-        found = shutil.which(name)
-        if found:
-            return found
-    return None
+        found = list(filter(None, map(claude_code.which, NAMES)))
+    else:
+        found = [path for path in map(os.path.expandvars, BROWSERS) if "%" not in path and os.path.exists(path)]
+        found += filter(None, map(shutil.which, NAMES))
+    seen, out = set(), []
+    for exe in found:
+        key = os.path.normcase(os.path.realpath(exe)) if not FLATPAK else exe
+        if key not in seen:
+            seen.add(key)
+            out.append(exe)
+    return out
 
 
-def _capture(exe, url, out, budget_ms, size, wait_for=None):
-    """Opens url in a fresh headless browser, lets it run for budget_ms of page time, and saves a screenshot to out.
-    `wait_for` (a threading.Event) also waits for the page's report to arrive."""
+def _stamp(exe):
+    """Changes when the browser updates (Edge keeps msedge.exe and swaps the version folder beside it)."""
+    try:
+        return f"{os.path.getmtime(exe):.0f}-{os.path.getmtime(os.path.dirname(exe)):.0f}"
+    except OSError:
+        return "?"
+
+
+def _works(exe):
+    """Can this browser take a headless screenshot at all? Some builds can't (Edge 157 on Windows starts and
+    never opens the page). Asked once per browser version, then remembered in the temp folder."""
+    if FLATPAK:
+        return True
+    memo = Path(tempfile.gettempdir()) / "lithnode-shot-browsers.json"
+    try:
+        known = json.loads(memo.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        known = {}
+    was = known.get(exe) if isinstance(known, dict) else None
+    known = known if isinstance(known, dict) else {}
+    # a browser that failed gets another try after a day: an update may have fixed it without touching the stamp
+    if isinstance(was, dict) and was.get("stamp") == _stamp(exe) and (was.get("ok") or time.time() - was.get("at", 0) < 86400):
+        return bool(was.get("ok"))
+    folder = Path(tempfile.mkdtemp(prefix="lithnode-shot-try-"))
+    try:
+        ok = _run(exe, "about:blank", folder / "try.png", 500, "400x300", None, launch_wait=20, land_wait=20)
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+    known[exe] = {"stamp": _stamp(exe), "ok": ok, "at": time.time()}
+    try:
+        memo.write_text(json.dumps(known), encoding="utf-8")
+    except OSError:
+        pass
+    return ok
+
+
+def browser():
+    """The browser to use: the first one that can really take a headless screenshot, else the first one found."""
+    found = browsers()
+    for exe in found:
+        if _works(exe):
+            return exe
+    return found[0] if found else None
+
+
+def _sweep(profile):
+    """Ends a browser that never finished. Its launcher may be gone already, so find it by its profile folder."""
+    name = Path(profile).name
+    try:
+        if os.name == "nt":
+            subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                            "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*" + name + "*' -and "
+                            "$_.CommandLine -notlike '*--type=*' -and $_.ProcessId -ne $PID } | "
+                            "ForEach-Object { taskkill /F /T /PID $_.ProcessId }"],
+                           capture_output=True, timeout=30, creationflags=NO_WINDOW)
+        elif not FLATPAK:
+            subprocess.run(["pkill", "-f", name], capture_output=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def _run(exe, url, out, budget_ms, size, wait_for, launch_wait=60, land_wait=30):
+    """One headless run. True when the picture (and the page's report, if waited for) landed."""
     w, h = size.split("x")
     host = (lambda a: a)
     if FLATPAK:
@@ -147,24 +209,38 @@ def _capture(exe, url, out, budget_ms, size, wait_for=None):
         host = claude_code.host
     profile = tempfile.mkdtemp(prefix="lithnode-shot-", dir=__import__("claude_code").shared_tmp() if FLATPAK else None)
     out.unlink(missing_ok=True)   # so an old picture is never mistaken for this one
+
+    def landed():
+        return out.exists() and out.stat().st_size > 0 and (wait_for is None or wait_for.is_set())
     try:
-        subprocess.run(host([exe, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--no-default-browser-check",
-                        f"--user-data-dir={profile}", f"--window-size={w},{h}", f"--virtual-time-budget={int(budget_ms)}",
-                        f"--screenshot={out}", url]), capture_output=True, timeout=60 + budget_ms / 1000, creationflags=NO_WINDOW)
-        # Edge hands the work to a background process and returns at once: wait for the picture (and report) to land
-        deadline = time.time() + budget_ms / 1000 + 30
-        while time.time() < deadline and not (out.exists() and out.stat().st_size > 0 and (wait_for is None or wait_for.is_set())):
-            time.sleep(0.25)
-        time.sleep(0.3)   # let it finish writing
-    except subprocess.TimeoutExpired:
-        # some headless Chromes (seen on macOS) never exit after a page that reported back: if the picture
-        # and the report both landed, the work is done and the hang doesn't matter
-        if not (out.exists() and out.stat().st_size > 0 and (wait_for is None or wait_for.is_set())):
-            raise RuntimeError("The browser took too long to draw the page.") from None
+        try:
+            subprocess.run(host([exe, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--no-default-browser-check",
+                            f"--user-data-dir={profile}", f"--window-size={w},{h}", f"--virtual-time-budget={int(budget_ms)}",
+                            f"--screenshot={out}", url]), capture_output=True, timeout=launch_wait + budget_ms / 1000, creationflags=NO_WINDOW)
+            # Edge hands the work to a background process and returns at once: wait for the picture (and report) to land
+            deadline = time.time() + budget_ms / 1000 + land_wait
+            while time.time() < deadline and not landed():
+                time.sleep(0.25)
+            time.sleep(0.3)   # let it finish writing
+        except subprocess.TimeoutExpired:
+            # some headless Chromes (seen on macOS) never exit after a page that reported back: if the picture
+            # and the report both landed, the work is done and the hang doesn't matter
+            pass
+        ok = landed()
+        if not ok:
+            _sweep(profile)   # it hung: don't leave a headless browser running on their computer
+        return ok
     finally:
         shutil.rmtree(profile, ignore_errors=True)
-    if not out.exists():
-        raise RuntimeError("The browser didn't save a screenshot.")
+
+
+def _capture(exe, url, out, budget_ms, size, wait_for=None):
+    """Opens url in a fresh headless browser, lets it run for budget_ms of page time, and saves a screenshot to out.
+    `wait_for` (a threading.Event) also waits for the page's report to arrive."""
+    if not _run(exe, url, out, budget_ms, size, wait_for):
+        if out.exists() and out.stat().st_size > 0:
+            return out   # the picture is there; the report never came, and the caller says so
+        raise RuntimeError("The browser took too long to draw the page.")
     return out
 
 

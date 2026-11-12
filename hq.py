@@ -608,7 +608,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"error": "Describe the team you want first."}, 400)
         engine = engines.available_engine()
         if not engine:
-            return self.send_json({"error": "Sign in to Claude Code, Codex, or Cursor before building a flow."}, 409)
+            return self.send_json({"error": "Get an engine ready first: open the engines menu in the top bar and sign in to Claude Code, Codex, Cursor or another one."}, 409)
         bots = [public_bot(b) for b in load_bots()]
         agent = flows.agents.Agent(model=flows.DESIGNER_MODEL, effort="low", tools="none",
                                    system=flows.designer_system(bots, usable_models()), prompt=prompt,
