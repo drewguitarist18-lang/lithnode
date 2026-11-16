@@ -148,6 +148,11 @@ if "--append-system-prompt" in flags:
         sys.exit(0)
     time.sleep(60 if "HANGSTAGE" in system else 4 if "SLOWSTAGE" in system
                else float(os.environ.get("CLAWD_MOCK_WAIT") or 1.0))   # side-by-side agents overlap; CLAWD_MOCK_WAIT slows demos
+    if "You preview a job for a team" in system:   # the dry run: one line per team
+        text = json.dumps({"steps": [{"team": "Sorter", "does": "Sorts the columns in columns.csv A to Z."}], "watch": "It overwrites the file."})
+        out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
+        out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": 0.001, "num_turns": 1, **base})
+        sys.exit(0)
     if "flow designer for Lithnode" in system:   # the "describe a team" box: answer with a flow draft
         draft = {"name": "Bug sweep", "nodes": [
             {"id": "master", "type": "master", "mode": "pass"},
@@ -249,6 +254,12 @@ if "--append-system-prompt" in flags:
         sys.exit(1)
     stage = system.split('" stage of')[0].split('"')[-1] if '" stage of' in system else "lead"
     text = f"Working on it.\n\nREPORT: {stage} report from {session[:8]}."
+    if "# Sent back to you" in prompt:   # redoing work that was sent back
+        text = text.replace(" report from", " report after feedback from")
+    if 'exactly "VERDICT: PASS"' in system:   # a checker with send-back on: fails until the work before it was redone
+        text += "\nVERDICT: " + ("FAIL" if "ALWAYSFAIL" in prompt or "after feedback" not in prompt else "PASS")
+    if "ASKUSER" in prompt and "# The user answered" not in prompt:   # an agent that stops to ask
+        text = "I need one thing first.\n\nQUESTION: Which file should I sort?"
     if os.environ.get("CLAWD_MOCK_RICH"):   # a report shaped like a real one, for looking at the results page
         text = (f"Done.\n\nREPORT: **{stage}** checked the change to the login flow.\n\n**Found**\n"
                 "- `session.ts` refreshes the token after it expires, so a slow request can log you out (line 88).\n"

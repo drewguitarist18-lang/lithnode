@@ -15,7 +15,7 @@
   dialog.ui-pop[open] { animation: ui-in .14s ease-out; }
   dialog.ui-pop::backdrop { background: rgba(8, 9, 14, .5); backdrop-filter: blur(2px); }
   .ui-pop h3 { margin: 0 0 6px; font-size: 16px; font-weight: 650; text-transform: none; letter-spacing: normal; color: var(--ui-ink); }
-  .ui-pop p { margin: 0; color: var(--ui-muted); }
+  .ui-pop p { margin: 0; color: var(--ui-muted); overflow-wrap: anywhere; }
   .ui-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
   .ui-btn { font: inherit; cursor: pointer; border-radius: 9px; padding: 7px 14px; border: 1px solid var(--ui-line);
             background: transparent; color: var(--ui-ink); }

@@ -10,6 +10,7 @@ Everything is served on localhost only.
 Lithnode runs only on Claude Code and your Claude sign-in: there are no API keys. Your sign-in never
 reaches the page. Bots live in ~/.clawd-bot; flows and runs live in ~/.lithnode.
 """
+import datetime
 import json
 import logging
 import logging.handlers
@@ -576,7 +577,10 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- flows -------------------------------------------------------------------
     def flow_payload(self, flow: dict[str, Any]) -> dict[str, Any]:
-        return {"flow": flow, "estimate": flows.estimate(flow), "problems": flows.check_runnable(flow) + plan_problems(flow)}
+        problems = flows.check_runnable(flow) + plan_problems(flow)
+        return {"flow": flow, "estimate": flows.estimate(flow), "problems": problems,
+                "fixable": bool(problems) and bool(flows.repair(flow)[1]),   # the Fix it button: wiring that can only mean one thing
+                "history": flows.run_history(HQ_STORE.list_runs(limit=200), flow.get("id") or "")}
 
     def GET_api_flows(self) -> None:
         self.send_json({"flows": HQ_STORE.list_flows(),
@@ -652,6 +656,31 @@ class Handler(BaseHTTPRequestHandler):
         questions = flows.parse_precheck(agent.text or "") if done.get("ok") else []
         self.send_json({"ok": not questions, "questions": questions, "skipped": not done.get("ok")})
 
+    def POST_api_dryrun(self) -> None:
+        """A preview of a run: one quick agent says what each team would do with this job."""
+        body = self.read_json()
+        task = str(body.get("task") or "").strip()[:4000]
+        flow = HQ_STORE.get_flow(str(body.get("flow") or "")) if FLOW_ID_RE.match(str(body.get("flow") or "")) else None
+        folder = str(body.get("folder") or "").strip().strip('"')
+        engine = engines.available_engine()
+        if not task or not flow:
+            return self.send_json({"error": "Type the job first."}, 400)
+        if not engine:
+            return self.send_json({"error": "Get an engine ready first: open the engines menu in the top bar."}, 409)
+        try:
+            flow = flows.clean_flow(flow)
+        except (ValueError, TypeError) as exc:
+            return self.send_json({"error": str(exc)}, 400)
+        agent = flows.agents.Agent(model=flows.SUMMARY_MODEL, effort="low", tools="none", system=flows.DRYRUN_SYSTEM,
+                                   prompt=flows.precheck_prompt(flow, task, folder if Path(folder).is_dir() else ""),
+                                   cwd=HQ_STORE.work_dir / "_precheck", on_update=lambda: None, engine=engine)
+        if not agent.run():
+            return self.send_json({"error": agent.error or "The preview failed."}, 502)
+        try:
+            self.send_json(flows.parse_dryrun(agent.text or "", flow))
+        except ValueError as exc:
+            self.send_json({"error": str(exc)}, 422)
+
     def POST_api_flows_import(self) -> None:
         """A team file someone shared. With check, says what the team can do; otherwise saves it as a new flow."""
         body = self.read_json()
@@ -690,6 +719,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"error": f"This flow's file is damaged: {exc}"}, 400)
         if method == "GET" and not action:
             return self.send_json(self.flow_payload(flow))
+        if method == "POST" and action == "repair":   # the Fix it button
+            fixed, did = flows.repair(flow)
+            if did:
+                flow = {**flows.clean_flow(fixed), "id": flow_id}
+                if flow.get("auto") is not False:
+                    flows._layout(flow, flow.get("dir") or "lr")
+                HQ_STORE.save_flow(flow)
+            return self.send_json({**self.flow_payload(flow), "did": did})
         if method == "GET" and action == "export":   # the team as a file to share (see flows.export_team)
             own = {b["id"]: b.get("instructions", "") for b in load_bots() if not b.get("builtin")}
             body = json.dumps(flows.export_team(flow, own), indent=2).encode()
@@ -709,7 +746,8 @@ class Handler(BaseHTTPRequestHandler):
             problems = flows.check_runnable(flow) + plan_problems(flow)
             if problems:
                 return self.send_json({"error": " ".join(problems)}, 400)
-            folder = str(body.get("folder") or flow.get("folder") or "").strip().strip('"')
+            before = RUNNER.snapshot(str(body.get("after") or "")) if FLOW_ID_RE.match(str(body.get("after") or "")) else None
+            folder = str(body.get("folder") or (before or {}).get("folder") or flow.get("folder") or "").strip().strip('"')
             if folder and not Path(folder).is_dir():
                 return self.send_json({"error": f"That folder doesn't exist: {folder}"}, 400)
             limit = flows.clean_limit(body["limit"]) if "limit" in body else flows.clean_limit(flow.get("limit", flows.DEFAULT_LIMIT))
@@ -720,7 +758,8 @@ class Handler(BaseHTTPRequestHandler):
             if new_models or folder != flow.get("folder", "") or task[:4000] != flow.get("task", "") or limit != flow.get("limit"):
                 flow["folder"], flow["task"], flow["limit"] = folder, task[:4000], limit   # the next run starts from this one
                 HQ_STORE.save_flow(flow)
-            run = RUNNER.start(flow, flows.with_answers(task, body.get("answers"))[:20000], folder)
+            job = flows.follow_up(task, before) if before else task   # a follow-up carries the run it follows
+            run = RUNNER.start(flow, flows.with_answers(job, body.get("answers"))[:20000], folder)
             return self.send_json({"run": run.id})
         self.send_json({"error": "not found"}, 404)
 
@@ -739,6 +778,20 @@ class Handler(BaseHTTPRequestHandler):
         except (OSError, subprocess.TimeoutExpired):
             folder = ""
         self.send_json({"folder": folder})
+
+    def POST_api_pick_file(self) -> None:
+        """Open the normal file dialog on this computer and return the file picked ("" if cancelled)."""
+        if os.environ.get("LITHNODE_PICKER_FILE"):       # tests: a fixed answer instead of a window
+            return self.send_json({"file": os.environ["LITHNODE_PICKER_FILE"]})
+        script = ("import tkinter as tk; from tkinter import filedialog; r = tk.Tk(); r.withdraw(); "
+                  "r.attributes('-topmost', True); print(filedialog.askopenfilename(title='Pick the file') or '')")
+        command = ([claude_code.own_exe("lithnode-cli"), "pick-file"] if getattr(sys, "frozen", False) else [sys.executable, "-c", script])
+        try:
+            done = subprocess.run(command, capture_output=True, text=True, timeout=600, creationflags=claude_code.NO_WINDOW)
+            picked = str(Path(done.stdout.strip())) if done.stdout.strip() else ""
+        except (OSError, subprocess.TimeoutExpired):
+            picked = ""
+        self.send_json({"file": picked})
 
     def POST_api_folder_size(self) -> None:
         """How many project files a folder has (capped), so the Run dialog can warn when a flow is too heavy for it."""
@@ -770,15 +823,71 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(snap) if snap else self.send_json({"error": "not found"}, 404)
         if method == "POST" and action == "open":
             return self.open_run_file(run_id, str(self.read_json().get("file") or ""))
+        if method == "POST" and action in ("files", "read"):   # the canvas's file preview: what the run has made so far
+            snap = RUNNER.snapshot(run_id)
+            if not snap:
+                return self.send_json({"error": "not found"}, 404)
+            folder = Path(snap.get("folder") or "")
+            live = snap.get("status") in ("running", "waiting")
+            made = flows.changed_files(folder, snap.get("started") or 0) if live else list(snap.get("files") or [])
+            if action == "files":
+                return self.send_json({"files": made})
+            rel = str(self.read_json().get("file") or "")
+            path = (folder / rel).resolve()
+            if rel not in made or folder.resolve() not in path.parents:
+                return self.send_json({"error": "That file isn't part of this run."}, 400)
+            return self.send_json(flows.read_for_preview(path))
+        if method == "GET" and action == "changes":   # what the run did to its folder, against the before-picture
+            snap = RUNNER.snapshot(run_id)
+            if not snap:
+                return self.send_json({"error": "not found"}, 404)
+            pic = HQ_STORE.snap_dir(run_id)
+            has = bool(snap.get("snap")) and pic.is_dir() and Path(snap.get("folder") or "").is_dir()
+            return self.send_json({"kept": has, "undone": bool(snap.get("undone")),
+                                   "changes": flows.folder_changes(snap["folder"], pic) if has else []})
+        if method == "POST" and action == "undo":
+            snap = RUNNER.snapshot(run_id)
+            pic = HQ_STORE.snap_dir(run_id)
+            if not snap or not snap.get("snap") or not pic.is_dir():
+                return self.send_json({"error": "There's no before-picture of this run's folder any more."}, 404)
+            if snap.get("status") in ("running", "waiting"):
+                return self.send_json({"error": "This run is still going. Stop it first."}, 409)
+            n = flows.undo_changes(snap["folder"], pic)
+            live = RUNNER.get(run_id)
+            if live:
+                live.undone = True
+                live.changed(force=True)
+            else:
+                HQ_STORE.save_run({**snap, "undone": True})
+            return self.send_json({"ok": True, "files": n})
+        if method == "POST" and action == "rerun":   # run again from one step, keeping what the earlier steps made
+            old = RUNNER.snapshot(run_id)
+            if not old:
+                return self.send_json({"error": "not found"}, 404)
+            if old.get("status") in ("running", "waiting"):
+                return self.send_json({"error": "This run is still going. Stop it or let it finish first."}, 409)
+            try:
+                flow = {**flows.clean_flow(old.get("flow")), "id": old.get("flow_id") or (old.get("flow") or {}).get("id")}
+                seed = flows.rerun_seed({**old, "flow": flow}, str(self.read_json().get("node") or ""))
+            except (ValueError, TypeError) as exc:
+                return self.send_json({"error": str(exc)}, 400)
+            problems = flows.check_runnable(flow) + plan_problems(flow)
+            folder = old.get("folder") or ""
+            if problems or not Path(folder).is_dir():
+                return self.send_json({"error": " ".join(problems) or f"That run's folder is gone: {folder}"}, 400)
+            return self.send_json({"run": RUNNER.start(flow, str(old.get("task") or ""), folder, seed).id})
         run = RUNNER.get(run_id)
         if not run:
             return self.send_json({"error": "That run isn't active."}, 404)
+        if method == "POST" and action == "note":
+            ok = run.tell(str(self.read_json().get("text") or ""))
+            return self.send_json({"ok": True}) if ok else self.send_json({"error": "Type the note first."}, 400)
         if method == "POST" and action == "stop":
             run.stop()
             return self.send_json({"ok": True})
         if method == "POST" and action == "decide":
             body = self.read_json()
-            ok = run.decide(str(body.get("node") or ""), bool(body.get("approved")), str(body.get("note") or ""))
+            ok = run.decide(str(body.get("node") or ""), bool(body.get("approved")), str(body.get("note") or ""), bool(body.get("redo")))
             return self.send_json({"ok": ok}) if ok else self.send_json({"error": "Nothing is waiting there."}, 400)
         self.send_json({"error": "not found"}, 404)
 
@@ -917,6 +1026,50 @@ def already_running() -> bool:
         return False
 
 
+def run_schedules(now: datetime.datetime | None = None) -> list[str]:
+    """Start every flow whose schedule is due. Returns the ids of the runs it started."""
+    now = now or datetime.datetime.now()
+    state_file = HQ_STORE.root / "schedules.json"
+    try:
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        state = {}
+    started = []
+    for item in HQ_STORE.list_flows():
+        flow = HQ_STORE.get_flow(item["id"]) or {}
+        key = flows.schedule_due(flows.clean_schedule(flow.get("schedule")), now, state.get(item["id"], ""))
+        if not key:
+            continue
+        state[item["id"]] = key   # this slot is used, whether or not the run could start
+        try:
+            flow = {**flows.clean_flow(flow), "id": item["id"]}
+            sched = flow["schedule"]
+            folder = sched["folder"] or flow.get("folder") or ""
+            busy = any(r.flow["id"] == item["id"] for r in RUNNER.active())
+            if busy or flows.check_runnable(flow) + plan_problems(flow) or (folder and not Path(folder).is_dir()):
+                log.warning("Scheduled run of %s skipped: %s", flow["name"], "still running" if busy else "the flow or its folder isn't ready")
+                continue
+            started.append(RUNNER.start(flow, sched["task"], folder).id)
+            log.info("Scheduled run of %s started", flow["name"])
+        except Exception:
+            log.exception("Scheduled run of %s failed to start", item.get("name"))
+    if state:
+        try:
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+        except OSError:
+            pass
+    return started
+
+
+def _schedule_loop() -> None:
+    while True:
+        time.sleep(30)
+        try:
+            run_schedules()
+        except Exception:
+            log.exception("schedule check failed")
+
+
 def main() -> None:
     claude_code.fix_path()
     if already_running():
@@ -929,6 +1082,7 @@ def main() -> None:
     log.info("Lithnode started on %s", URL)
     # Only now does this process own the port: touching runs and flows any earlier could clobber a live server's.
     RUNNER.mark_interrupted()
+    threading.Thread(target=_schedule_loop, daemon=True).start()
     try:
         _backfill_tasks()
     except (OSError, ValueError, KeyError):

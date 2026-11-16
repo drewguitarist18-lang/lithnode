@@ -19,6 +19,7 @@ DEFAULTS: dict[str, Any] = {"limit": flows.DEFAULT_LIMIT, "roles": True, "check_
                             "auto": True,         # new flows auto-arrange
                             "dir": "lr",          # new blank flows go left to right, or top to bottom ("tb")
                             "precheck": True,     # a quick check of the job before each run, which may ask a question
+                            "dry_run": False,     # the Run menu offers a preview of what each team would do
                             "notify_sound": True, "notify_desktop": False}   # when a run finishes or needs you
 _lock = threading.Lock()
 
@@ -29,7 +30,7 @@ def clean(raw: Any) -> dict[str, Any]:
     out = dict(DEFAULTS)
     if "limit" in raw:
         out["limit"] = flows.clean_limit(raw["limit"])
-    for key in ("roles", "check_updates", "count_install", "auto", "precheck", "notify_sound", "notify_desktop"):
+    for key in ("roles", "check_updates", "count_install", "auto", "precheck", "dry_run", "notify_sound", "notify_desktop"):
         if isinstance(raw.get(key), bool):
             out[key] = raw[key]
     if raw.get("engine") in engines.ENGINES:

@@ -846,6 +846,7 @@ function renderSettings() {
       <select data-key="limit" aria-label="Token limit for new flows">${limits.map((n) =>
         `<option value="${n}"${n === p.limit ? " selected" : ""}>${shortTokens(n)} tokens</option>`).join("")}</select></div>
     <div class="row"><div><b>Check the job before a run</b><small>A quick look at the job and folder first. If the team can't start without something, it asks you instead of guessing.</small></div>${sw("precheck", p.precheck, "Check the job before a run")}</div>
+    <div class="row"><div><b>Offer a preview before a run</b><small>Adds a Preview button to the Run menu: one quick agent says what each team would do with your job.</small></div>${sw("dry_run", p.dry_run, "Offer a preview before a run")}</div>
     ${h("tidyLr", "Canvas")}
     <div class="row"><div><b>Auto-arrange new flows</b><small>Keeps nodes neatly laid out as you edit. The button by the zoom turns it off for one flow.</small></div>${sw("auto", p.auto, "Auto-arrange new flows")}</div>
     <div class="row"><div><b>New flows go</b><small>Which way a blank flow runs.</small></div>

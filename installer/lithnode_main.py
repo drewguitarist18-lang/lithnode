@@ -3,7 +3,7 @@
 lithnode-server.exe (no console) the engine that Lithnode.exe (the app window, installer/app) starts;
                                  `lithnode-server.exe pet` runs Claude Pet.
 lithnode-cli.exe  (console)      `hook <Event>`  Claude Pet's Claude Code hook (feeds the pet and the Office)
-                                 `pick-folder`   the folder dialog the app opens
+                                 `pick-folder`   the folder dialog the app opens (`pick-file`: the file dialog)
                                  `install-pet` / `uninstall-pet`  add or remove the pet's hooks (the installer runs these)
                                  `shot <file or URL> [seconds]`   a screenshot for agents to look at (lithnode-shot)
                                  `mcp`           Lithnode's MCP server, so Claude can build and run flows (mcp_server.py)
@@ -111,6 +111,15 @@ def pick_folder():
     print(filedialog.askdirectory(title="Pick the folder your agents work in") or "")
 
 
+def pick_file():
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    print(filedialog.askopenfilename(title="Pick the file") or "")
+
+
 def main():
     args = sys.argv[1:]
     cli = Path(sys.executable).stem.lower() == "lithnode-cli"
@@ -119,6 +128,8 @@ def main():
         runpy.run_module("hook", run_name="__main__")
     elif cli and args[:1] == ["pick-folder"]:
         pick_folder()
+    elif cli and args[:1] == ["pick-file"]:
+        pick_file()
     elif cli and args[:1] == ["install-pet"]:
         install_pet()
     elif cli and args[:1] == ["uninstall-pet"]:

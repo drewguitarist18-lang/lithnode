@@ -51,10 +51,15 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
   });
   win.removeMenu();
-  // no menu means no built-in shortcuts: keep reload (Ctrl+R, F5) like a browser
+  // no menu means no built-in shortcuts: keep reload (Ctrl+R, F5) like a browser. The page's own reload asks GitHub
+  // for a newer version and saves the open flow first; Shift, or a page too broken to answer, reloads straight away.
   win.webContents.on("before-input-event", (e, input) => {
     if (input.type === "keyDown" && (input.key === "F5" || ((input.control || input.meta) && input.key.toLowerCase() === "r"))) {
-      e.preventDefault(); win.webContents.reloadIgnoringCache();
+      e.preventDefault();
+      const hard = () => win.webContents.reloadIgnoringCache();
+      if (input.shift) return hard();
+      win.webContents.executeJavaScript("typeof window.checkAndReload === 'function' ? (window.checkAndReload(), true) : false", true)
+        .then((ok) => { if (!ok) hard(); }, hard);
     }
   });
   win.once("ready-to-show", () => win.show());
@@ -77,6 +82,11 @@ ipcMain.on("bar", (_e, colors) => {
 // the system's own folder picker, on every platform (and inside the Linux sandbox, through its portal)
 ipcMain.handle("pick-folder", async () => {
   const r = await dialog.showOpenDialog(win, { title: "Pick the folder your agents work in", properties: ["openDirectory", "createDirectory"] });
+  return r.canceled || !r.filePaths.length ? "" : r.filePaths[0];
+});
+// and its file picker, for a job that needs one file (a spreadsheet, a document)
+ipcMain.handle("pick-file", async () => {
+  const r = await dialog.showOpenDialog(win, { title: "Pick the file", properties: ["openFile"] });
   return r.canceled || !r.filePaths.length ? "" : r.filePaths[0];
 });
 

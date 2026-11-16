@@ -317,6 +317,93 @@ _fixed = flows.build_design({"name": "Sort", "nodes": [{"id": "master", "type": 
 check("wiring: a designed flow's loose end goes into Done, and Start no longer skips the teams",
       {(e["from"], e["to"]) for e in _fixed["edges"]} == {("master", "a"), ("a", "b"), ("b", "done")} and flows.check_runnable(_fixed) == [])
 
+_early = {"name": "Early", "nodes": [{"id": "master", "type": "master", "mode": "pass"}, {"id": "cp", "type": "checkpoint", "name": "Collect Results"},
+                                    {"id": "a", "type": "cluster", "name": "Sorter"}, {"id": "done", "type": "done"}],
+          "edges": [{"from": "master", "to": "cp"}, {"from": "cp", "to": "a"}, {"from": "a", "to": "done"}]}
+check("wiring: a checkpoint before any team has nothing to collect, and says so",
+      any("Collect Results comes before any team" in p for p in flows.check_runnable(flows.clean_flow(_early))))
+_cut = flows.build_design({**_early, "edges": [[e["from"], e["to"]] for e in _early["edges"]]}, [])
+check("wiring: the designer cuts such a checkpoint out and joins the wires",
+      [n["type"] for n in _cut["nodes"]] == ["master", "cluster", "done"] and {(e["from"], e["to"]) for e in _cut["edges"]} == {("master", "a"), ("a", "done")})
+
+# ---- widgets: extras pinned to the canvas, saved with the flow ---------------------------------------------------------
+_w = flows.clean_flow({**_early, "widgets": [{"id": "Note 1!", "type": "note", "x": 10, "y": 20, "w": 5, "h": "x", "text": "hi", "color": "red"},
+                                             {"type": "output", "node": "a"}, {"type": "output", "node": "gone"}, {"type": "evil"}, "junk"]})["widgets"]
+check("widgets: kept with the flow, sizes and colors made sane, unknown kinds dropped",
+      [(w["id"], w["type"]) for w in _w] == [("note1", "note"), ("w2", "output"), ("w3", "output")]
+      and _w[0] == {"id": "note1", "type": "note", "x": 10, "y": 20, "w": 150, "h": 170, "text": "hi", "color": flows.WIDGET_COLORS[0]}, _w)
+check("widgets: live output keeps its team only while that team exists", (_w[1]["node"], _w[2]["node"]) == ("a", ""))
+check("widgets: a flow without any still loads", flows.clean_flow(_early)["widgets"] == [])
+_w2 = {w["type"]: w for w in flows.clean_flow({**_early, "widgets": [
+    {"type": "checklist", "items": [{"text": "  Tests   pass ", "done": True}, {"text": ""}, "junk", {"text": "x" * 300}], "pin": "a", "px": 30, "py": -40},
+    {"type": "group", "text": "G" * 90, "pin": "a"}, {"type": "file", "file": "out.md", "pin": "gone"}, {"type": "approve"}]})["widgets"]}
+check("widgets: a checklist keeps clean items, a pin holds only to a step that exists, and groups are gone",
+      _w2["checklist"]["items"] == [{"text": "Tests pass", "done": True}, {"text": "x" * 120, "done": False}]
+      and (_w2["checklist"]["pin"], _w2["checklist"]["px"], _w2["checklist"]["py"]) == ("a", 30, -40)
+      and "pin" not in _w2["file"] and "group" not in _w2 and _w2["file"]["file"] == "out.md"
+      and "approve" in _w2, _w2)
+with tempfile.TemporaryDirectory() as _pd:
+    _pp = Path(_pd)
+    (_pp / "a.txt").write_text("hello", encoding="utf-8")
+    (_pp / "b.bin").write_bytes(b"\0\1\2")
+    (_pp / "c.png").write_bytes(b"\x89PNG")
+    check("file preview: text as text, a picture as a data URL, anything else says why not",
+          flows.read_for_preview(_pp / "a.txt") == {"text": "hello"} and "error" in flows.read_for_preview(_pp / "b.bin")
+          and flows.read_for_preview(_pp / "c.png")["image"].startswith("data:image/png;base64,") and "error" in flows.read_for_preview(_pp / "gone.txt"))
+
+# ---- fix-it, saved jobs, schedules, history, follow-ups, previews --------------------------------------------------
+_bad = flows.clean_flow({"name": "Bad", "nodes": [{"id": "master", "type": "master", "mode": "pass"}, {"id": "cp", "type": "checkpoint", "name": "Collect"},
+                                                  {"id": "a", "type": "cluster", "name": "Sorter"}, {"id": "b", "type": "cluster", "name": "Debugger"},
+                                                  {"id": "done", "type": "done"}],
+                         "edges": [{"from": "master", "to": "cp"}, {"from": "cp", "to": "a"}, {"from": "a", "to": "b"}, {"from": "master", "to": "done"}]})
+_good, _did = flows.repair(_bad)
+check("fix it: the checkpoint goes, the loose end is wired in, Start stops skipping the teams, and it says what it did",
+      {(e["from"], e["to"]) for e in _good["edges"]} == {("master", "a"), ("a", "b"), ("b", "done")} and len(_did) == 3
+      and flows.check_runnable(flows.clean_flow(_good)) == [], _did)
+check("fix it: a good flow is left alone", flows.repair(flows.clean_flow(_good))[1] == [])
+_j = flows.clean_flow({**_early, "jobs": [{"task": "Sort the weekly export by date", "folder": "C:/data"}, {"name": "Sort the weekly export by", "task": "x y"},
+                                          {"name": "Empty", "task": " "}, "junk"], "schedule": {"on": True, "every": "weekday", "at": "9:5", "task": "Do it"}})
+check("saved jobs: named from the task when unnamed, no duplicates, no empty ones",
+      _j["jobs"] == [{"name": "Sort the weekly export by", "task": "Sort the weekly export by date", "folder": "C:/data"}], _j["jobs"])
+check("schedule: a bad time falls back, and it needs a job to be on", _j["schedule"] == {"on": True, "every": "weekday", "at": "09:00", "task": "Do it", "folder": ""}
+      and flows.clean_schedule({"on": True})["on"] is False)
+from datetime import datetime  # noqa: E402
+
+_s = {"on": True, "every": "weekday", "at": "09:00", "task": "x", "folder": ""}
+check("schedule: fires in its slot once, not before, not hours late, not at the weekend",
+      flows.schedule_due(_s, datetime(2026, 11, 16, 9, 3)) == "2026-11-16" and flows.schedule_due(_s, datetime(2026, 11, 16, 9, 3), "2026-11-16") == ""
+      and flows.schedule_due(_s, datetime(2026, 11, 16, 8, 59)) == "" and flows.schedule_due(_s, datetime(2026, 11, 16, 13, 0)) == ""
+      and flows.schedule_due(_s, datetime(2026, 11, 14, 9, 3)) == "" and flows.schedule_due({**_s, "on": False}, datetime(2026, 11, 16, 9, 3)) == "")
+check("schedule: hourly fires each hour at its minute", flows.schedule_due({**_s, "every": "hour", "at": "00:30"}, datetime(2026, 11, 14, 15, 31)) == "2026-11-14 15"
+      and flows.schedule_due({**_s, "every": "hour", "at": "00:30"}, datetime(2026, 11, 14, 15, 29)) == "")
+_runs = [{"flow_id": "f", "status": "done", "tokens": t, "started": 0, "ended": s} for t, s in ((100, 10), (300, 30), (200, 20))] + [
+    {"flow_id": "f", "status": "failed", "tokens": 9, "started": 0, "ended": 1}, {"flow_id": "g", "status": "done", "tokens": 5, "started": 0, "ended": 1}]
+check("history: what this flow's finished runs used", flows.run_history(_runs, "f") == {"runs": 3, "tokens": 200, "low": 100, "high": 300, "seconds": 20}
+      and flows.run_history(_runs, "none") == {})
+check("follow-up: carries the earlier job and result", "## The earlier job\nSort it" in flows.follow_up("Now chart it", {"task": "Sort it", "final": "Sorted."})
+      and "## What that run produced\nSorted." in flows.follow_up("Now chart it", {"task": "Sort it", "final": "Sorted."}))
+check("preview: read from the answer, junk refused", flows.parse_dryrun('ok {"steps": [{"team": "Sorter", "does": "Sorts it."}, {"team": ""}], "watch": "x"}', _bad)
+      == {"steps": [{"team": "Sorter", "does": "Sorts it."}], "watch": "x"} and raises(lambda: flows.parse_dryrun("nope", _bad)))
+
+# ---- what a run changed, and putting it back ---------------------------------------------------------------------------
+with tempfile.TemporaryDirectory() as tmp:
+    proj, pic = Path(tmp) / "proj", Path(tmp) / "pic"
+    for rel, body in (("a.txt", "one\ntwo\n"), ("keep.txt", "same\n"), ("gone.txt", "bye\n"), ("node_modules/x.js", "dep")):
+        (proj / rel).parent.mkdir(parents=True, exist_ok=True)
+        (proj / rel).write_text(body, encoding="utf-8")
+    check("changes: a before-picture is taken of the folder's own files", flows.snapshot_folder(proj, pic) and (pic / "files" / "a.txt").is_file()
+          and not (pic / "files" / "node_modules").exists())
+    check("changes: nothing changed means nothing listed", flows.folder_changes(proj, pic) == [])
+    (proj / "a.txt").write_text("one\nTWO\nthree\n", encoding="utf-8")
+    (proj / "new.txt").write_text("hi\n", encoding="utf-8")
+    (proj / "gone.txt").unlink()
+    _ch = {c["file"]: c for c in flows.folder_changes(proj, pic)}
+    check("changes: new, changed and deleted files, with line counts", {f: (c["kind"], c["added"], c["removed"]) for f, c in _ch.items()}
+          == {"a.txt": ("changed", 2, 1), "gone.txt": ("deleted", 0, 1), "new.txt": ("new", 1, 0)} and "+TWO" in _ch["a.txt"]["diff"], _ch)
+    check("changes: undo puts every file back", flows.undo_changes(proj, pic) == 3 and (proj / "a.txt").read_text(encoding="utf-8") == "one\ntwo\n"
+          and (proj / "gone.txt").is_file() and not (proj / "new.txt").exists() and flows.folder_changes(proj, pic) == [])
+check("changes: no folder, no picture", flows.snapshot_folder(Path(tempfile.gettempdir()) / "no-such-lithnode-folder", Path(tempfile.gettempdir()) / "x") is False)
+
 # ---- the check before a run: what it asks, and how answers reach the team ---------------------------------------------
 check("precheck: questions are read out of the answer, at most 3", flows.parse_precheck(
     'Sure: {"ok": false, "questions": [{"q": "Where  are the columns?", "kind": "folder"}, {"q": "By what?", "kind": "weird"}, "And?", {"q": "4"}]}')

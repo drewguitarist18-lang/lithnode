@@ -12,17 +12,20 @@ Every node waits for all of its inputs, so stages run in order and parallel bran
 side by side. Only short reports travel between stages, which keeps later prompts small.
 """
 import ast
+import difflib
 import ipaddress
 import json
 import math
 import os
 import re
+import shutil
 import socket
+import statistics
 import threading
 import time
 import uuid
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib import request as urlrequest
@@ -60,6 +63,7 @@ class Store:
         self.root = Path(root)
         self.flows_dir = self.root / "flows"
         self.runs_dir = self.root / "runs"
+        self.snaps_dir = self.root / "snapshots"   # before-pictures of folders, for a run's diff and undo
         self.work_dir = self.root / "workspaces"
         self._lock = threading.Lock()
 
@@ -104,6 +108,18 @@ class Store:
         (self.flows_dir / f"{flow_id}.json").unlink(missing_ok=True)
 
     # runs
+    def snap_dir(self, run_id: str) -> Path:
+        return self.snaps_dir / run_id
+
+    def prune_snaps(self, keep: int = 12) -> None:
+        """Only the newest few before-pictures are kept; older runs lose their diff and undo."""
+        try:
+            old = sorted((p for p in self.snaps_dir.iterdir() if p.is_dir()), key=lambda p: p.stat().st_mtime, reverse=True)[keep:]
+        except OSError:
+            return
+        for p in old:
+            shutil.rmtree(p, ignore_errors=True)
+
     def save_run(self, record: dict[str, Any]) -> None:
         self._write(self.runs_dir / f"{record['id']}.json", record)
 
@@ -229,6 +245,7 @@ def clean_node(raw: Any) -> dict[str, Any]:
                     bot=_text(raw, "bot", 40),
                     connectors=_connectors(raw.get("connectors")), clis=_clis(raw.get("clis")),
                     split=raw.get("split") is True,
+                    retry=_span(raw, "retry", 0, 0) if _span(raw, "retry", 0, 0) <= MAX_RETRY else MAX_RETRY,   # a checker: send work back this many times
                     engine=node["engine"], engine_model=node["engine_model"])
     if kind == "checkpoint":
         node.update(mode=raw.get("mode") if raw.get("mode") in ("pass", "summarize") else "pass",
@@ -265,6 +282,159 @@ def clean_engine_models(raw: Any) -> dict[str, dict[str, str]]:
             continue
         picks = raw.get(engine) if isinstance(raw.get(engine), dict) else {}
         out[engine] = {role: m if MODEL_RE.match(m := str(picks.get(role) or "").strip()[:60]) else "" for role in ROLES}
+    return out
+
+
+def clean_jobs(raw: Any) -> list[dict[str, str]]:
+    """Jobs saved on a flow so repeat work is one click: a name, the task, the folder."""
+    out, seen = [], set()
+    for j in raw if isinstance(raw, list) else []:
+        if not isinstance(j, dict) or len(out) >= 12:
+            continue
+        task = str(j.get("task") or "").strip()[:4000]
+        name = " ".join(str(j.get("name") or "").split())[:40] or " ".join(task.split()[:5])[:40]
+        if task and name.lower() not in seen:
+            seen.add(name.lower())
+            out.append({"name": name, "task": task, "folder": str(j.get("folder") or "").strip().strip('"')[:500]})
+    return out
+
+
+SCHEDULE_EVERY = ("hour", "day", "weekday")
+
+
+def clean_schedule(raw: Any) -> dict[str, Any]:
+    """When a flow runs by itself while Lithnode is open: every hour, day or weekday, at a time, with one job."""
+    raw = raw if isinstance(raw, dict) else {}
+    at = str(raw.get("at") or "")
+    task = str(raw.get("task") or "").strip()[:4000]
+    return {"on": raw.get("on") is True and bool(task), "every": raw.get("every") if raw.get("every") in SCHEDULE_EVERY else "day",
+            "at": at if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", at) else "09:00", "task": task,
+            "folder": str(raw.get("folder") or "").strip().strip('"')[:500]}
+
+
+def schedule_due(schedule: dict[str, Any], now: datetime, last: str = "", grace: int = 10) -> str:
+    """The key of the slot a schedule should fire for right now ('' when it isn't due, or already fired for it).
+    A slot opens at its time and stays open for `grace` minutes, so a job never fires hours late."""
+    if not schedule.get("on"):
+        return ""
+    hh, mm = (int(x) for x in schedule["at"].split(":"))
+    if schedule["every"] == "hour":
+        start, key = now.replace(minute=mm, second=0, microsecond=0), now.strftime("%Y-%m-%d %H")
+    else:
+        if schedule["every"] == "weekday" and now.weekday() >= 5:
+            return ""
+        start, key = now.replace(hour=hh, minute=mm, second=0, microsecond=0), now.strftime("%Y-%m-%d")
+    late = (now - start).total_seconds()
+    return key if 0 <= late < grace * 60 and key != last else ""
+
+
+def run_history(runs: Sequence[dict[str, Any]], flow_id: str) -> dict[str, Any]:
+    """What this flow's finished runs used, so the Run menu can say what to expect ({} when it has never finished one)."""
+    done = [r for r in runs if r.get("flow_id") == flow_id and r.get("status") == "done" and r.get("tokens") and r.get("ended")][:12]
+    if not done:
+        return {}
+    tokens = [r["tokens"] for r in done]
+    return {"runs": len(done), "tokens": int(statistics.median(tokens)), "low": min(tokens), "high": max(tokens),
+            "seconds": int(statistics.median(r["ended"] - r["started"] for r in done))}
+
+
+def follow_up(task: str, old: dict[str, Any]) -> str:
+    """A follow-up job with what it follows: the earlier job and its result, so the team builds on it."""
+    final = (old.get("final") or "").strip()
+    return (f"{task}\n\n# This follows an earlier run of this team\n## The earlier job\n{(old.get('task') or '').strip()[:3000]}"
+            + (f"\n\n## What that run produced\n{final[:6000]}" if final else "")
+            + "\nBuild on that work (it is still in the folder); don't start over.")
+
+
+def repair(flow: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Fix wiring that can only mean one thing: a checkpoint before any team is taken out, loose ends go into Done,
+    and Start stops skipping the teams. Returns the flow and what was done, in plain words."""
+    nodes, edges, did = list(flow["nodes"]), [dict(e) for e in flow["edges"]], []
+    names = {n["id"]: n["name"] for n in nodes}
+    for n in [n for n in nodes if n["type"] == "checkpoint" and any(e["to"] == n["id"] for e in edges)
+              and not _teams_before({"nodes": nodes, "edges": edges}, n["id"])]:
+        ins = [e["from"] for e in edges if e["to"] == n["id"]]
+        outs = [e["to"] for e in edges if e["from"] == n["id"]]
+        edges = [e for e in edges if n["id"] not in (e["from"], e["to"])] + [{"from": a, "to": b} for a in ins for b in outs]
+        nodes = [x for x in nodes if x["id"] != n["id"]]
+        did.append(f"Removed {n['name']}: it came before any team.")
+    dones = [n["id"] for n in nodes if n["type"] == "done"]
+    master = next((n["id"] for n in nodes if n["type"] == "master"), None)
+    if len(dones) == 1:
+        done = dones[0]
+        for n in nodes:
+            if n["type"] not in ("done", "master") and any(e["to"] == n["id"] for e in edges) and not any(e["from"] == n["id"] for e in edges):
+                edges.append({"from": n["id"], "to": done})
+                did.append(f"Wired {n['name']} into {names[done]}.")
+        if any(e["to"] == done and e["from"] != master for e in edges) and any(e["from"] == master and e["to"] == done for e in edges):
+            edges = [e for e in edges if not (e["from"] == master and e["to"] == done)]
+            did.append(f"Removed the wire from Start straight to {names[done]}.")
+    edges = [e for i, e in enumerate(edges) if e not in edges[:i]]
+    return {**flow, "nodes": nodes, "edges": edges}, did
+
+
+# ---- a preview of a run: what each team would do with this job, from one quick agent
+DRYRUN_SYSTEM = """You preview a job for a team of AI agents in an app called Lithnode, before the user spends a real run on it.
+You are given the job, where it runs, and the teams in the order they work. Say what each team will actually do for
+THIS job: one short plain sentence each, concrete (name the files or things when the job does), no filler.
+Then one sentence on the main risk or thing to check, or "" when there is none.
+Reply with ONLY one JSON object, no prose and no code fence:
+{"steps": [{"team": "the team's name", "does": "what it will do"}], "watch": "the main risk, or empty"}"""
+
+
+def parse_dryrun(text: str, flow: dict[str, Any]) -> dict[str, Any]:
+    """The preview in the agent's answer; raises ValueError when it isn't one."""
+    start, end = text.find("{"), text.rfind("}")
+    try:
+        raw = json.loads(text[start:end + 1]) if 0 <= start < end else None
+    except ValueError:
+        raw = None
+    if not isinstance(raw, dict) or not isinstance(raw.get("steps"), list):
+        raise ValueError("The preview didn't come back readable. Try again.")
+    steps = [{"team": " ".join(str(s.get("team") or "").split())[:60], "does": " ".join(str(s.get("does") or "").split())[:300]}
+             for s in raw["steps"][:30] if isinstance(s, dict)]
+    steps = [s for s in steps if s["team"] and s["does"]]
+    if not steps:
+        raise ValueError("The preview came back empty. Try again.")
+    return {"steps": steps, "watch": " ".join(str(raw.get("watch") or "").split())[:300]}
+
+
+WIDGET_TYPES = ("note", "output", "stats", "file", "checklist", "approve")
+WIDGET_COLORS = ("#e0a23c", "#5b8def", "#36d39a", "#c084fc", "#ff6b8b")
+
+
+def _span(raw: dict[str, Any], key: str, default: int, low: int) -> int:
+    try:
+        return max(low, min(1200, int(float(raw.get(key, default)))))
+    except (TypeError, ValueError):
+        return default
+
+
+def clean_widgets(raw: Any, ids: Sequence[str]) -> list[dict[str, Any]]:
+    """The extras pinned to a flow's canvas (notes, a team's live output, run stats). They never take part in a run."""
+    out, seen = [], set()
+    for i, w in enumerate(raw if isinstance(raw, list) else []):
+        if not isinstance(w, dict) or w.get("type") not in WIDGET_TYPES or len(out) >= 30:
+            continue
+        wid = re.sub(r"[^a-z0-9-]", "", str(w.get("id") or "").lower())[:24] or f"w{i + 1}"
+        if wid in seen:
+            continue
+        seen.add(wid)
+        item = {"id": wid, "type": w["type"], "x": _coord(w, "x"), "y": _coord(w, "y"), "w": _span(w, "w", 260, 150), "h": _span(w, "h", 170, 70)}
+        if w["type"] in ("note", "group"):
+            item["text"] = str(w.get("text") or "")[:4000 if w["type"] == "note" else 60]
+            item["color"] = w.get("color") if w.get("color") in WIDGET_COLORS else WIDGET_COLORS[0 if w["type"] == "note" else 1]
+        if w["type"] == "output":
+            item["node"] = str(w.get("node")) if str(w.get("node")) in ids else ""
+        if w["type"] == "file":
+            item["file"] = str(w.get("file") or "")[:300]
+        if w["type"] == "checklist":
+            item["items"] = [{"text": " ".join(str(i.get("text") or "").split())[:120], "done": i.get("done") is True}
+                             for i in (w.get("items") if isinstance(w.get("items"), list) else [])[:30]
+                             if isinstance(i, dict) and str(i.get("text") or "").strip()]
+        if w["type"] != "group" and str(w.get("pin") or "") in ids:   # it rides along with that step
+            item.update(pin=str(w["pin"]), px=_coord(w, "px"), py=_coord(w, "py"))
+        out.append(item)
     return out
 
 
@@ -311,7 +481,8 @@ def clean_flow(raw: Any) -> dict[str, Any]:
             "dir": raw.get("dir") if raw.get("dir") in ("tb", "lr") else "lr",
             "auto": raw.get("auto") is not False,   # auto-arrange: re-lay out the nodes on every change
             "limit": clean_limit(raw.get("limit", DEFAULT_LIMIT)), "models": models, "roles": use_roles,
-            "engine_models": engine_models}
+            "engine_models": engine_models, "widgets": clean_widgets(raw.get("widgets"), ids),
+            "jobs": clean_jobs(raw.get("jobs")), "schedule": clean_schedule(raw.get("schedule"))}
 
 
 DEFAULT_LIMIT = 1_000_000   # tokens a run may use before it's stopped; no agent may use more than half of it
@@ -382,12 +553,31 @@ def check_runnable(flow: dict[str, Any]) -> list[str]:
             problems.append("Not connected to Start: " + ", ".join(steps[:5]) + ".")
         if workers and len(steps) < len(loose):   # with no team yet, adding one is the fix, not this
             problems.append(f"Nothing leads to {next(n['name'] for n in loose if n['type'] == 'done')} yet: wire your last step into it.")
+        empty = [n["name"] for n in flow["nodes"] if n["type"] == "checkpoint" and n["id"] in reach and not _teams_before(flow, n["id"])]
+        if empty and not problems:
+            problems.append(f"{' and '.join(empty[:3])} come{'s' if len(empty) == 1 else ''} before any team, so there is nothing for it to collect. "
+                            "Move it after a team, or delete it.")
         lost = dead_ends(flow)
         if lost and dones == 1 and not problems:
             done = next(n["name"] for n in flow["nodes"] if n["type"] == "done")
             problems.append(f"{' and '.join(lost[:3])} {'is' if len(lost) == 1 else 'are'}n't wired into anything, so that work never reaches "
                             f"{done} and the result would come back without it. Wire {'it' if len(lost) == 1 else 'them'} into {done} or the next step.")
     return problems
+
+
+def _teams_before(flow: dict[str, Any], nid: str) -> bool:
+    """Does any team's work flow into this step?"""
+    kinds = {n["id"]: n["type"] for n in flow["nodes"]}
+    seen, frontier = set(), [nid]
+    while frontier:
+        cur = frontier.pop()
+        for e in flow["edges"]:
+            if e["to"] == cur and e["from"] not in seen:
+                if kinds.get(e["from"]) == "cluster":
+                    return True
+                seen.add(e["from"])
+                frontier.append(e["from"])
+    return False
 
 
 def dead_ends(flow: dict[str, Any]) -> list[str]:
@@ -720,7 +910,11 @@ Node types:
   bot (a bot id to base it on, or ""), split (true when the agents should divide one big job into equal parts and
   work side by side, e.g. processing 100,000 rows; then add a checker team after them), clis (command-line tools the
   team may run, from: <<CLIS>>; only the ones the job needs, e.g. ["gh"] to work with GitHub issues).
+  retry (0-3): only on a team that checks or tests the team right before it. With 1 or 2, a failed check sends the
+  work back to that team to fix, then checks again. Use it when the user asks to loop, retry or fix until it passes.
 - checkpoint: waits for everything wired into it. Fields: id, name, mode ("pass" or "summarize"), role.
+  It collects teams' reports, so it only ever goes after teams, never straight after master. Skip it unless two or
+  more teams feed it, or a long report needs summarizing.
   Use mode "summarize" with role "run" after clusters with several agents, before the next stage.
 - approval: pauses until the user approves. Fields: id, name, message. Add one only if the user wants to sign off,
   or before a stage that edits files based on reviews.
@@ -880,12 +1074,9 @@ def build_design(raw: Any, bots: list[dict[str, Any]], engine: str = "claude") -
         sinks = [n["id"] for n in nodes if n["type"] != "done" and not any(e["from"] == n["id"] for e in edges)]
         nodes.append({"id": "done", "type": "done", "name": "Complete"})
         edges += [{"from": s_, "to": "done"} for s_ in sinks if s_ in ids]
-    else:   # a Done the designer forgot to wire up: every loose end goes into it, and Start doesn't skip the teams
-        done = next(n["id"] for n in nodes if n["type"] == "done")
-        edges += [{"from": n["id"], "to": done} for n in nodes if n["type"] not in ("done", "master") and not any(e["from"] == n["id"] for e in edges)]
-        if any(e["to"] == done and e["from"] != "master" for e in edges):
-            edges = [e for e in edges if not (e["from"] == "master" and e["to"] == done)]
     flow = clean_flow({"name": raw.get("name") or "Designed flow", "nodes": nodes, "edges": edges})
+    flow, _ = repair(flow)   # a checkpoint before any team, a loose end, Start wired past the teams
+    flow = clean_flow(flow)
     _layout(flow)
     return flow
 
@@ -967,12 +1158,62 @@ def _layout(flow: dict[str, Any], direction: str = "lr") -> None:
 # --------------------------------------------------------------------- runs
 
 TERMINAL = ("done", "failed", "stopped", "skipped")
+MAX_REDO = 2     # times you can send work back from one approval
+MAX_RETRY = 3    # most rounds a checker team may send work back
+MAX_ASKS = 2     # questions one agent may stop to ask you
+QUESTION_RE = re.compile(r"^[ \t>*_-]*QUESTION:[ \t*_]*(.+)$", re.M)
+VERDICT_RE = re.compile(r"VERDICT:[\s*_]*(PASS|FAIL)", re.I)
+
+
+def question_of(text: str | None) -> str:
+    """The question an agent stopped to ask you: a QUESTION: line with no report after it ('' when it didn't ask)."""
+    text = text or ""
+    asked = list(QUESTION_RE.finditer(text))
+    if not asked or text.upper().rfind("REPORT:") > asked[-1].start():
+        return ""
+    return " ".join(asked[-1].group(1).strip("*_ ").split())[:400]
+
+
+def verdict_of(reports: Sequence[str]) -> str:
+    """'fail' when any checker's last verdict is FAIL, 'pass' when all said PASS, '' when none gave one."""
+    said = [found[-1].upper() for found in (VERDICT_RE.findall(r or "") for r in reports) if found]
+    return "fail" if "FAIL" in said else "pass" if said else ""
+
+
+def rerun_seed(old: dict[str, Any], node_id: str) -> dict[str, Any]:
+    """What a re-run from one step keeps of an earlier run: every finished step that isn't that step or after it.
+    Raises ValueError with a plain reason when there is nothing to start from."""
+    flow = old.get("flow") or {}
+    ids = {n["id"] for n in flow.get("nodes") or []}
+    edges = flow.get("edges") or []
+    if node_id not in ids:
+        raise ValueError("That step isn't part of this run.")
+    after, frontier = {node_id}, [node_id]
+    while frontier:
+        cur = frontier.pop()
+        for e in edges:
+            if e["from"] == cur and e["to"] not in after:
+                after.add(e["to"])
+                frontier.append(e["to"])
+    states = old.get("nodes") or {}
+    if any((states.get(e["from"]) or {}).get("status") != "done" for e in edges if e["to"] == node_id):
+        raise ValueError("The steps before it didn't finish in that run, so there is nothing to start from.")
+    keep = {}
+    for nid, st in states.items():
+        if nid in ids and nid not in after and st.get("status") == "done":
+            st = json.loads(json.dumps(st))
+            st["note"] = "Kept from the earlier run."
+            for a in st.get("agents") or []:   # their tokens were spent last time, not in this run
+                a.update(cost=0.0, tokens=0)
+            keep[nid] = st
+    return {"nodes": keep, "brief": old.get("brief") or ""}
 
 
 class Run:
     """One execution of a flow. Thread-safe; `snapshot()` is what the page polls."""
 
-    def __init__(self, store: Store, flow: dict[str, Any], task: str, folder: str | Path, roles: dict[str, str] | None = None) -> None:
+    def __init__(self, store: Store, flow: dict[str, Any], task: str, folder: str | Path, roles: dict[str, str] | None = None,
+                 seed: dict[str, Any] | None = None) -> None:
         self.store = store
         self.id = uuid.uuid4().hex[:12]
         self.flow = flow
@@ -983,6 +1224,8 @@ class Run:
         self.started = time.time()
         self.ended = None
         self.files = []               # files this run made or changed, found when it ends
+        self.snap = False             # a before-picture of the folder was taken (teams that can change files)
+        self.undone = False           # you put the folder back after this run
         self.limit = clean_limit(flow.get("limit", DEFAULT_LIMIT))   # tokens; 0 means no limit
         self.over_limit = False
         self.brief = ""
@@ -1000,6 +1243,16 @@ class Run:
         self._save_lock = threading.Lock()
         self._edit_lock = threading.Lock()   # clusters that edit files, in any branch, take turns in the folder
         self._wake = threading.Event()
+        self.checklist = [i["text"] for w in flow.get("widgets") or [] if w["type"] == "checklist" for i in w.get("items") or []][:30]
+        self.feedback = {}            # team id -> what it was told when its work was sent back
+        self.previous = {}            # team id -> what it reported before it was sent back
+        self.rounds = {}              # step id -> how many times it has sent work back
+        self.notes = []               # what you told the team mid-run: every agent that starts later reads it
+        self._ask_serial = threading.Lock()   # one agent's question on screen at a time
+        for nid, old in ((seed or {}).get("nodes") or {}).items():   # a re-run from a step: earlier steps keep their results
+            if nid in self.nodes:
+                self.nodes[nid] = old
+        self.brief = (seed or {}).get("brief") or ""
 
     # -- bookkeeping ------------------------------------------------------------
     def say(self, text: str) -> None:
@@ -1035,7 +1288,7 @@ class Run:
                 "task": self.task, "folder": str(self.folder), "status": self.status, "started": self.started,
                 "ended": self.ended, "cost": self.cost, "tokens": self.tokens, "brief": self.brief, "log": list(self.log),
                 "nodes": json.loads(json.dumps(self.nodes)),
-                "final": self.final_output(), "files": list(self.files),
+                "final": self.final_output(), "files": list(self.files), "snap": self.snap, "undone": self.undone,
             }
 
     def final_output(self) -> str:
@@ -1045,6 +1298,9 @@ class Run:
 
     # -- control ------------------------------------------------------------------
     def start(self) -> None:
+        if any(n["type"] == "cluster" and n.get("tools") in agents.WRITES for n in self.flow["nodes"]):
+            self.snap = snapshot_folder(self.folder, self.store.snap_dir(self.id))
+            self.store.prune_snaps()
         self.say(f"Run started in {self.folder}")
         threading.Thread(target=self._loop, daemon=True).start()
 
@@ -1081,13 +1337,56 @@ class Run:
                 ev.set()
         self.changed(force=True)
 
-    def decide(self, node_id: str, approved: bool, note: str = "") -> bool:
+    def decide(self, node_id: str, approved: bool, note: str = "", redo: bool = False) -> bool:
+        """Your answer where a run waits for you: approve, reject, send the work back (redo), or answer an agent's question."""
         with self.lock:
             ev = self.approvals.get(node_id)
             if not ev or self.nodes[node_id]["status"] != "approval":
                 return False
-            self.decisions[node_id] = (bool(approved), str(note)[:2000])
+            self.decisions[node_id] = (bool(approved), str(note)[:2000], bool(redo))
             ev.set()
+        return True
+
+    def tell(self, text: str) -> bool:
+        """A note from you while the run goes. Agents already working can't hear it; every agent that starts after does."""
+        text = " ".join(str(text or "").split())[:1000]
+        with self.lock:
+            if not text or self.status not in ("running", "waiting"):
+                return False
+            self.notes.append(text)
+        self.say(f"You told the team: {text}")
+        return True
+
+    def _send_back(self, nid: str, note: str, limit: int = MAX_REDO) -> bool:
+        """Have the team(s) feeding a step redo their work with `note` as feedback, then come back through this step.
+        False when there is no team before it, or it has already sent work back `limit` times."""
+        with self.lock:
+            if self.status == "stopped" or self.rounds.get(nid, 0) >= limit:
+                return False
+            teams, between, frontier = [], [], list(self.inputs[nid])
+            while frontier:
+                cur = frontier.pop()
+                if cur in teams or cur in between:
+                    continue
+                if self.by_id[cur]["type"] == "cluster":
+                    teams.append(cur)
+                elif self.by_id[cur]["type"] != "master":
+                    between.append(cur)
+                    frontier += self.inputs[cur]
+            if not teams:
+                return False
+            self.rounds[nid] = self.rounds.get(nid, 0) + 1
+            for t in teams:
+                self.previous[t] = self.nodes[t]["output"]
+                self.feedback[t] = note
+            for x in [*teams, *between, nid]:
+                st = self.nodes[x]
+                for a in st["agents"]:
+                    a["old"] = True   # an earlier round: kept for the record, not part of the result
+                st.pop("items", None)
+                st.update(status="waiting", output="", started=None, ended=None, error="", note=f"Round {self.rounds[nid] + 1}: sent back with feedback.")
+            names = ", ".join(self.by_id[t]["name"] for t in teams)
+        self.say(f"{self.by_id[nid]['name']} sent the work back to {names} (round {self.rounds[nid] + 1}).")
         return True
 
     # -- scheduler ----------------------------------------------------------------
@@ -1150,7 +1449,7 @@ class Run:
         with self.lock:
             if self.status == "stopped" and st["status"] not in ("done", "failed"):
                 st["status"] = "stopped"
-            st["ended"] = time.time()
+            st["ended"] = None if st["status"] == "waiting" else time.time()   # waiting: it sent work back and runs again
         if st["status"] == "failed":
             self.say(f"{node['name']} failed: {st['error'] or 'see its agents'}")
         elif st["status"] == "done":
@@ -1241,7 +1540,18 @@ class Run:
             "Work economically: read only the files you need, prefer Grep and Glob over reading whole files, "
             "and skip exploratory detours.",
             "Do your stage's job only; other stages handle the rest.",
+            'If you can\'t do your job without something only the user knows (which file, which account, a choice that changes '
+            'everything), stop and make the last line of your reply "QUESTION:" followed by that one question, with no REPORT. '
+            "Ask only when a wrong guess would waste the whole job; otherwise decide, and say what you assumed.",
+            *(['You are the checker for the work that came before you. End your report with a line that is exactly "VERDICT: PASS" '
+               'or "VERDICT: FAIL". On FAIL the team before you redoes the work with your report as its feedback, so say '
+               "exactly what is wrong and what a pass looks like. Pass work that does the job; don't fail it over taste."]
+              if node.get("retry") else []),
             ITEMS_NOTE,
+            *(["The user's checklist for this job:\n" + "\n".join(f"- {c}" for c in self.checklist)
+               + '\nFor each item your own work in this stage completes or confirms, add a line to your report: "CHECKED: " followed by '
+               "the item, word for word. Never tick an item you didn't finish or check yourself."]
+              if self.checklist else []),
             'Finish with a section starting with "REPORT:" (under 250 words, plus any list your job produces). Its first '
             'line is "Bottom line:" and one plain sentence for the user, naming what they now have and how to use it, '
             'even when your job was checking the work (for example "index.html is a working todo page: open '
@@ -1264,6 +1574,12 @@ class Run:
             parts.append(f"# Handoff from earlier stages\n{handoff}")
         if teammates:
             parts.append(f"# Teammates who went before you in this stage\n{teammates}")
+        if self.feedback.get(nid):
+            parts.append("# Sent back to you\nYour team already did this job once in this run and it was sent back. Fix what the "
+                         "feedback says and keep what was fine; your earlier work is still in the folder.\n\n## Feedback\n" + self.feedback[nid]
+                         + (f"\n\n## What your team reported last time\n{self.previous[nid]}" if self.previous.get(nid) else ""))
+        if self.notes:
+            parts.append("# Notes the user sent during this run\n" + "\n".join(f"- {n}" for n in self.notes))
         parts.append(f"# Your focus\n{focus}")
         return "\n\n".join(parts)
 
@@ -1272,7 +1588,7 @@ class Run:
                shape: str | None = None, color: str | None = None, connectors: Sequence[str] = (), known: Sequence[str] = (), clis: Sequence[str] = (),
                engine: str = "claude", engine_model: str = "") -> dict[str, Any]:
         """Run one agent to completion, tracked in the node's state. Returns its record."""
-        rec = {"name": label, "status": "running", "step": "", "steps": [], "report": "", "items": [], "error": "",
+        rec = {"name": label, "status": "running", "step": "", "steps": [], "report": "", "items": [], "error": "", "question": "",
                "cost": 0.0, "turns": 0, "model": model if engine == "claude" else engines.LABELS[engine], "engine": engine, "session_id": "", "started": time.time(), "ended": None,
                "shape": shape or node.get("shape") or "crab", "color": color or node.get("color") or "#ecebe6"}
 
@@ -1302,7 +1618,7 @@ class Run:
                 self.live_agents.remove(agent)
             rec.update(status="done" if ok else ("stopped" if agent.stopped else "failed"),
                        report=agents.report_of(strip_items(agent.text), REPORT_LIMIT) if ok else "",
-                       items=parse_items(agent.text) if ok else [],
+                       items=parse_items(agent.text) if ok else [], question=question_of(agent.text) if ok else "",
                        error=agent.error or "", cost=round(agent.cost, 4), tokens=agent.tokens, turns=agent.turns,
                        step=agent.step, ended=time.time())
         if agent.out_of_usage:
@@ -1360,11 +1676,22 @@ class Run:
             st["note"] = (st.get("note", "") + " This Windows setup can't restrict Codex to the selected folder, so this team ran with full access to your computer.").strip()
 
         def one(i: int, teammates: str = "") -> dict[str, Any]:
-            return self._agent(node, st, f"{node['name']} {i}" if n > 1 else node["name"],
-                               model=node["model"], effort=node.get("effort", "low"), tools=node["tools"],
-                               system=self._system(node, i, n, apps, clis), prompt=self._prompt(node["id"], focus(i), teammates),
-                               max_turns=node.get("max_turns", 0), connectors=apps, known=known, clis=clis,
-                               engine=engine, engine_model=node.get("engine_model", ""))
+            answered = ""
+            for asks in range(MAX_ASKS + 1):
+                rec = self._agent(node, st, f"{node['name']} {i}" if n > 1 else node["name"],
+                                  model=node["model"], effort=node.get("effort", "low"), tools=node["tools"],
+                                  system=self._system(node, i, n, apps, clis), prompt=self._prompt(node["id"], focus(i), teammates) + answered,
+                                  max_turns=node.get("max_turns", 0), connectors=apps, known=known, clis=clis,
+                                  engine=engine, engine_model=node.get("engine_model", ""))
+                if rec["status"] != "done" or not rec["question"] or asks == MAX_ASKS:
+                    return rec
+                answer = self._ask(node, st, rec)
+                if answer is None:   # the run was stopped while it waited
+                    return rec
+                answered += (f"\n\n# You asked the user\n{rec['question']}\n\n# The user answered\n"
+                             + (answer or "No answer. Use your best judgment and say what you assumed.")
+                             + "\nAnything you already did is still in the folder. Carry on and finish the job.")
+            return rec
 
         # Agents that edit files take turns, so they never overwrite each other. A team that splits the job
         # works side by side instead: each agent only writes its own part.
@@ -1413,6 +1740,34 @@ class Run:
             if len(good) < len(recs):
                 st["note"] = f"{len(recs) - len(good)} of {len(recs)} agents failed; passing on the rest."
             st["status"] = "done"
+            if node.get("retry") and verdict_of([r["report"] for r in good]) == "fail":
+                if self._send_back(node["id"], st["output"], limit=node["retry"]):
+                    return
+                st["note"] = (f"Still not passing after {self.rounds.get(node['id'], 0)} round"
+                              f"{'' if self.rounds.get(node['id'], 0) == 1 else 's'} of fixes, so it was passed on as it is.")
+
+    def _ask(self, node: dict[str, Any], st: dict[str, Any], rec: dict[str, Any]) -> str | None:
+        """An agent stopped to ask you something: wait here for the answer ('' = you skipped it, None = the run stopped)."""
+        with self._ask_serial:
+            ev = threading.Event()
+            with self.lock:
+                if self.status == "stopped":
+                    return None
+                rec["status"] = "asked"
+                self.approvals[node["id"]] = ev
+                was = st["status"]
+                st["status"], st["question"] = "approval", {"agent": rec["name"], "text": rec["question"]}
+            self.say(f"{rec['name']} asks: {rec['question']}")
+            self.changed(force=True)
+            ev.wait()
+            with self.lock:
+                approved, note, _ = self.decisions.pop(node["id"], (False, "", False))
+                st.pop("question", None)
+                if self.status == "stopped":
+                    return None
+                st["status"] = was
+            self.say(f"You answered {rec['name']}." if approved and note else f"You skipped {rec['name']}'s question.")
+            return note if approved else ""
 
     def _checkpoint(self, node: dict[str, Any], st: dict[str, Any]) -> None:
         handoff = self._handoff(node["id"])
@@ -1449,9 +1804,14 @@ class Run:
             threading.Thread(target=_ping, args=(node["webhook"], self.flow["name"], msg), daemon=True).start()
         self.changed(force=True)
         ev.wait()
-        approved, note = self.decisions.get(node["id"], (False, ""))
+        approved, note, redo = self.decisions.pop(node["id"], (False, "", False))
         if self.status == "stopped":
             st["status"] = "stopped"
+            return
+        if not approved and redo:
+            if self._send_back(node["id"], note or "Not good enough yet. Look again and improve it."):
+                return
+            st["status"], st["error"] = "failed", f"Rejected: the work had already been sent back {MAX_REDO} times." + (f" {note}" if note else "")
             return
         if approved:
             handoff = self._handoff(node["id"])
@@ -1518,6 +1878,134 @@ def count_files(folder: str | Path, cap: int = 2000, seconds: float = 1.0) -> in
     return n
 
 
+SNAP_FILES, SNAP_BYTES, SNAP_TOTAL = 600, 300_000, 30_000_000   # what a before-picture of a folder may hold
+
+
+def snapshot_folder(folder: str | Path, dest: str | Path) -> bool:
+    """Copy the folder's own small files to dest before a run that can change them, with a list of everything that
+    was there. False when there is nothing to keep (no folder) or it is too big to copy quickly."""
+    root, dest = Path(folder), Path(dest)
+    if not root.is_dir():
+        return False
+    listing, copied, total = {}, 0, 0
+    try:
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+            for name in filenames:
+                path = Path(dirpath) / name
+                rel = path.relative_to(root).as_posix()
+                try:
+                    size = path.stat().st_size
+                except OSError:
+                    continue
+                listing[rel] = size
+                if len(listing) > 5000:
+                    return False
+                if size <= SNAP_BYTES and copied < SNAP_FILES and total + size <= SNAP_TOTAL:
+                    target = dest / "files" / rel
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(path, target)
+                    copied, total = copied + 1, total + size
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "listing.json").write_text(json.dumps(listing), encoding="utf-8")
+    except OSError:
+        shutil.rmtree(dest, ignore_errors=True)
+        return False
+    return True
+
+
+def _text_lines(path: Path) -> list[str] | None:
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    if b"\0" in data[:4000] or len(data) > SNAP_BYTES:
+        return None
+    return data.decode("utf-8", errors="replace").splitlines()
+
+
+def folder_changes(folder: str | Path, snap: str | Path, limit: int = 40) -> list[dict[str, Any]]:
+    """What a run did to its folder, against the before-picture: each file new, changed or deleted, with a diff
+    when both sides are text. Newest work first is not known here, so files come in name order."""
+    root, snap = Path(folder), Path(snap)
+    try:
+        listing = json.loads((snap / "listing.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    now = {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+        for name in filenames:
+            path = Path(dirpath) / name
+            now[path.relative_to(root).as_posix()] = path
+        if len(now) > 6000:
+            break
+    out = []
+    for rel in sorted(set(listing) | set(now)):
+        before, after = snap / "files" / rel, now.get(rel)
+        if rel not in listing:
+            kind, old, new = "new", [], _text_lines(after)
+        elif after is None:
+            kind, old, new = "deleted", _text_lines(before) if before.is_file() else None, []
+        else:
+            if not before.is_file():   # too big to have been copied: only its size tells
+                if after.stat().st_size == listing[rel]:
+                    continue
+                out.append({"file": rel, "kind": "changed", "added": 0, "removed": 0, "diff": "", "restorable": False})
+                continue
+            if before.stat().st_size == after.stat().st_size and before.read_bytes() == after.read_bytes():
+                continue
+            kind, old, new = "changed", _text_lines(before), _text_lines(after)
+        diff = [] if old is None or new is None else list(difflib.unified_diff(old, new, lineterm="", n=2))[2:]
+        out.append({"file": rel, "kind": kind, "added": sum(ln.startswith("+") for ln in diff), "removed": sum(ln.startswith("-") for ln in diff),
+                    "diff": "\n".join(diff[:400]) + ("\n… and more" if len(diff) > 400 else ""),
+                    "restorable": kind == "new" or before.is_file()})
+        if len(out) >= limit:
+            break
+    return out
+
+
+def undo_changes(folder: str | Path, snap: str | Path) -> int:
+    """Put the folder back the way the before-picture has it: changed and deleted files restored, new files removed.
+    Returns how many files it touched. Files too big to have been copied are left alone."""
+    root, snap, n = Path(folder), Path(snap), 0
+    for ch in folder_changes(root, snap, limit=5000):
+        if not ch["restorable"]:
+            continue
+        target = root / ch["file"]
+        try:
+            if ch["kind"] == "new":
+                target.unlink()
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(snap / "files" / ch["file"], target)
+            n += 1
+        except OSError:
+            continue
+    return n
+
+
+IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml"}
+
+
+def read_for_preview(path: Path) -> dict[str, str]:
+    """A file for the canvas's file preview: its text (the first part), or a picture as a data URL."""
+    import base64
+    try:
+        size = path.stat().st_size
+        if path.suffix.lower() in IMAGE_TYPES:
+            if size > 2_000_000:
+                return {"error": "That picture is too big to preview."}
+            return {"image": f"data:{IMAGE_TYPES[path.suffix.lower()]};base64," + base64.b64encode(path.read_bytes()).decode()}
+        data = path.read_bytes()[:60_000]
+    except OSError:
+        return {"error": "It's not there any more."}
+    if b"\0" in data[:4000]:
+        return {"error": "Not a text file, so there is nothing to show."}
+    text = data.decode("utf-8", errors="replace")
+    return {"text": text + ("\n… (the rest isn't shown)" if size > 60_000 else "")}
+
+
 def changed_files(folder: str | Path, since: float, limit: int = 40) -> list[str]:
     """Files under folder modified since a time, newest first, as paths relative to it (forward slashes).
     Skips hidden and build folders, and gives up on huge trees rather than stall the end of a run."""
@@ -1573,9 +2061,9 @@ class Runner:
                     rec.setdefault("log", []).append({"t": last, "text": "Interrupted: Lithnode closed while this was running."})
                     self.store.save_run(rec)
 
-    def start(self, flow: dict[str, Any], task: str, folder: str | Path) -> Run:
+    def start(self, flow: dict[str, Any], task: str, folder: str | Path, seed: dict[str, Any] | None = None) -> Run:
         flow = {**clean_flow(flow), "id": flow["id"]}   # never trust a flow just because it came from disk
-        run = Run(self.store, flow, task, folder, self.bot_roles())
+        run = Run(self.store, flow, task, folder, self.bot_roles(), seed)
         with self.lock:
             self.runs[run.id] = run
         run.start()

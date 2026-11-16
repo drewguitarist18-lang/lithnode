@@ -251,7 +251,8 @@ try:
                 "z": ("", flows.SUMMARY_MODEL)} and rf["models"]["build"] == "claude-sonnet-5-5", m)
     check("the designer's stages get a role even when it names none",
           [n.get("role") for n in flows.build_design({"nodes": [{"type": "master"}, {"id": "t", "type": "cluster"},
-                                                                {"id": "m", "type": "checkpoint", "mode": "summarize"}]}, [])["nodes"]
+                                                                {"id": "m", "type": "checkpoint", "mode": "summarize"}],
+                                                      "edges": [{"from": "t", "to": "m"}]}, [])["nodes"]
            if n["type"] != "done"] == ["build", "build", "run"])
     check("every template stage that runs a model has a role", all(n.get("role") for t in flows.TEMPLATES for n in t["nodes"] if "model" in n))
     check("out-of-usage notices are recognized, ordinary failures aren't",
@@ -822,6 +823,73 @@ try:
     check("Browse returns the folder picked", call("/api/pick-folder", {}, "POST")[1]["folder"] == str(project))
     check("folders you ran flows in are suggested, once each", call("/api/folders")[1]["folders"].count(str(project)) == 1)
 
+
+    # ---- send work back, loop until it passes, re-run from a step, questions and notes mid-run --------------------
+    def chain(nodes, edges):
+        flow = {"name": "Chain", "nodes": [{"id": "master", "type": "master", "x": 0, "y": 0, "mode": "pass"}, *nodes,
+                                           {"id": "done", "type": "done", "x": 0, "y": 0}], "edges": [{"from": x, "to": y} for x, y in edges]}
+        _, made = call("/api/flows", {}, "POST")
+        return call(f"/api/flows/{made['flow']['id']}", flow, "POST")[1]["flow"]["id"]
+
+    gate = chain([{"id": "b", "type": "cluster", "name": "Maker", "model": "claude-haiku-4-5"}, {"id": "ok", "type": "approval", "name": "Your call"}],
+                 [("master", "b"), ("b", "ok"), ("ok", "done")])
+    rid = call(f"/api/flows/{gate}/run", {"task": "Make the thing", "folder": str(project)}, "POST")[1]["run"]
+    wait_run(rid, until=("waiting",))
+    s, _ = call(f"/api/runs/{rid}/note", {"text": "Keep it short"}, "POST")
+    check("a note to a running team is taken", s == 200 and any("You told the team: Keep it short" in e["text"] for e in call(f"/api/runs/{rid}")[1]["log"]))
+    check("an empty note is refused", call(f"/api/runs/{rid}/note", {"text": "  "}, "POST")[0] == 400)
+    call(f"/api/runs/{rid}/decide", {"node": "ok", "approved": False, "redo": True, "note": "Too long"}, "POST")
+    time.sleep(0.5)
+    r = wait_run(rid, until=("waiting", "failed", "done"))
+    made = r["nodes"]["b"]["agents"]
+    check("reject with send-back has the team redo the work, with your feedback", r["status"] == "waiting" and len(made) == 2 and made[0].get("old")
+          and "after feedback" in made[1]["report"], [(a["status"], a.get("old"), a["report"]) for a in made])
+    sent = [json.loads(line) for line in Path(cli_dir, "calls.jsonl").read_text().splitlines() if "Too long" in line]
+    check("the redo reads the feedback, its last report and your note", bool(sent) and "# Sent back to you" in sent[-1]["prompt"]
+          and "What your team reported last time" in sent[-1]["prompt"] and "- Keep it short" in sent[-1]["prompt"])
+    call(f"/api/runs/{rid}/decide", {"node": "ok", "approved": False, "redo": True}, "POST")
+    time.sleep(0.5)
+    wait_run(rid, until=("waiting", "failed", "done"))
+    call(f"/api/runs/{rid}/decide", {"node": "ok", "approved": False, "redo": True}, "POST")
+    r = wait_run(rid)
+    check("work can be sent back twice, then a third reject ends the run", r["status"] == "failed" and "already been sent back" in r["nodes"]["ok"]["error"], r["nodes"]["ok"])
+
+    loop = chain([{"id": "b", "type": "cluster", "name": "Maker", "model": "claude-haiku-4-5"},
+                  {"id": "chk", "type": "cluster", "name": "Checker gate", "model": "claude-haiku-4-5", "retry": 2}],
+                 [("master", "b"), ("b", "chk"), ("chk", "done")])
+    check("a checker's send-back rounds are saved, capped at 3", call(f"/api/flows/{loop}")[1]["flow"]["nodes"][2]["retry"] == 2
+          and flows.clean_node({"id": "x", "type": "cluster", "retry": 99})["retry"] == 3)
+    r = wait_run(call(f"/api/flows/{loop}/run", {"task": "Make the thing", "folder": str(project)}, "POST")[1]["run"])
+    check("a checker that fails the work sends it back, and passes the redo", r["status"] == "done" and "VERDICT: PASS" in r["final"]
+          and len(r["nodes"]["b"]["agents"]) == 2 and len(r["nodes"]["chk"]["agents"]) == 2, r["final"])
+    r = wait_run(call(f"/api/flows/{loop}/run", {"task": "ALWAYSFAIL make the thing", "folder": str(project)}, "POST")[1]["run"])
+    check("a checker that never passes stops after its rounds and says so", r["status"] == "done" and len(r["nodes"]["chk"]["agents"]) == 3
+          and "Still not passing after 2 rounds" in r["nodes"]["chk"]["note"], r["nodes"]["chk"]["note"])
+
+    two = chain([{"id": "a", "type": "cluster", "name": "First", "model": "claude-haiku-4-5"}, {"id": "b", "type": "cluster", "name": "Second", "model": "claude-haiku-4-5"}],
+                [("master", "a"), ("a", "b"), ("b", "done")])
+    first = wait_run(call(f"/api/flows/{two}/run", {"task": "Make the thing", "folder": str(project)}, "POST")[1]["run"])
+    s, d = call(f"/api/runs/{first['id']}/rerun", {"node": "b"}, "POST")
+    again = wait_run(d["run"]) if s == 200 else {}
+    check("re-run from a step keeps the earlier steps and redoes the rest", s == 200 and again.get("status") == "done"
+          and again["nodes"]["a"]["output"] == first["nodes"]["a"]["output"] and again["nodes"]["a"]["note"] == "Kept from the earlier run."
+          and again["nodes"]["b"]["output"] != first["nodes"]["b"]["output"] and again["nodes"]["a"]["agents"][0]["tokens"] == 0, d)
+    check("re-run from a step that isn't there is refused", call(f"/api/runs/{first['id']}/rerun", {"node": "nope"}, "POST")[0] == 400)
+
+    asker = simple_flow({"name": "Sorter", "count": 1, "model": "claude-haiku-4-5"})
+    rid = call(f"/api/flows/{asker}/run", {"task": "ASKUSER sort the columns", "folder": str(project)}, "POST")[1]["run"]
+    r = wait_run(rid, until=("waiting", "done", "failed"))
+    check("an agent can stop and ask you a question", r["status"] == "waiting" and r["nodes"]["c"]["status"] == "approval"
+          and r["nodes"]["c"].get("question") == {"agent": "Sorter", "text": "Which file should I sort?"}, r["nodes"]["c"])
+    call(f"/api/runs/{rid}/decide", {"node": "c", "approved": True, "note": "data.csv"}, "POST")
+    r = wait_run(rid)
+    got = [json.loads(line) for line in Path(cli_dir, "calls.jsonl").read_text().splitlines() if "ASKUSER" in line]
+    check("your answer goes back to it and it finishes the job", r["status"] == "done" and [a["status"] for a in r["nodes"]["c"]["agents"]] == ["asked", "done"]
+          and "# The user answered\ndata.csv" in got[-1]["prompt"] and "question" not in r["nodes"]["c"], [a["status"] for a in r["nodes"]["c"]["agents"]])
+    check("questions and verdicts are read from what agents write",
+          flows.question_of("Hmm.\n\nQUESTION: Which **file**?") == "Which **file**?" and flows.question_of("QUESTION: x?\n\nREPORT: did it") == ""
+          and flows.verdict_of(["ok\nVERDICT: PASS", "bad\n**VERDICT:** FAIL"]) == "fail" and flows.verdict_of(["VERDICT: FAIL then VERDICT: PASS"]) == "pass"
+          and flows.verdict_of(["no verdict"]) == "")
 
     # ---- a Free plan has no Fable ---------------------------------------------------------------
     Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True, "plan": "free"}))

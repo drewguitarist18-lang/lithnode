@@ -73,6 +73,10 @@
       <button id="zFit" title="Fit to screen" aria-label="Fit to screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
     </div>
   </div>
+  <section id="dock" aria-label="Run dock">
+    <div class="dpane"><header><h4>Live</h4><span class="dsub" id="dockWho"></span></header><div class="dbody" id="dockLive"></div></div>
+    <div class="dpane"><header><div class="dtabs" id="dockTabs" role="tablist"></div><button type="button" class="dtog" id="dockTog" aria-label="Show or hide the dock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></header><div class="dbody" id="dockSide"></div></div>
+  </section>
   <aside class="rside" id="rside">
     <div class="rtop"><button id="runsBtn" title="Every run of your flows"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5v4h4"/><path d="M12 7.5V12l3 2"/></svg>Runs</button><span class="grow"></span><button id="runBtn" class="primary"><svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>Run</button><button class="ib" id="paneR" title="Hide the side panel" aria-label="Hide the side panel" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></svg></button></div>
     <div class="probs" id="probChip" hidden></div>
@@ -98,6 +102,7 @@
     <div class="field"><label for="taskIn">What should the team do this run?</label>
       <textarea id="taskIn" rows="4" placeholder="Write the job in your own words, e.g. Find bugs in the checkout code and list them with file and line"></textarea>
       <div class="ideas" id="taskIdeas"></div>
+      <div class="jobs" id="jobChips"></div>
       <div class="sub" id="taskSub"></div></div>
     <div class="field"><label for="folderIn">Project folder</label><div class="folder"><input id="folderIn" list="recentFolders" placeholder="Pick your project folder (blank = a scratch folder)">
       <button type="button" data-browse="folderIn">Browse…</button></div>
@@ -115,13 +120,20 @@
         <label><span>Orchestrator</span><select id="roleBuild" data-role="build"></select></label>
         <label><span>Performer</span><select id="roleRun" data-role="run"></select></label></div>
       <div class="sub" id="rolesSub"></div></div>
+    <details class="sched" id="schedBox"><summary>Schedule <span id="schedState"></span></summary>
+      <div class="schedrow"><select id="schedEvery" aria-label="How often"><option value="hour">Every hour</option><option value="day">Every day</option><option value="weekday">Every weekday</option></select>
+        <span>at</span><input type="time" id="schedAt" value="09:00" aria-label="Time"><span class="grow"></span>
+        <button type="button" id="schedOff" hidden>Turn off</button><button type="button" id="schedSave">Turn on</button></div>
+      <div class="sub" id="schedJob"></div>
+      <div class="sub">Uses the job and folder above. It runs only while Lithnode is open, and starts without the questions or the checkbox below. For every hour, only the minutes of the time count.</div></details>
+    <div id="previewBox" class="previewbox" hidden></div>
     <div id="askBox" class="askbox" hidden></div>
     <label id="riskBox" class="risk" hidden><input type="checkbox" id="riskOk"> <span id="riskText"></span></label>
     <div id="heavyWarn" class="hint" hidden></div>
     <div id="runWarn" class="hint" style="color:var(--failed)"></div>
   </div>
   <footer class="rfoot"><span id="runEst" class="hint"></span>
-    <div class="acts"><button data-close>Cancel</button><button type="button" id="skipCheck" hidden>Run anyway</button><button class="primary go" id="goBtn">▶ Start run <kbd id="goKey">Ctrl ↵</kbd></button></div></footer>
+    <div class="acts"><button data-close>Cancel</button><button type="button" id="previewBtn" hidden title="One quick agent says what each team would do with this job">Preview</button><button type="button" id="skipCheck" hidden>Run anyway</button><button class="primary go" id="goBtn">▶ Start run <kbd id="goKey">Ctrl ↵</kbd></button></div></footer>
 </dialog>
 
 <dialog id="usageDlg" class="usagedlg">
@@ -251,6 +263,7 @@ async function loadClis() {
   renderInspector();
 }
 let flows = [], flow = null, est = null, problems = [], bots = [];
+let fixable = false, pastRuns = {};   // the Fix it button, and what this flow's finished runs used
 let allRuns = [];              // the latest runs of every flow (the overview lists this flow's)
 let sel = null;                 // { kind: "node" | "edge", id }
 const view = { x: 40, y: 20, k: 1 };
@@ -313,7 +326,7 @@ async function boot() {
 
 async function openFlow(id) {
   const d = await api("/api/flows/" + id);
-  flow = d.flow; est = d.estimate; problems = d.problems; sel = null; draftTask = "";
+  flow = d.flow; est = d.estimate; problems = d.problems; fixable = !!d.fixable; pastRuns = d.history || {}; sel = null; draftTask = "";
   try { localStorage.setItem("hq-flow", id); } catch (e) {}
   if (flow.auto !== false) {   // open it neatly arranged, and save that if it moved anything
     const before = JSON.stringify(flow.nodes.map((n) => [n.x, n.y]));
@@ -353,7 +366,7 @@ async function save() {   // resolves once your latest edits are on the server; 
   saving = (async () => {
     try {
       const d = await api("/api/flows/" + flow.id, { method: "POST", body: flow });
-      est = d.estimate; problems = d.problems; renderChips();
+      est = d.estimate; problems = d.problems; fixable = !!d.fixable; pastRuns = d.history || pastRuns; renderChips();
       $("saved").textContent = "Saved";
       const f = flows.find((x) => x.id === flow.id);
       if (f) f.name = flow.name;   // the flow menu lists it by this name
@@ -526,6 +539,177 @@ $("canvas").addEventListener("drop", (e) => {
   let spec; try { spec = JSON.parse(e.dataTransfer.getData("text/hq-node")); } catch (err) { return; }
   const p = toWorld(e.clientX, e.clientY);
   addNode(spec.type, p.x - 107, p.y - 30, spec.bot);
+});
+
+// ------------------------------------------------------------------ dock: the strip under the canvas
+// Left: what the agents are doing right now. Right: run stats, your checklist, a file the run made, a note, and your
+// approvals when one is waiting. It always sits in the same place; nothing to drag or arrange. The checklist and the
+// note are saved with the flow (in flow.widgets). Only the checklist reaches a run: agents are told its items and tick
+// what they finish.
+const DOCK_TABS = [["stats", "Stats"], ["checklist", "Checklist"], ["file", "File"], ["note", "Note"]];
+let dockTab = "stats", dockOpen = true, dockFile = "", dockHadCalls = false;
+try { dockTab = localStorage.getItem("hq-dock-tab") || "stats"; dockOpen = localStorage.getItem("hq-dock") !== "0"; } catch (e) { /* private window */ }
+if (!DOCK_TABS.some(([id]) => id === dockTab)) dockTab = "stats";
+let dockView = dockTab;
+const dockItem = (type, f = shown()) => (f.widgets || []).find((w) => w.type === type);
+function dockEdit(type) {   // the flow's own checklist or note, made the first time you use it
+  let w = dockItem(type, flow);
+  if (!w) {
+    w = { id: `${type}-1`, type, x: 0, y: 0, w: 280, h: 180, ...(type === "note" ? { text: "" } : { items: [] }) };
+    flow.widgets = (flow.widgets || []).concat(w);
+  }
+  return w;
+}
+// an item counts as ticked in a run once any agent's report says "CHECKED: <the item>"
+const normItem = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+function runChecked(text) {
+  if (!run) return false;
+  const want = normItem(text); if (!want) return false;
+  return Object.values(run.nodes).some((st) => (st.agents || []).some((a) => !a.old && a.report &&
+    a.report.split("\n").some((ln) => /^\W*CHECKED:/i.test(ln) && normItem(ln.replace(/^\W*CHECKED:/i, "")) === want)));
+}
+// the files a run has made so far (asked for while it goes), and their contents, for the File tab
+const liveFiles = {}, fileCache = {};
+function runFiles() {
+  if (!run) return [];
+  const live = run.status === "running" || run.status === "waiting", got = liveFiles[run.id];
+  if (live && (!got || Date.now() - got.at > 4000) && !(got && got.busy)) {
+    liveFiles[run.id] = { ...(got || { files: [] }), busy: true, at: Date.now() };
+    api(`/api/runs/${run.id}/files`, { method: "POST", body: {} }).then((d) => { liveFiles[run.id] = { files: d.files || [], at: Date.now() }; renderDock(); })
+      .catch(() => { liveFiles[run.id] = { files: (got || {}).files || [], at: Date.now() }; });
+  }
+  return live ? (liveFiles[run.id] || {}).files || [] : run.files || [];
+}
+function fileView(file) {
+  const key = run.id + "|" + file, got = fileCache[key], live = run.status === "running" || run.status === "waiting";
+  if ((!got || (live && Date.now() - got.at > 4000)) && !(got && got.busy)) {
+    fileCache[key] = { ...(got || {}), busy: true, at: Date.now() };
+    api(`/api/runs/${run.id}/read`, { method: "POST", body: { file } }).then((d) => { fileCache[key] = { ...d, at: Date.now() }; renderDock(); })
+      .catch((e) => { fileCache[key] = { error: e.message, at: Date.now() }; renderDock(); });
+  }
+  const d = fileCache[key] || {};
+  if (d.image) return `<img src="${esc(d.image)}" alt="${esc(file)}">`;
+  if (d.text !== undefined) return `<pre>${esc(d.text) || " "}</pre>`;
+  return `<p class="dmute">${esc(d.error || "Loading…")}</p>`;
+}
+const dockCalls = () => (run ? Object.entries(run.nodes).filter(([, st]) => st.status === "approval") : []);
+function dockLive() {   // one card per agent at work; once nothing is, the last few that finished
+  if (!run) return { who: "", html: `<p class="dmute">What each agent is doing shows here while a run goes.</p>` };
+  const all = [];
+  for (const n of run.flow.nodes) for (const a of (run.nodes[n.id] || {}).agents || []) if (!a.old) all.push({ a, n });
+  if (!all.length) return { who: "", html: `<p class="dmute">Waiting for the first agent to start.</p>` };
+  const busy = all.filter((x) => x.a.status === "running" || x.a.status === "asked");
+  const html = (busy.length ? busy : all.slice(-4)).slice(-8).reverse().map(({ a, n }) => {
+    const said = a.status === "done" && a.report ? bottomOf(a.report)[0] : a.status === "asked" ? a.question : "";
+    return `<div class="dag" style="--c:${esc(n.color || "#36d39a")}"><div class="dah"><b>${esc(a.name)}</b><span class="pill ${esc(a.status)}">${esc(cap(a.status))}</span></div>`
+      + (said ? `<p>${esc(said)}</p>` : a.error ? `<p class="bad">${esc(String(a.error).split("\n")[0].slice(0, 200))}</p>`
+        : `<ul>${(a.steps || []).slice(-4).map((s) => `<li>${esc(s)}</li>`).join("") || `<li>${esc(a.step || "Starting up")}</li>`}</ul>`) + `</div>`;
+  }).join("");
+  return { who: busy.length ? `${busy.length} working` : "last to finish", html };
+}
+function dockSide(view) {
+  const f = shown();
+  if (view === "call") {
+    return dockCalls().map(([nid, st]) => {
+      const n = f.nodes.find((x) => x.id === nid), q = st.question;
+      return `<div class="dapp"><b>${esc(q ? `${q.agent} asks` : n.name)}</b><p>${esc(q ? q.text : n.message || "Waiting for your approval.")}</p>
+        <div class="acts"><input data-dnote="${esc(nid)}" maxlength="1000" autocomplete="off" placeholder="${q ? "Your answer" : "Optional note"}" aria-label="${q ? "Your answer" : "Note"}">${q ? `<button type="button" data-decide="${esc(nid)}" data-ok="0">Skip</button><button type="button" class="primary" data-decide="${esc(nid)}" data-ok="1">Answer</button>`
+          : `<button type="button" class="danger" data-decide="${esc(nid)}" data-ok="0">Reject</button><button type="button" data-decide="${esc(nid)}" data-ok="0" data-redo="1">Send back</button><button type="button" class="primary" data-decide="${esc(nid)}" data-ok="1">Approve</button>`}</div></div>`;
+    }).join("");
+  }
+  if (view === "stats") {
+    const cell = (big, small) => `<div><b>${esc(String(big))}</b><small>${esc(small)}</small></div>`;
+    if (!run) {
+      const h = pastRuns;
+      return h && h.runs ? `<div class="dstats">${cell(tokenWord(h.tokens), "usual tokens")}${cell(dur(h.seconds), "usual time")}${cell(h.runs, h.runs === 1 ? "past run" : "past runs")}</div>`
+        : `<p class="dmute">Time, tokens and agents show here during a run.</p>`;
+    }
+    const m = runMeta(run);
+    return `<div class="dstats">${cell(dur(m.took), STATUS_WORD[run.status] || run.status)}${cell(run.tokens ? tokenWord(run.tokens) : "0", "tokens")}`
+      + `${cell(`${m.fin}/${m.states.length}`, "steps")}${cell(m.agents, m.agents === 1 ? "agent" : "agents")}</div>`;
+  }
+  if (view === "checklist") {
+    const items = (dockItem("checklist") || {}).items || [];
+    return items.map((it, i) => {
+      const by = runChecked(it.text);
+      return `<div class="dci${it.done || by ? " on" : ""}"><input type="checkbox" data-ci="${i}"${it.done || by ? " checked" : ""}${locked() ? " disabled" : ""} aria-label="${esc(it.text)}"><span>${esc(it.text)}</span>`
+        + (by ? `<em title="An agent reported this done">agent</em>` : "") + (locked() ? "" : `<button type="button" data-cx="${i}" aria-label="Remove item">✕</button>`) + `</div>`;
+    }).join("") + (locked() ? (items.length ? "" : `<p class="dmute">No checklist on this flow.</p>`)
+      : `<input data-cadd maxlength="120" autocomplete="off" placeholder="${items.length ? "Add another…" : "What must be true when the job is done? Agents tick these off."}">`);
+  }
+  if (view === "file") {
+    if (!run) return `<p class="dmute">Shows a file a run makes or changes, as it changes.</p>`;
+    const files = runFiles(), file = files.includes(dockFile) ? dockFile : files[0];
+    if (!file) return `<p class="dmute">No files made or changed yet.</p>`;
+    return `<select data-dfile aria-label="File to show">${files.map((x) => `<option value="${esc(x)}"${x === file ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>` + fileView(file);
+  }
+  return `<textarea class="dnote" data-dtext placeholder="A note kept with this flow: reminders, context, what to try next." spellcheck="false"${locked() ? " readonly" : ""}></textarea>`;
+}
+function renderDock() {
+  const dock = $("dock"); if (!dock) return;
+  const calls = dockCalls();
+  if (calls.length && !dockHadCalls) dockView = "call";            // something needs you: it comes to the front by itself
+  if (!calls.length && dockView === "call") dockView = dockTab;
+  dockHadCalls = calls.length > 0;
+  const open = dockOpen || calls.length > 0;
+  dock.classList.toggle("shut", !open);
+  $("dockTog").setAttribute("aria-expanded", String(open));
+  $("dockTog").title = open ? "Hide the dock" : "Show the dock";
+  const tabs = (calls.length ? [["call", `Your call${calls.length > 1 ? ` · ${calls.length}` : ""}`]] : []).concat(DOCK_TABS)
+    .map(([id, name]) => `<button type="button" role="tab" data-dtab="${id}" class="${id === "call" ? "call" : ""}" aria-selected="${id === dockView}">${esc(name)}</button>`).join("");
+  if ($("dockTabs").dataset.html !== tabs) { $("dockTabs").innerHTML = tabs; $("dockTabs").dataset.html = tabs; }
+  const live = dockLive();
+  $("dockWho").textContent = live.who;
+  for (const [box, html] of [[$("dockLive"), live.html], [$("dockSide"), dockSide(dockView)]]) {
+    if (box.dataset.html === html) continue;
+    const adding = document.activeElement && document.activeElement.matches("[data-cadd]") && box.contains(document.activeElement);
+    const typed = Object.fromEntries([...box.querySelectorAll("[data-dnote]")].map((t) => [t.dataset.dnote, t.value]));   // a half-typed answer survives a redraw
+    box.innerHTML = html; box.dataset.html = html;
+    box.querySelectorAll("[data-dnote]").forEach((t) => { if (typed[t.dataset.dnote]) t.value = typed[t.dataset.dnote]; });
+    if (adding) { const a = box.querySelector("[data-cadd]"); if (a) a.focus(); }
+  }
+  const note = $("dockSide").querySelector("[data-dtext]");
+  if (note) { const text = (dockItem("note") || {}).text || ""; if (document.activeElement !== note && note.value !== text) note.value = text; }
+}
+$("dock").addEventListener("click", async (e) => {
+  if (e.target.closest("#dockTog")) {
+    dockOpen = $("dock").classList.contains("shut");
+    try { localStorage.setItem("hq-dock", dockOpen ? "1" : "0"); } catch (err) { /* private window */ }
+    renderDock(); if (autoFit) fit();
+    return;
+  }
+  const tab = e.target.closest("[data-dtab]");
+  if (tab) {
+    dockView = tab.dataset.dtab;
+    if (dockView !== "call") { dockTab = dockView; try { localStorage.setItem("hq-dock-tab", dockTab); } catch (err) { /* private window */ } }
+    if (!dockOpen) { dockOpen = true; try { localStorage.setItem("hq-dock", "1"); } catch (err) { /* private window */ } }
+    return renderDock();
+  }
+  const dec = e.target.closest("[data-decide]");
+  if (dec && run) {   // approve, reject, send back or answer, without leaving the canvas
+    const nid = dec.dataset.decide, note = ($("dockSide").querySelector(`[data-dnote="${nid}"]`) || {}).value || "";
+    try { await api(`/api/runs/${run.id}/decide`, { method: "POST", body: { node: nid, approved: dec.dataset.ok === "1", note, redo: dec.dataset.redo === "1" } }); } catch (err) { toast(err.message); }
+    return pollRun();
+  }
+  const cx = e.target.closest("[data-cx]");
+  if (cx && !locked()) { dockEdit("checklist").items.splice(+cx.dataset.cx, 1); changed(false); }
+});
+$("dock").addEventListener("change", (e) => {
+  if (e.target.matches("[data-dfile]")) { dockFile = e.target.value; return renderDock(); }
+  if (e.target.matches("[data-ci]") && !locked()) { dockEdit("checklist").items[+e.target.dataset.ci].done = e.target.checked; changed(false); }
+});
+$("dock").addEventListener("input", (e) => {
+  if (e.target.matches("[data-dtext]") && !locked()) { dockEdit("note").text = e.target.value.slice(0, 4000); changed(false); }
+});
+$("dock").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || !e.target.matches("[data-cadd]") || locked()) return;
+  e.preventDefault();
+  const text = e.target.value.trim(); if (!text) return;
+  const w = dockEdit("checklist");
+  if (w.items.length >= 30) return toast("That checklist is full.");
+  w.items.push({ text: text.slice(0, 120), done: false });
+  changed(false);
+  const add = $("dockSide").querySelector("[data-cadd]"); if (add) { add.value = ""; add.focus(); }
 });
 
 function newId(type) {
@@ -934,6 +1118,7 @@ function renderNodes() {
   const g = ghostAt();
   $("ghost").classList.toggle("off", !g);
   if (g) { $("ghost").style.left = g.x + "px"; $("ghost").style.top = g.y + "px"; }
+  renderDock();
   renderSteps();
 }
 // A flow with no team yet shows where one goes: a dashed slot between Start and Done, with its in and out ends.
@@ -962,18 +1147,24 @@ function portPos(id, side) {
   if (n.type === "cluster") return { x: n.x + e.el.offsetWidth / 2 + (side === "out" ? ORB_R : -ORB_R), y: n.y + ORB_R };   // the orb's sides
   return { x: n.x + (side === "out" ? e.el.offsetWidth : 0), y: n.y + e.el.offsetHeight / 2 };
 }
+function wrapLanes(a, b) {   // where a wire to the next row runs: the gap it travels along, its two upright lanes, and how round its turns are
+  const gy = gapBetween(a.y, b.y), r1 = Math.min(64, Math.abs(gy - a.y) / 2), r2 = Math.min(64, Math.abs(b.y - gy) / 2);
+  return { gy, r1, r2, rx: a.x + Math.max(44, r1 + 6), lx: b.x - Math.max(70, r2 + 6) };
+}
 function wirePath(a, b) {
   if (vertical()) {
     const dy = Math.max(40, Math.abs(b.y - a.y) / 2);
     return `M${a.x},${a.y} C${a.x},${a.y + dy} ${b.x},${b.y - dy} ${b.x},${b.y}`;
   }
-  if (b.x < a.x - 40) {   // to the start of the next row: out to the right, down to the gap between rows, back along it, then down into the node
-    // Square with round corners, like a carriage return. Wires to a stack of nodes share the lane on the left, so none crosses a node.
-    const gy = gapBetween(a.y, b.y), rx = a.x + 44, lx = b.x - 70;
+  if (b.x < a.x - 40) {   // to the start of the next row: out to the right, round into the gap between rows, back along it, round into the node
+    // One soft S, like a ribbon: every turn is a full quarter circle as big as the gap allows, never a corner. Wires to a
+    // stack of nodes still share the lane on the left, so none crosses a node.
+    const { gy, rx, lx, r1, r2 } = wrapLanes(a, b), K = 0.5523;
     const s1 = gy >= a.y ? 1 : -1, s2 = b.y >= gy ? 1 : -1;
-    const r1 = Math.min(22, Math.abs(gy - a.y) / 2), r2 = Math.min(22, Math.abs(b.y - gy) / 2);
-    return `M${a.x},${a.y} H${rx - r1} Q${rx},${a.y} ${rx},${a.y + s1 * r1} V${gy - s1 * r1} Q${rx},${gy} ${rx - r1},${gy}`
-      + ` H${lx + r2} Q${lx},${gy} ${lx},${gy + s2 * r2} V${b.y - s2 * r2} Q${lx},${b.y} ${lx + r2},${b.y} H${b.x}`;
+    const turn = (x0, y0, x1, y1, first) => first === "x"   // a quarter circle from (x0,y0) to (x1,y1), leaving along x or along y
+      ? `C${x0 + (x1 - x0) * K},${y0} ${x1},${y1 - (y1 - y0) * K} ${x1},${y1}` : `C${x0},${y0 + (y1 - y0) * K} ${x1 - (x1 - x0) * K},${y1} ${x1},${y1}`;
+    return `M${a.x},${a.y} H${rx - r1} ${turn(rx - r1, a.y, rx, a.y + s1 * r1, "x")} V${gy - s1 * r1} ${turn(rx, gy - s1 * r1, rx - r1, gy, "y")}`
+      + ` H${lx + r2} ${turn(lx + r2, gy, lx, gy + s2 * r2, "x")} V${b.y - s2 * r2} ${turn(lx, b.y - s2 * r2, lx + r2, b.y, "y")} H${b.x}`;
   }
   const dx = Math.max(50, Math.abs(b.x - a.x) / 2);
   return `M${a.x},${a.y} C${a.x + dx},${a.y} ${b.x - dx},${b.y} ${b.x},${b.y}`;
@@ -1000,7 +1191,7 @@ function ghostWires() {   // dashed: Start into the empty slot, and the slot on 
   return [[portPos(s.id, "out"), g.in], [g.out, portPos(d.id, "in")]].map(([a, b]) => `<path class="ghostw" d="${wirePath(a, b)}"/>`).join("");
 }
 function wireMid(a, b) {   // the curve's point halfway along (t = 0.5)
-  if (b.x < a.x - 40 && !vertical()) return { x: (a.x + 44 + b.x - 70) / 2, y: gapBetween(a.y, b.y) };
+  if (b.x < a.x - 40 && !vertical()) { const l = wrapLanes(a, b); return { x: (l.rx + l.lx) / 2, y: l.gy }; }
   if (vertical()) return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   const dx = Math.max(50, Math.abs(b.x - a.x) / 2);
   return { x: (a.x + 3 * (a.x + dx) + 3 * (b.x - dx) + b.x) / 8, y: (a.y + b.y) / 2 };
@@ -1022,7 +1213,7 @@ function renderChips() {
     $("estChip").title = per ? per + "." : "";
   }
   $("probChip").hidden = run || !problems.length || !flow.nodes.some((x) => x.type === "cluster");
-  $("probChip").innerHTML = problems.length ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg><span>${esc(problems[0])}${problems.length > 1 ? ` <small>+${problems.length - 1} more</small>` : ""}</span>` : "";
+  $("probChip").innerHTML = problems.length ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg><span>${esc(problems[0])}${problems.length > 1 ? ` <small>+${problems.length - 1} more</small>` : ""}</span>${fixable ? `<button type="button" id="fixBtn" title="Rewire it the only way that makes sense">Fix it</button>` : ""}` : "";
   $("probChip").title = problems.join(" ");
   $("runBtn").disabled = locked();
   for (const id of ["flowName", "flowMenu", "newBtn", "floatRun"]) $(id).disabled = locked();
@@ -1131,6 +1322,7 @@ $("canvas").addEventListener("contextmenu", (e) => {
     { icon: ui.icon("merge"), label: "Add checkpoint", action: at("checkpoint") },
     { icon: ui.icon("hand"), label: "Add approval", action: at("approval") },
     { icon: ui.icon("flag"), label: "Add done", action: at("done"), disabled: flow.nodes.some((x) => x.type === "done") },
+    { sep: true },
     { sep: true },
     { icon: ui.icon("fit"), label: "Fit to screen", action: () => { autoFit = true; fit(); } },
   ]);
@@ -1465,6 +1657,9 @@ function renderInspector() {
         <div class="agents"><div class="stepper"><button type="button" data-step="-1" aria-label="One agent fewer"${n.count <= 1 ? " disabled" : ""}>−</button><output>${n.count}</output><button type="button" data-step="1" aria-label="One agent more"${n.count >= meta.max_agents ? " disabled" : ""}>+</button></div>
           <div class="how" title="${esc(how[1])}"><b>${how[0]}</b></div></div>
         <label class="switch mini"><span><b>Split the job</b></span><input type="checkbox" id="splitSw"${n.split ? " checked" : ""} title="${esc(n.split ? `One job, cut into ${n.count} parts` : n.count > 1 ? "Every agent does the whole job" : "Adds a second agent and cuts the job in two")}"></label></div>
+      <div class="isec"><h4>Checker loop</h4>
+        <label class="rowsel"><span><b>Send work back until it passes</b><small>${n.retry ? `This team checks the team before it. If it fails the work, that team redoes it with the feedback, up to ${n.retry} time${n.retry === 1 ? "" : "s"}.` : "Turn this on for a team that checks the team before it."}</small></span>
+          <select id="retrySel" aria-label="Rounds of fixes">${opt([["0", "Off"], ["1", "1 round"], ["2", "2 rounds"], ["3", "3 rounds"]], String(n.retry || 0))}</select></label></div>
       <div class="isec"><h4>Model</h4>${engineCards(n)}
         ${modelPick(n)}${claude ? effortBar(n) : ""}</div>
       <div class="isec"><h4>Access</h4>
@@ -1578,6 +1773,7 @@ function renderInspector() {
     }
     changed(false); renderInspector();
   }));
+  if ($("retrySel")) $("retrySel").onchange = (e) => { n.retry = +e.target.value; changed(false); renderInspector(); };
   if ($("splitSw")) $("splitSw").onchange = (e) => {
     n.split = e.target.checked;
     if (n.split && n.count < 2) n.count = Math.min(2, meta.max_agents);   // a split needs someone to split with
@@ -1603,6 +1799,19 @@ function renderInspector() {
   box.querySelectorAll("[data-acc]").forEach((d) => d.addEventListener("click", () => { n.tools = ACCESS[Number(d.dataset.acc)][0]; changed(false); renderInspector(); }));
 }
 
+$("probChip").onclick = async (e) => {
+  if (!e.target.closest("#fixBtn") || locked()) return;
+  try {
+    if (!(await save())) return toast("Your latest changes aren't saved yet. Try again.");
+    const before = snap();
+    const d = await api(`/api/flows/${flow.id}/repair`, { method: "POST", body: {} });
+    settle(); undoStack.push(before); redoStack = [];   // Ctrl+Z puts the old wiring back
+    flow = d.flow; est = d.estimate; problems = d.problems; fixable = !!d.fixable; sel = null;
+    lastSnap = snap(); renderAll(); renderInspector();
+    requestAnimationFrame(() => { renderWires(); autoFit = true; fit(); });
+    toast((d.did || []).join(" ") || "Nothing to fix.");
+  } catch (err) { toast(err.message); }
+};
 // ------------------------------------------------------------------ runs
 $("runBtn").onclick = () => {
   $("runName").textContent = flow.name;
@@ -1614,7 +1823,9 @@ $("runBtn").onclick = () => {
     $("recentChips").innerHTML = recentFolders.slice(0, 4).map((f) => `<button type="button" data-folder="${esc(f)}" title="${esc(f)}">${esc(f.split(/[\\/]/).filter(Boolean).pop() || f)}</button>`).join("");
   });
   const writers = flow.nodes.filter((n) => n.type === "cluster" && WRITES.includes(n.tools));
-  $("runEst").innerHTML = usageLine(est);
+  $("runEst").innerHTML = usageLine(est) + pastLine();
+  renderJobs(); renderSchedule();
+  $("previewBtn").hidden = !appPrefs.dry_run; $("previewBox").hidden = true; $("previewBox").innerHTML = "";
   renderRunTeam();
   const last = (flow.task || "").trim();   // offered, never filled in: you pick it on purpose
   $("taskIdeas").innerHTML = last && last !== draftTask.trim() ? `<button type="button" data-idea="${esc(last)}" title="${esc(last)}">Use last run's task: ${esc(last.length > 60 ? last.slice(0, 60) + "…" : last)}</button>` : "";
@@ -1682,6 +1893,63 @@ function usageLine(e) {
   return `<b>${e.sessions} agent session${e.sessions === 1 ? "" : "s"}</b>: ${esc(parts.join(", "))}.` +
     (big ? ` <span class="bigrun">This is a big run and can use a lot of your plan.</span>` : "");
 }
+// what this flow's finished runs used, so you know what Start will cost before you press it
+function pastLine() {
+  const h = pastRuns;
+  if (!h || !h.runs) return ` <span class="past">No finished run of this flow yet, so no estimate.</span>`;
+  const range = h.low !== h.high ? ` (${tokenWord(h.low)} to ${tokenWord(h.high)})` : "";
+  return ` <span class="past">Expect about <b>${tokenWord(h.tokens)} tokens</b>${range} and <b>${dur(h.seconds)}</b>, going by ${h.runs === 1 ? "its last run" : `its last ${h.runs} runs`}.</span>`;
+}
+// jobs saved on this flow: one click fills the task and the folder
+function renderJobs() {
+  const jobs = flow.jobs || [];
+  $("jobChips").innerHTML = jobs.map((j, i) => `<span class="job"><button type="button" data-job="${i}" title="${esc(j.task)}${j.folder ? "\n" + esc(j.folder) : ""}">${esc(j.name)}</button><button type="button" class="jx" data-jobx="${i}" title="Remove this saved job" aria-label="Remove ${esc(j.name)}">✕</button></span>`).join("")
+    + `<button type="button" id="saveJob" title="Keep this task and folder on the flow, so next time it's one click">+ Save this job</button>`;
+}
+$("jobChips").addEventListener("click", async (e) => {
+  const use = e.target.closest("[data-job]"), del = e.target.closest("[data-jobx]");
+  if (use) { const j = flow.jobs[+use.dataset.job]; $("taskIn").value = draftTask = j.task; if (j.folder) { $("folderIn").value = j.folder; showTail($("folderIn")); } resetCheck(); ready(true); checkHeavy(); }
+  if (del) { flow.jobs.splice(+del.dataset.jobx, 1); changed(false); renderJobs(); }
+  if (e.target.closest("#saveJob")) {
+    const task = $("taskIn").value.trim();
+    if (!realTask(task)) { ready(true); return toast("Type the job first, then save it."); }
+    flow.jobs = flow.jobs || [];
+    if (flow.jobs.length >= 12) return toast("This flow already has 12 saved jobs. Remove one first.");
+    let name = task.split(/\s+/).slice(0, 5).join(" ").slice(0, 40), i = 2;
+    const base = name; while (flow.jobs.some((j) => j.name.toLowerCase() === name.toLowerCase())) name = `${base.slice(0, 36)} ${i++}`;
+    flow.jobs.push({ name, task: task.slice(0, 4000), folder: $("folderIn").value.trim().replace(/^"|"$/g, "") });
+    changed(false); renderJobs(); toast(`Saved as "${name}".`);
+  }
+});
+// a schedule: this flow runs by itself, with one job, while Lithnode is open
+const EVERY_WORD = { hour: "every hour", day: "every day", weekday: "every weekday" };
+function renderSchedule() {
+  const s = flow.schedule || {}, on = !!s.on;
+  $("schedState").textContent = on ? `· ${EVERY_WORD[s.every]} at ${s.every === "hour" ? ":" + s.at.slice(3) : `${+s.at.slice(0, 2) % 12 || 12}:${s.at.slice(3)} ${+s.at.slice(0, 2) < 12 ? "AM" : "PM"}`}` : "· off";
+  $("schedEvery").value = s.every || "day"; $("schedAt").value = s.at || "09:00";
+  $("schedJob").textContent = on ? `Runs: ${s.task.length > 90 ? s.task.slice(0, 90) + "…" : s.task}${s.folder ? ` · in ${s.folder.split(/[\\/]/).filter(Boolean).pop()}` : ""}` : "";
+  $("schedOff").hidden = !on; $("schedSave").textContent = on ? "Update schedule" : "Turn on";
+}
+$("schedSave").onclick = () => {
+  const task = $("taskIn").value.trim();
+  if (!realTask(task)) { ready(true); return toast("Type the job this schedule should run first."); }
+  flow.schedule = { on: true, every: $("schedEvery").value, at: $("schedAt").value || "09:00", task: task.slice(0, 4000), folder: $("folderIn").value.trim().replace(/^"|"$/g, "") };
+  changed(false); renderSchedule(); toast("Scheduled. It runs while Lithnode is open, without asking first.");
+};
+$("schedOff").onclick = () => { flow.schedule = { ...(flow.schedule || {}), on: false }; changed(false); renderSchedule(); toast("Schedule turned off."); };
+// a preview: one quick agent says what each team would do with this job (on in Settings)
+$("previewBtn").onclick = async () => {
+  const b = $("previewBtn"), box = $("previewBox");
+  if (!realTask($("taskIn").value)) { ready(true); return; }
+  b.disabled = true; b.textContent = "Previewing…";
+  try {
+    if (!(await save())) throw new Error("Your latest changes aren't saved yet. Try again.");
+    const d = await api("/api/dryrun", { method: "POST", body: { flow: flow.id, task: $("taskIn").value, folder: $("folderIn").value } });
+    box.innerHTML = `<b>What this run would do</b><ol>${d.steps.map((s) => `<li><b>${esc(s.team)}</b> ${esc(s.does)}</li>`).join("")}</ol>${d.watch ? `<p><b>Watch for:</b> ${esc(d.watch)}</p>` : ""}`;
+  } catch (err) { box.innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
+  box.hidden = false; box.scrollIntoView({ block: "nearest" });
+  b.disabled = false; b.textContent = "Preview";
+};
 // a real job is a few words, not a stray letter: the same rule the server uses
 const realTask = (t) => (t.trim().match(/\p{L}{2,}/gu) || []).length >= 2;
 let draftTask = "", ready = () => {};
@@ -1828,11 +2096,12 @@ async function precheck() {   // true: start the run now
   if (!d || d.ok !== false || !(d.questions || []).length) return true;
   asked = d.questions;
   $("askBox").innerHTML = `<b>Before the team starts</b><p>Answer what you can, then start. The team gets your answers with the job.</p>`
-    + asked.map((q, i) => `<label for="askQ${i}">${esc(q.q)}</label>` + (q.kind === "folder"
-        ? `<div class="folder"><input id="askQ${i}" data-q="${i}" placeholder="Pick or paste a folder" autocomplete="off"><button type="button" data-qbrowse="${i}">Browse…</button></div>`
-        : `<input id="askQ${i}" data-q="${i}" autocomplete="off" placeholder="${q.kind === "file" ? "Paste the file's path" : "Your answer"}">`)).join("");
+    + asked.map((q, i) => `<label for="askQ${i}">${esc(q.q)}</label>` + (q.kind === "text"
+        ? `<input id="askQ${i}" data-q="${i}" autocomplete="off" placeholder="Your answer">`
+        : `<div class="folder"><input id="askQ${i}" data-q="${i}" placeholder="${q.kind === "file" ? "Browse to the file" : "Browse to the folder"}" autocomplete="off"><button type="button" class="primary" data-qbrowse="${i}" data-kind="${q.kind}">Browse…</button></div>`)).join("");
   $("askBox").hidden = false; $("skipCheck").hidden = false;
-  $("askBox").scrollIntoView({ block: "nearest" }); $("askQ0").focus();
+  $("askBox").scrollIntoView({ block: "nearest" });
+  ($("askBox").querySelector("[data-qbrowse]") || $("askQ0")).focus();   // a file or folder question: Browse is the way in
   return false;
 }
 const askAnswers = () => asked.map((q, i) => ({ q: q.q, kind: q.kind, a: (($("askQ" + i) || {}).value || "").trim().replace(/^"|"$/g, "") })).filter((x) => x.a);
@@ -1844,8 +2113,10 @@ $("askBox").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-qbrowse]"); if (!b) return;
   try {
     const app = window.top.lithnodeApp;
-    const { folder } = app && app.pickFolder ? { folder: await app.pickFolder() } : await api("/api/pick-folder", { method: "POST", body: {} });
-    if (folder) { $("askQ" + b.dataset.qbrowse).value = folder; showTail($("askQ" + b.dataset.qbrowse)); }
+    const picked = b.dataset.kind === "file"
+      ? (app && app.pickFile ? await app.pickFile() : (await api("/api/pick-file", { method: "POST", body: {} })).file)
+      : (app && app.pickFolder ? await app.pickFolder() : (await api("/api/pick-folder", { method: "POST", body: {} })).folder);
+    if (picked) { $("askQ" + b.dataset.qbrowse).value = picked; showTail($("askQ" + b.dataset.qbrowse)); }
   } catch (err) { toast(err.message); }
 });
 $("askBox").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("input") && !$("goBtn").disabled) { e.preventDefault(); $("goBtn").click(); } });
@@ -2057,7 +2328,7 @@ function runMeta(r) {
 function runTrouble(r) {
   const out = [];
   for (const n of r.flow.nodes) for (const a of ((r.nodes[n.id] || {}).agents || []))
-    if (a.status === "failed") out.push({ team: n.name, name: a.name || n.name, error: String(a.error || "It stopped without a report.").split(String.fromCharCode(10))[0].slice(0, 160) });
+    if (a.status === "failed" && !a.old) out.push({ team: n.name, name: a.name || n.name, error: String(a.error || "It stopped without a report.").split(String.fromCharCode(10))[0].slice(0, 160) });
   return out;
 }
 function troubleHtml(r, cls) {
@@ -2080,9 +2351,15 @@ function renderRunPanel() {
   for (const [nid, st] of Object.entries(r.nodes)) {
     if (st.status !== "approval") continue;
     const n = r.flow.nodes.find((x) => x.id === nid);
+    if (st.question) {   // an agent stopped to ask you something
+      html += `<div class="approve ask"><b>${esc(st.question.agent)} asks</b><p class="q">${esc(st.question.text)}</p>
+        <textarea id="note-${esc(nid)}" rows="2" placeholder="Your answer"></textarea>
+        <div class="acts" style="margin-top:8px"><button data-decide="${esc(nid)}" data-ok="0" title="It carries on with its best guess">Skip</button><button class="primary" data-decide="${esc(nid)}" data-ok="1">Answer</button></div></div>`;
+      continue;
+    }
     html += `<div class="approve"><b>${esc(n.name)}</b><p class="hint" style="margin:4px 0 8px">${esc(n.message || "Waiting for your approval.")}</p>
-      <textarea id="note-${esc(nid)}" rows="2" placeholder="Optional note for the next stage"></textarea>
-      <div class="acts" style="margin-top:8px"><button class="danger" data-decide="${esc(nid)}" data-ok="0">Reject</button><button class="primary" data-decide="${esc(nid)}" data-ok="1">Approve</button></div></div>`;
+      <textarea id="note-${esc(nid)}" rows="2" placeholder="Optional note: for the next stage, or what to fix"></textarea>
+      <div class="acts" style="margin-top:8px"><button class="danger" data-decide="${esc(nid)}" data-ok="0" title="End the run here">Reject</button><button data-decide="${esc(nid)}" data-ok="0" data-redo="1" title="The team before this redoes the work with your note as feedback">Send back</button><button class="primary" data-decide="${esc(nid)}" data-ok="1">Approve</button></div></div>`;
   }
   const said = BOTTOM_RE.test(r.final || "") ? bottomOf(r.final)[0] : "";
   if (r.final) html += `<div class="card result-card"><h4>✓ Result</h4>${said ? `<p class="said">${md(said).replace(/^<p>|<\/p>$/g, "")}</p>` : `<div class="peek doc">${md(r.final)}</div>`}
@@ -2109,9 +2386,11 @@ function renderRunPanel() {
       </div>`;
     }
     if (!st.agents.length && st.output && n.type !== "done") html += `<details><summary class="hint">What it passed on</summary><div class="doc">${md(st.output)}</div></details>`;
+    if (!live && n.type !== "master" && n.type !== "done") html += `<div class="acts" style="margin-top:10px"><button id="rerunBtn" data-node="${esc(n.id)}" title="A new run that keeps what the earlier steps made and redoes ${esc(n.name)} and everything after it">Run again from here</button></div>`;
     html += `</div>`;
   } else html += `<div class="hw-h">How it works${live ? `<span class="hw-live"><i></i>Live</span>` : ""}</div>${howItWorks(r.flow, r)}`;
 
+  if (live) html += `<form id="tellForm" class="tell"><input id="tellIn" maxlength="1000" autocomplete="off" placeholder="Tell the team something…" aria-label="A note to the team" title="Agents already working can't hear it. Every agent that starts after this reads it."><button>Send</button></form>`;
   html += `<details class="quiet"${live ? " open" : ""}><summary>Task</summary><div class="task-text">${esc(r.task)}</div></details>
     <details class="quiet"><summary>Activity · ${r.log.length}</summary><ul class="timeline">${r.log.slice().reverse().map((l) =>
       `<li class="${logClass(l.text)}"><time>${new Date(l.t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><b></b><span>${esc(l.text)}</span></li>`).join("")}</ul></details>`;
@@ -2131,9 +2410,19 @@ function renderRunPanel() {
   if ($("copyFinal")) $("copyFinal").onclick = () => copyText(r.final);
   box.querySelectorAll("[data-decide]").forEach((b) => b.onclick = async () => {
     const nid = b.dataset.decide, note = ($("note-" + nid) || {}).value || "";
-    try { await api(`/api/runs/${r.id}/decide`, { method: "POST", body: { node: nid, approved: b.dataset.ok === "1", note } }); } catch (e) { toast(e.message); }
+    try { await api(`/api/runs/${r.id}/decide`, { method: "POST", body: { node: nid, approved: b.dataset.ok === "1", note, redo: b.dataset.redo === "1" } }); } catch (e) { toast(e.message); }
     pollRun();
   });
+  if ($("tellForm")) $("tellForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const text = $("tellIn").value.trim(); if (!text) return;
+    try { await api(`/api/runs/${r.id}/note`, { method: "POST", body: { text } }); $("tellIn").value = ""; toast("Sent. Agents that start from now on will read it."); } catch (err) { toast(err.message); }
+    pollRun();
+  };
+  if ($("rerunBtn")) $("rerunBtn").onclick = async () => {
+    try { const d = await api(`/api/runs/${r.id}/rerun`, { method: "POST", body: { node: $("rerunBtn").dataset.node } }); sel = null; openRun(d.run); }
+    catch (err) { toast(err.message); }
+  };
 }
 
 // ---- the result page: a full page of its own when a run finishes
@@ -2177,7 +2466,7 @@ function agentSays(r) {
     if (n.type !== "cluster") continue;
     const team = ((r.nodes[n.id] || {}).agents || []).slice().sort((x, y) => String(x.name).localeCompare(String(y.name), undefined, { numeric: true }));
     for (const a of team) {
-      if (a.status === "running") continue;
+      if (a.status === "running" || a.status === "asked" || a.old) continue;
       const ok = a.status === "done" && a.report;
       const line = ok ? bottomOf(a.report)[0] : String(a.error || (a.status === "stopped" ? "Stopped before it reported." : "It ended without a report.")).split("\n")[0].slice(0, 200);
       const who = a.name || n.name;
@@ -2290,12 +2579,24 @@ function openSheet(r) {
     <div class="rp-body"><div class="rp-main"><div class="rp-col">
       ${troubleHtml(r, "rp-warn")}
       ${resultView(r.final, filesView(r), r)}
+      ${r.snap ? `<div id="sheetChanges" class="rp-changes"></div>` : ""}
+      ${ok && r.flow_id && flows.some((f) => f.id === r.flow_id) ? `<form id="followForm" class="follow"><input id="followIn" maxlength="4000" autocomplete="off" placeholder="Follow up: now also…" aria-label="A follow-up job for the same team"><button class="primary">Run</button></form>` : ""}
       <details class="rp-details"><summary>Details: ${what.join(", ")}</summary>${more.join("")}</details>
     </div></div></div>`;
 
   const main = $("sheet").querySelector(".rp-main");
   $("sheet").classList.add("show"); main.scrollTop = 0;
   drawLooks($("sheet")); wireSays($("sheet"));
+  if (r.snap) loadChanges(r);
+  if ($("followForm")) $("followForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const task = $("followIn").value.trim();
+    if (!realTask(task)) return toast("Say what to do next, in a few words.");
+    try {
+      const d = await api(`/api/flows/${r.flow_id}/run`, { method: "POST", body: { task, folder: r.folder, after: r.id } });
+      closeSheet(); openRun(d.run);
+    } catch (err) { toast(err.message); }
+  };
   $("sheetCopy").onclick = () => copyText(r.final || "");
   if ($("sheetItems")) $("sheetItems").onclick = () => copyText(itemsMarkdown(r.nodes[lastItems.id].items));
   $("sheetDl").onclick = () => downloadResult(r);
@@ -2305,6 +2606,25 @@ function openSheet(r) {
   if ($("sheetExpand")) $("sheetExpand").onclick = (e) => {
     const all = [...$("sheet").querySelectorAll(".rp-agent, .rp-say")].filter((d) => d.querySelector(".doc")), open = !all.every((d) => d.open);
     all.forEach((d) => d.open = open); e.target.textContent = open ? "Collapse all" : "Expand all";
+  };
+}
+// What the run did to its folder, against the picture taken before it started: each file, its diff, and an undo.
+async function loadChanges(r) {
+  const box = $("sheetChanges"); if (!box) return;
+  let d; try { d = await api(`/api/runs/${r.id}/changes`); } catch (e) { return; }
+  if (!$("sheetChanges")) return;
+  if (!d.kept) { box.innerHTML = ""; return; }
+  const ch = d.changes || [];
+  const line = (ln) => `<span class="${ln.startsWith("+") ? "add" : ln.startsWith("-") ? "del" : ln.startsWith("@@") ? "hunk" : ""}">${esc(ln) || " "}</span>`;
+  box.innerHTML = `<small>${ch.length ? `What changed in the folder · ${plural(ch.length, "file")}` : d.undone ? "You put the folder back the way it was before this run." : "This run didn't change any files."}`
+    + (ch.length ? `<button id="undoBtn" class="danger" title="Put every file back the way it was before this run">Undo these changes</button>` : "") + `</small>`
+    + ch.map((c) => `<details class="chg"><summary><i class="k ${c.kind}">${c.kind}</i><b>${esc(c.file)}</b><span class="n">${c.added ? `<em class="add">+${c.added}</em>` : ""}${c.removed ? `<em class="del">−${c.removed}</em>` : ""}</span></summary>`
+      + (c.diff ? `<pre class="diff">${c.diff.split("\n").map(line).join("\n")}</pre>` : `<p class="hint">${c.restorable ? "Not a text file, so there is no line-by-line view." : "Too big to compare or put back."}</p>`) + `</details>`).join("");
+  if ($("undoBtn")) $("undoBtn").onclick = async () => {
+    const yes = await ui.confirm({ title: "Undo this run's changes?", text: `${plural(ch.length, "file")} in ${r.folder} go back to how they were before this run. Anything you changed in them since is lost too.`, ok: "Undo changes", danger: true });
+    if (!yes) return;
+    try { const u = await api(`/api/runs/${r.id}/undo`, { method: "POST", body: {} }); toast(`Put ${plural(u.files, "file")} back.`); loadChanges(r); }
+    catch (err) { toast(err.message); }
   };
 }
 function closeSheet() { $("sheet").classList.remove("show"); }
