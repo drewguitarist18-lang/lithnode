@@ -823,18 +823,21 @@ try:
     check("folders you ran flows in are suggested, once each", call("/api/folders")[1]["folders"].count(str(project)) == 1)
 
 
-    # ---- a Pro plan has no Fable ----------------------------------------------------------------
-    Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True, "plan": "pro"}))
+    # ---- a Free plan has no Fable ---------------------------------------------------------------
+    Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True, "plan": "free"}))
     call("/api/hq?fresh=1")
-    check("Fable isn't offered on a Pro plan", "claude-fable-5-1" not in [m["id"] for m in call("/api/flows")[1]["models"]])
-    f = simple_flow({"name": "Deep", "count": 1, "role": "think"}, models={"think": "claude-fable-5-1"})
+    check("Fable isn't offered on a Free plan", "claude-fable-5-2" not in [m["id"] for m in call("/api/flows")[1]["models"]])
+    f = simple_flow({"name": "Deep", "count": 1, "role": "think"}, models={"think": "claude-fable-5-2"})
     s, r = call(f"/api/flows/{f}")
-    check("a flow set to Fable on Pro says so before you run", any("Fable isn't on your Claude plan" in p for p in r["problems"]), r["problems"])
+    check("a flow set to Fable on Free says so before you run", any("Fable isn't on your Claude plan" in p for p in r["problems"]), r["problems"])
     s, r = call(f"/api/flows/{f}/run", {"task": "Think it through", "folder": str(project)}, "POST")
     check("and won't start", s == 400 and "Fable" in r["error"], r)
+    Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True, "plan": "pro"}))
+    call("/api/hq?fresh=1")
+    check("Fable is offered on Pro", "claude-fable-5-2" in [m["id"] for m in call("/api/flows")[1]["models"]])
     Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": True}))
     call("/api/hq?fresh=1")
-    check("Fable is back on Max", "claude-fable-5-1" in [m["id"] for m in call("/api/flows")[1]["models"]])
+    check("Fable is back on Max", "claude-fable-5-2" in [m["id"] for m in call("/api/flows")[1]["models"]])
 
     # ---- signed out ------------------------------------------------------------------------------
     Path(cli_dir, "state.json").write_text(json.dumps({"logged_in": False}))

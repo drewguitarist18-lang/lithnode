@@ -99,6 +99,7 @@ def _backfill_tasks() -> None:
 # Flow clusters made from a built-in bot use its hidden role at run time.
 RUNNER.bot_roles = lambda: {b["id"]: b["instructions"] for b in load_bots() if b.get("builtin")}
 FLOW_ID_RE = re.compile(r"^[0-9a-f]{12}$")
+PRECHECK_SECONDS = float(os.environ.get("LITHNODE_PRECHECK_SECONDS") or 40)   # longer than this and the run just starts
 # Files a run made that open straight in their default app; anything else is shown in its folder
 OPENABLE = {".html", ".htm", ".md", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".pdf", ".csv", ".json"}
 STORE = Path(os.environ.get("CLAWD_BOT_HOME") or Path.home() / ".clawd-bot")
@@ -106,14 +107,14 @@ STORE = Path(os.environ.get("CLAWD_BOT_HOME") or Path.home() / ".clawd-bot")
 MODELS = [
     {"id": "claude-opus-5-5", "label": "Opus 5.5", "blurb": "Most capable everyday model"},
     {"id": "claude-sonnet-5-5", "label": "Sonnet 5.5", "blurb": "Fast and capable"},
-    {"id": "claude-fable-5-1", "label": "Fable 5.1", "blurb": "Deepest reasoning, slower", "not_on": ["free", "pro"]},
+    {"id": "claude-fable-5-2", "label": "Fable 5.2", "blurb": "Deepest reasoning, slower", "not_on": ["free"]},
     {"id": "claude-haiku-4-5", "label": "Haiku 4.5", "blurb": "Fastest and cheapest"},
 ]
 
 
 
 def usable_models() -> list[dict[str, Any]]:
-    """The models this account's plan can run: Fable isn't on Free or Pro."""
+    """The models this account's plan can run: Fable isn't on Free."""
     plan = claude_code.auth_status().get("plan") or ""
     return [m for m in MODELS if plan not in m.get("not_on", [])]
 
@@ -624,6 +625,33 @@ class Handler(BaseHTTPRequestHandler):
         HQ_STORE.save_flow(flow)
         self.send_json({**self.flow_payload(flow), "cost": round(agent.cost, 4), "engine": engine})
 
+    def POST_api_precheck(self) -> None:
+        """Before a run: one quick agent reads the job and the folder, and says whether to start or what to ask
+        the user first. Never blocks a run: any failure, an unreadable answer or a slow engine means start."""
+        body = self.read_json()
+        task = str(body.get("task") or "").strip()[:4000]
+        flow = HQ_STORE.get_flow(str(body.get("flow") or "")) if FLOW_ID_RE.match(str(body.get("flow") or "")) else None
+        folder = str(body.get("folder") or "").strip().strip('"')
+        engine = engines.available_engine()
+        if not task or not flow or not engine or (folder and not Path(folder).is_dir()):
+            return self.send_json({"ok": True, "questions": [], "skipped": True})
+        try:
+            flow = flows.clean_flow(flow)
+        except (ValueError, TypeError):
+            return self.send_json({"ok": True, "questions": [], "skipped": True})
+        agent = flows.agents.Agent(model=flows.SUMMARY_MODEL, effort="low", tools="none", system=flows.PRECHECK_SYSTEM,
+                                   prompt=flows.precheck_prompt(flow, task, folder), cwd=HQ_STORE.work_dir / "_precheck",
+                                   on_update=lambda: None, engine=engine)
+        done = {}
+        worker = threading.Thread(target=lambda: done.setdefault("ok", agent.run()), daemon=True)
+        worker.start()
+        worker.join(PRECHECK_SECONDS)
+        if worker.is_alive():   # too slow to be worth waiting for
+            agent.stop()
+            return self.send_json({"ok": True, "questions": [], "skipped": True})
+        questions = flows.parse_precheck(agent.text or "") if done.get("ok") else []
+        self.send_json({"ok": not questions, "questions": questions, "skipped": not done.get("ok")})
+
     def POST_api_flows_import(self) -> None:
         """A team file someone shared. With check, says what the team can do; otherwise saves it as a new flow."""
         body = self.read_json()
@@ -692,7 +720,7 @@ class Handler(BaseHTTPRequestHandler):
             if new_models or folder != flow.get("folder", "") or task[:4000] != flow.get("task", "") or limit != flow.get("limit"):
                 flow["folder"], flow["task"], flow["limit"] = folder, task[:4000], limit   # the next run starts from this one
                 HQ_STORE.save_flow(flow)
-            run = RUNNER.start(flow, task[:20000], folder)
+            run = RUNNER.start(flow, flows.with_answers(task, body.get("answers"))[:20000], folder)
             return self.send_json({"run": run.id})
         self.send_json({"error": "not found"}, 404)
 
@@ -711,6 +739,12 @@ class Handler(BaseHTTPRequestHandler):
         except (OSError, subprocess.TimeoutExpired):
             folder = ""
         self.send_json({"folder": folder})
+
+    def POST_api_folder_size(self) -> None:
+        """How many project files a folder has (capped), so the Run dialog can warn when a flow is too heavy for it."""
+        folder = str(self.read_json().get("folder") or "").strip().strip('"')
+        files = flows.count_files(folder) if folder and Path(folder).is_dir() else None
+        self.send_json({"files": files})
 
     def GET_api_folders(self) -> None:
         """Folders you've run flows in, newest first, for the folder box's suggestions."""

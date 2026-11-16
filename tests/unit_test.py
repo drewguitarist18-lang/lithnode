@@ -290,6 +290,52 @@ check("settings: junk is dropped, a sane value is kept", settings.clean({"limit"
 check("settings: the token limit is clamped like a flow's", settings.clean({"limit": 5})["limit"] == 50_000)
 check("settings: every offered limit survives cleaning", all(settings.clean({"limit": n})["limit"] == n for n in settings.LIMITS))
 
+# ---- too-heavy warning: how many project files a folder has --------------------------------------------------------
+import tempfile  # noqa: E402
+
+with tempfile.TemporaryDirectory() as tmp:
+    for rel in ("a.py", "src/b.py", "src/c.js", ".env", "node_modules/x/y.js", ".git/HEAD", "dist/out.js"):
+        (Path(tmp) / rel).parent.mkdir(parents=True, exist_ok=True)
+        (Path(tmp) / rel).write_text("x", encoding="utf-8")
+    check("folder size: counts the project's files, skips dependencies, build output and dotfiles", flows.count_files(tmp) == 3)
+    check("folder size: stops at the cap", flows.count_files(tmp, cap=2) == 2)
+check("folder size: a missing folder is zero", flows.count_files(Path(tempfile.gettempdir()) / "no-such-lithnode-folder") == 0)
+
+# ---- wiring: work that never reaches Done ------------------------------------------------------------------------
+def _wired(edges):
+    return flows.clean_flow({"name": "W", "nodes": [{"id": "master", "type": "master", "mode": "pass"}, {"id": "a", "type": "cluster", "name": "Sorter"},
+                                                     {"id": "b", "type": "cluster", "name": "Debugger"}, {"id": "done", "type": "done"}],
+                             "edges": [{"from": x, "to": y} for x, y in edges]})
+
+
+check("wiring: a team wired into nothing is a problem, named", any("Debugger isn't wired into anything" in p
+      for p in flows.check_runnable(_wired([("master", "a"), ("a", "b"), ("master", "done")]))))
+check("wiring: everything reaching Done is fine", flows.check_runnable(_wired([("master", "a"), ("a", "b"), ("b", "done")])) == [])
+_fixed = flows.build_design({"name": "Sort", "nodes": [{"id": "master", "type": "master", "mode": "pass"}, {"id": "a", "type": "cluster", "name": "Sorter"},
+                                                      {"id": "b", "type": "cluster", "name": "Debugger"}, {"id": "done", "type": "done"}],
+                             "edges": [["master", "a"], ["a", "b"], ["master", "done"]]}, [])
+check("wiring: a designed flow's loose end goes into Done, and Start no longer skips the teams",
+      {(e["from"], e["to"]) for e in _fixed["edges"]} == {("master", "a"), ("a", "b"), ("b", "done")} and flows.check_runnable(_fixed) == [])
+
+# ---- the check before a run: what it asks, and how answers reach the team ---------------------------------------------
+check("precheck: questions are read out of the answer, at most 3", flows.parse_precheck(
+    'Sure: {"ok": false, "questions": [{"q": "Where  are the columns?", "kind": "folder"}, {"q": "By what?", "kind": "weird"}, "And?", {"q": "4"}]}')
+      == [{"q": "Where are the columns?", "kind": "folder"}, {"q": "By what?", "kind": "text"}, {"q": "And?", "kind": "text"}])
+check("precheck: ok, junk or no questions all mean start the run",
+      [flows.parse_precheck(s) for s in ('{"ok": true}', "no json here", '{"ok": false}', '{"ok": false, "questions": []}', "{broken")] == [[]] * 5)
+check("precheck: answers are added to the job, blanks left out", flows.with_answers("Sort it", [{"q": "Where?", "a": " C:/data "}, {"q": "How?", "a": ""}])
+      == "Sort it\n\nAsked before the run started, and the user's answers:\n- Where?\n  C:/data")
+check("precheck: no answers leaves the job alone", flows.with_answers("Sort it", None) == "Sort it" and flows.with_answers("Sort it", [{"q": "x"}]) == "Sort it")
+with tempfile.TemporaryDirectory() as tmp:
+    for rel in ("data.csv", "src/a.py", ".env", "node_modules/x.js"):
+        (Path(tmp) / rel).parent.mkdir(parents=True, exist_ok=True)
+        (Path(tmp) / rel).write_text("x", encoding="utf-8")
+    check("precheck: the folder is shown by its top level, folders first, junk skipped", flows.folder_glance(tmp) == "src/, data.csv")
+    said = flows.precheck_prompt({"nodes": [{"type": "cluster", "name": "Sorter", "tools": "edit"}]}, "Sort the columns", tmp)
+    check("precheck: the checker sees the job, the folder and what the team can do", "Sort the columns" in said and "data.csv" in said and "Sorter (edits files)" in said)
+check("precheck: no folder is said plainly", "empty scratch folder" in flows.precheck_prompt({"nodes": []}, "x", ""))
+check("settings: the pre-run check is on by default and can be turned off", settings.DEFAULTS["precheck"] is True and settings.clean({"precheck": False})["precheck"] is False)
+
 print()
 if failures:
     print(f"{len(failures)} FAILED: " + ", ".join(failures))

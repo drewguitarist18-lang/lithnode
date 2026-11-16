@@ -152,7 +152,7 @@ def _works(exe):
     never opens the page). Asked once per browser version, then remembered in the temp folder."""
     if FLATPAK:
         return True
-    memo = Path(tempfile.gettempdir()) / "lithnode-shot-browsers.json"
+    memo = _memo_path()
     try:
         known = json.loads(memo.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -165,14 +165,28 @@ def _works(exe):
     folder = Path(tempfile.mkdtemp(prefix="lithnode-shot-try-"))
     try:
         ok = _run(exe, "about:blank", folder / "try.png", 500, "400x300", None, launch_wait=20, land_wait=20)
+    except OSError:
+        ok = False   # listed but can't be launched: move on to the next one
     finally:
         shutil.rmtree(folder, ignore_errors=True)
     known[exe] = {"stamp": _stamp(exe), "ok": ok, "at": time.time()}
     try:
-        memo.write_text(json.dumps(known), encoding="utf-8")
+        memo.parent.mkdir(parents=True, exist_ok=True)
+        part = memo.with_name(f"{memo.name}.{os.getpid()}.part")
+        part.write_text(json.dumps(known), encoding="utf-8")
+        os.replace(part, memo)   # atomic, and replaces a planted symlink instead of writing through it
     except OSError:
         pass
     return ok
+
+
+def _memo_path():
+    """Per-user cache file, never the shared /tmp (another user could plant it)."""
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA") or tempfile.gettempdir())
+    else:
+        base = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+    return base / "lithnode" / "shot-browsers.json"
 
 
 def browser():
@@ -244,17 +258,24 @@ def _capture(exe, url, out, budget_ms, size, wait_for=None):
     return out
 
 
-def _check(size, exe):
-    if not exe:
-        raise RuntimeError("No Chrome, Edge or Chromium on this computer to take the screenshot with.")
+def _check_size(size):
     if not re.fullmatch(r"\d{2,4}x\d{2,4}", size):
         raise RuntimeError("Size must look like 1280x800.")
 
 
+def _pick():
+    exe = browser()
+    if not exe:
+        raise RuntimeError("No Chrome, Edge or Chromium on this computer to take the screenshot with.")
+    return exe
+
+
 def shot(target, seconds=2.0, size="1280x800", out_dir=None):
     """Returns the PNG's path. Raises RuntimeError with a plain reason if it can't."""
-    exe = browser()
-    _check(size, exe)
+    _check_size(size)
+    if not re.match(r"https?://", target) and not Path(target).resolve().is_file():
+        raise RuntimeError(f"There's no file at {Path(target).resolve()}.")
+    exe = _pick()
     out_dir = Path(out_dir or Path.cwd() / ".lithnode-shots")
     out_dir.mkdir(parents=True, exist_ok=True)
     temp = None
@@ -372,13 +393,13 @@ def _serve(root, page, steps, report):
 
 def act(target, steps, size="1280x800", out_dir=None):
     """Uses an HTML file through `steps`. Returns {'steps', 'errors', 'title', 'text', 'shots': [(label, path)]}."""
-    exe = browser()
-    _check(size, exe)
+    _check_size(size)
     path = Path(target).resolve()
     if re.match(r"https?://", target) or path.suffix.lower() not in (".html", ".htm"):
         raise RuntimeError("--do works on HTML files (a page you made), not URLs or other files.")
     if not path.is_file():
         raise RuntimeError(f"There's no file at {path}.")
+    exe = _pick()
     out_dir = Path(out_dir or Path.cwd() / ".lithnode-shots")
     out_dir.mkdir(parents=True, exist_ok=True)
     marks = [i for i, s in enumerate(steps) if s.lower() == "shot"][:MAX_SHOTS]

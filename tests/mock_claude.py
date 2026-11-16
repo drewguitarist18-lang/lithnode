@@ -140,6 +140,12 @@ if "--session-id" in flags:   # written whole, then swapped in, so a reader neve
 # Cues: a stage named SLOWSTAGE takes 4s, HANGSTAGE hangs for a minute, FAILSTAGE (or FAILME in the prompt) fails.
 if "--append-system-prompt" in flags:
     system = flags["--append-system-prompt"]
+    if "You check a job before a team" in system:   # the check before a run: ASKME in the job makes it ask
+        text = json.dumps({"ok": False, "questions": [{"q": "Where are the columns you want sorted?", "kind": "folder"},
+                                                       {"q": "Sort them by what?", "kind": "text"}]}) if "ASKME" in prompt else '{"ok": true}'
+        out({"type": "assistant", "message": {"model": "claude", "role": "assistant", "content": [{"type": "text", "text": text}]}, **base})
+        out({"type": "result", "subtype": "success", "is_error": False, "result": text, "total_cost_usd": 0.001, "num_turns": 1, **base})
+        sys.exit(0)
     time.sleep(60 if "HANGSTAGE" in system else 4 if "SLOWSTAGE" in system
                else float(os.environ.get("CLAWD_MOCK_WAIT") or 1.0))   # side-by-side agents overlap; CLAWD_MOCK_WAIT slows demos
     if "flow designer for Lithnode" in system:   # the "describe a team" box: answer with a flow draft

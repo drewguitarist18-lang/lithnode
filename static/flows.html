@@ -43,6 +43,7 @@
         <div id="botPal"><p class="hint">Loading…</p></div>
       </div>
     </div>
+    <div class="psize" data-side="l" title="Drag to resize. Double-click to reset." role="separator" aria-orientation="vertical" aria-label="Resize the left panel"></div>
     <div class="tip"><span aria-hidden="true">↳</span><span><b>Click</b> to add, or <b>drag</b> onto the canvas. Then connect a node's right dot to the next one's left dot.</span></div>
   </aside>
   <div id="canvas">
@@ -76,6 +77,7 @@
     <div class="rtop"><button id="runsBtn" title="Every run of your flows"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5v4h4"/><path d="M12 7.5V12l3 2"/></svg>Runs</button><span class="grow"></span><button id="runBtn" class="primary"><svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>Run</button><button class="ib" id="paneR" title="Hide the side panel" aria-label="Hide the side panel" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></svg></button></div>
     <div class="probs" id="probChip" hidden></div>
     <div class="insp" id="insp"></div>
+    <div class="psize" data-side="r" title="Drag to resize. Double-click to reset." role="separator" aria-orientation="vertical" aria-label="Resize the right panel"></div>
   </aside>
 </main>
 
@@ -113,11 +115,13 @@
         <label><span>Orchestrator</span><select id="roleBuild" data-role="build"></select></label>
         <label><span>Performer</span><select id="roleRun" data-role="run"></select></label></div>
       <div class="sub" id="rolesSub"></div></div>
+    <div id="askBox" class="askbox" hidden></div>
     <label id="riskBox" class="risk" hidden><input type="checkbox" id="riskOk"> <span id="riskText"></span></label>
+    <div id="heavyWarn" class="hint" hidden></div>
     <div id="runWarn" class="hint" style="color:var(--failed)"></div>
   </div>
   <footer class="rfoot"><span id="runEst" class="hint"></span>
-    <div class="acts"><button data-close>Cancel</button><button class="primary go" id="goBtn">▶ Start run <kbd id="goKey">Ctrl ↵</kbd></button></div></footer>
+    <div class="acts"><button data-close>Cancel</button><button type="button" id="skipCheck" hidden>Run anyway</button><button class="primary go" id="goBtn">▶ Start run <kbd id="goKey">Ctrl ↵</kbd></button></div></footer>
 </dialog>
 
 <dialog id="usageDlg" class="usagedlg">
@@ -648,6 +652,33 @@ function setPanes(l, r) {
   autoFit = true;   // the canvas changes size: keep the flow in view
 }
 (() => { let p = [true, true]; try { p = JSON.parse(localStorage.getItem("hq-panes")) || p; } catch (e) {} setPanes(!!p[0], !!p[1]); })();
+// Drag a panel's inner edge to make it wider or narrower; double-click puts it back. Remembered per side.
+(() => {
+  const main = document.querySelector("main"), LIM = { l: [200, 480], r: [280, 720] }, VAR = { l: "--ulw", r: "--urw" };
+  let sizes = {};
+  try { sizes = JSON.parse(localStorage.getItem("hq-pane-size")) || {}; } catch (e) {}
+  const apply = () => { for (const s of ["l", "r"]) { if (sizes[s]) main.style.setProperty(VAR[s], sizes[s] + "px"); else main.style.removeProperty(VAR[s]); } };
+  const keep = () => { try { localStorage.setItem("hq-pane-size", JSON.stringify(sizes)); } catch (e) {} };
+  apply();
+  document.querySelectorAll(".psize").forEach((grip) => {
+    const side = grip.dataset.side;
+    grip.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault(); grip.setPointerCapture(e.pointerId);
+      main.classList.add("sizing"); grip.classList.add("on");
+      const r = main.getBoundingClientRect();
+      const move = (ev) => {
+        const w = side === "l" ? ev.clientX - r.left : r.right - ev.clientX;
+        sizes[side] = Math.round(Math.max(LIM[side][0], Math.min(LIM[side][1], w)));
+        apply();
+      };
+      const up = () => { grip.removeEventListener("pointermove", move); main.classList.remove("sizing"); grip.classList.remove("on"); keep(); };
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", up, { once: true }); grip.addEventListener("pointercancel", up, { once: true });
+    });
+    grip.addEventListener("dblclick", () => { delete sizes[side]; apply(); keep(); });
+  });
+})();
 $("paneL").onclick = () => setPanes($("paneL").getAttribute("aria-pressed") !== "true", $("paneR").getAttribute("aria-pressed") === "true");
 $("paneR").onclick = () => setPanes($("paneL").getAttribute("aria-pressed") === "true", $("paneR").getAttribute("aria-pressed") !== "true");
 $("showL").onclick = () => setPanes(true, $("paneR").getAttribute("aria-pressed") === "true");
@@ -1000,7 +1031,7 @@ function renderChips() {
 // ------------------------------------------------------------------ interaction
 let drag = null;
 $("canvas").addEventListener("mousedown", (e) => {
-  if (e.button !== 0 || e.target.closest("#ghost, .hud")) return;   // the empty team slot and the controls on the canvas are buttons, not somewhere to pan from
+  if (e.button !== 0 || e.target.closest("#ghost, .hud, #stepsView")) return;   // the empty team slot and canvas controls are buttons, and the steps list keeps its text selection and focus
   const port = e.target.closest(".port"), nodeEl = e.target.closest(".node"), path = e.target.closest("[data-edge]");
   const cut = e.target.closest("[data-cut]");
   if (cut) { e.preventDefault(); disconnect(+cut.dataset.cut); return; }
@@ -1358,7 +1389,7 @@ function renderInspector() {
     : { checkpoint: "Checkpoint · waits for everything before it", approval: "Approval · pauses until you say go", done: "Done · the final result lands here" }[n.type];
   const seg = (key, options, value) => `<div class="seg" data-seg="${key}">${options.map(([v, l, tip]) => `<button type="button" data-v="${esc(v)}" class="${v === value ? "on" : ""}"${tip ? ` title="${esc(tip)}"` : ""}>${esc(l)}</button>`).join("")}</div>`;
   const chips = (key, options, value) => `<div class="chips" data-seg="${key}">${options.map(([v, l]) => `<button type="button" data-v="${esc(v)}" class="${v === value ? "on" : ""}">${esc(l)}</button>`).join("")}</div>`;
-  const MODEL_ORDER = ["claude-haiku-4-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-1"];
+  const MODEL_ORDER = ["claude-haiku-4-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-1", "claude-fable-5-2"];
   const ordered = MODEL_ORDER.map((id) => meta.models.find((m) => m.id === id)).filter(Boolean)
     .concat(meta.models.filter((m) => !MODEL_ORDER.includes(m.id)));
   const EFFORTS = [["low", "Low"], ["medium", "Medium"], ["high", "High"], ["xhigh", "Extra high"], ["max", "Max"]];
@@ -1577,7 +1608,8 @@ $("runBtn").onclick = () => {
   $("runName").textContent = flow.name;
   $("folderIn").value = flow.folder || "";
   $("taskIn").value = draftTask;   // only what you typed: never a guess the team might run by mistake
-  wireFolder("folderIn", () => {});
+  wireFolder("folderIn", () => checkHeavy());
+  checkHeavy();
   loadRecentFolders().then(() => {
     $("recentChips").innerHTML = recentFolders.slice(0, 4).map((f) => `<button type="button" data-folder="${esc(f)}" title="${esc(f)}">${esc(f.split(/[\\/]/).filter(Boolean).pop() || f)}</button>`).join("");
   });
@@ -1590,7 +1622,7 @@ $("runBtn").onclick = () => {
   const usesEngine = (n) => n.type === "cluster" || (n.type === "master" && n.mode !== "pass") || (n.type === "checkpoint" && n.mode === "summarize");
   const notReady = () => !engines ? [] : [...new Set(flow.nodes.filter(usesEngine).map(engineOf))].filter((id) => { const e = engineInfo(id); return !(e.installed && e.signed_in); });
   const warn = () => {
-    const why = notReady().map((id) => id === "api" ? "No API key is added yet" : `${ENGINE_NAME[id]} isn't ${engineInfo(id).installed ? "signed in" : "installed"} on this computer`);
+    const why = notReady().map((id) => id === "api" ? "No API key is added yet" : id === "ollama" && engineInfo(id).installed ? (/no model/i.test(engineInfo(id).note || "") ? "Ollama has no model downloaded yet" : "Ollama isn't running") : `${ENGINE_NAME[id]} isn't ${engineInfo(id).installed ? "signed in" : "installed"} on this computer`);
     $("runWarn").textContent = [...problems, why.length ? `${why.join(". ")}. Open the engines menu at the top right to fix that, or switch those teams to another engine.` : ""].filter(Boolean).join(" ");
   };
   warn();
@@ -1609,6 +1641,7 @@ $("runBtn").onclick = () => {
     cliTeams.length ? cliTeams.map((n) => `${n.name} can run ${n.clis.join(", ")} on this computer.`).join(" ") : "",
     codexOpen.length ? `${codexOpen.map((n) => n.name).join(", ")} can read, change, or delete files and run commands anywhere on this PC. The selected folder won't limit Codex on this Windows setup.` : "",
   ].filter(Boolean).join(" ");
+  resetCheck();
   let nagged = false;   // the hint turns red only once you've tried something, not the moment the menu opens
   ready = (touched) => {
     if (touched) nagged = true;
@@ -1653,7 +1686,24 @@ function usageLine(e) {
 const realTask = (t) => (t.trim().match(/\p{L}{2,}/gu) || []).length >= 2;
 let draftTask = "", ready = () => {};
 $("taskIdeas").addEventListener("click", (e) => { const b = e.target.closest("[data-idea]"); if (b) { $("taskIn").value = draftTask = b.dataset.idea; $("taskIdeas").innerHTML = ""; ready(); $("taskIn").focus(); } });
-$("recentChips").addEventListener("click", (e) => { const b = e.target.closest("[data-folder]"); if (b) $("folderIn").value = b.dataset.folder; });
+$("recentChips").addEventListener("click", (e) => { const b = e.target.closest("[data-folder]"); if (b) { $("folderIn").value = b.dataset.folder; checkHeavy(); } });
+// A flow far bigger than the project it works on: lots of agents for a handful of files burns plan for nothing.
+// Only a warning: the user may know better (a short brief for a big new app, say).
+let heavyTimer = 0, heavySeq = 0;
+function checkHeavy() {
+  clearTimeout(heavyTimer);
+  heavyTimer = setTimeout(async () => {
+    const seq = ++heavySeq, folder = $("folderIn").value.trim(), sessions = (est && est.sessions) || 0;
+    let files = null;
+    if (folder && sessions > 4) { try { files = (await api("/api/folder-size", { method: "POST", body: { folder } })).files; } catch (e) { files = null; } }
+    if (seq !== heavySeq) return;   // the folder changed while we counted
+    const room = files ? Math.max(4, Math.ceil(files / 5)) : Infinity;   // about one agent per five files, never fewer than four
+    const heavy = files > 0 && sessions > room;
+    $("heavyWarn").hidden = !heavy;
+    $("heavyWarn").textContent = heavy ? `Heavy for this project: ${sessions} agent sessions for a folder with ${files} file${files === 1 ? "" : "s"}. ` +
+      `A smaller flow, or fewer agents per team, would likely do this job for much less of your plan.` : "";
+  }, 250);
+}
 // Nodes in the order a run reaches them: by how many steps from the start, then top to bottom. (Not by where they sit:
 // a long flow wraps onto rows, so a later step can sit further left.)
 function flowDepth(f) {   // node id -> how many steps from the start
@@ -1757,15 +1807,64 @@ function renderRunTeam() {   // the team in running order, as little avatars
 $("taskIn").addEventListener("input", () => { draftTask = $("taskIn").value.slice(0, 4000); ready(true); });   // a draft survives closing the menu
 $("taskIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { if ($("goBtn").disabled) ready(true); else $("goBtn").click(); } });
 let starting = false;   // a double-click must not start two runs
+// ---- the check before a run: one quick agent reads the job and the folder. If the team can't start without
+// something (data it can't find, a job with no goal), it asks here instead of burning a run on guesses.
+let checked = false, checkAbort = null, asked = [];
+function resetCheck() { checked = false; asked = []; if (checkAbort) checkAbort.abort(); $("askBox").hidden = true; $("askBox").innerHTML = ""; $("skipCheck").hidden = true; }
+async function precheck() {   // true: start the run now
+  if (checked || appPrefs.precheck === false) return true;
+  checked = true;
+  const go = $("goBtn"), label = go.innerHTML;
+  go.disabled = true; go.textContent = "Checking the job…"; $("skipCheck").hidden = false;
+  checkAbort = new AbortController();
+  let d = null;
+  try {
+    const r = await fetch("/api/precheck", { method: "POST", headers: { "Content-Type": "application/json" }, signal: checkAbort.signal,
+      body: JSON.stringify({ flow: flow.id, task: $("taskIn").value, folder: $("folderIn").value }) });
+    d = await r.json();
+  } catch (e) {}
+  checkAbort = null; go.innerHTML = label; $("skipCheck").hidden = true; ready();
+  if (!$("runDlg").open) return false;
+  if (!d || d.ok !== false || !(d.questions || []).length) return true;
+  asked = d.questions;
+  $("askBox").innerHTML = `<b>Before the team starts</b><p>Answer what you can, then start. The team gets your answers with the job.</p>`
+    + asked.map((q, i) => `<label for="askQ${i}">${esc(q.q)}</label>` + (q.kind === "folder"
+        ? `<div class="folder"><input id="askQ${i}" data-q="${i}" placeholder="Pick or paste a folder" autocomplete="off"><button type="button" data-qbrowse="${i}">Browse…</button></div>`
+        : `<input id="askQ${i}" data-q="${i}" autocomplete="off" placeholder="${q.kind === "file" ? "Paste the file's path" : "Your answer"}">`)).join("");
+  $("askBox").hidden = false; $("skipCheck").hidden = false;
+  $("askBox").scrollIntoView({ block: "nearest" }); $("askQ0").focus();
+  return false;
+}
+const askAnswers = () => asked.map((q, i) => ({ q: q.q, kind: q.kind, a: (($("askQ" + i) || {}).value || "").trim().replace(/^"|"$/g, "") })).filter((x) => x.a);
+$("skipCheck").onclick = () => {
+  if (checkAbort) return checkAbort.abort();                    // still checking: stop waiting and start
+  asked = []; $("askBox").hidden = true; $("skipCheck").hidden = true; $("goBtn").click();   // questions shown: start without answering
+};
+$("askBox").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-qbrowse]"); if (!b) return;
+  try {
+    const app = window.top.lithnodeApp;
+    const { folder } = app && app.pickFolder ? { folder: await app.pickFolder() } : await api("/api/pick-folder", { method: "POST", body: {} });
+    if (folder) { $("askQ" + b.dataset.qbrowse).value = folder; showTail($("askQ" + b.dataset.qbrowse)); }
+  } catch (err) { toast(err.message); }
+});
+$("askBox").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("input") && !$("goBtn").disabled) { e.preventDefault(); $("goBtn").click(); } });
 $("goBtn").onclick = async () => {
   if (starting) return;
   starting = true;
   try {
+    if (!(await precheck())) return;
+    const answers = askAnswers();
+    // a folder you were asked for is where the team works, unless you had already picked one
+    const where = answers.find((x) => x.kind === "folder");
+    if (where && !$("folderIn").value.trim()) $("folderIn").value = where.a;
+    const file = answers.find((x) => x.kind === "file" && /^(?:[a-z]:[\\/]|[\\/~])/i.test(x.a) && /[\\/][^\\/]+$/.test(x.a));   // a full path: the team works beside that file
+    if (!where && file && !$("folderIn").value.trim()) $("folderIn").value = file.a.replace(/[\\/][^\\/]+$/, "");
     const picked = Object.fromEntries([...document.querySelectorAll("#runDlg [data-role]")].map((el) => [el.dataset.role, el.value]));
     flow.models = picked;
     flow.nodes.forEach((n) => { if (n.role) n.model = roleModel(n.role); });
     if (!(await save())) { $("runWarn").textContent = "Your latest changes aren't saved yet, so the run didn't start. Try again."; return; }
-    const d = await api(`/api/flows/${flow.id}/run`, { method: "POST", body: { task: $("taskIn").value, folder: $("folderIn").value, limit: +$("limitIn").value, models: picked } });
+    const d = await api(`/api/flows/${flow.id}/run`, { method: "POST", body: { task: $("taskIn").value, folder: $("folderIn").value, limit: +$("limitIn").value, models: picked, answers } });
     flow.limit = +$("limitIn").value;
     flow.folder = $("folderIn").value.trim().replace(/^"|"$/g, "");
     flow.task = $("taskIn").value.trim().slice(0, 4000);
@@ -1985,7 +2084,8 @@ function renderRunPanel() {
       <textarea id="note-${esc(nid)}" rows="2" placeholder="Optional note for the next stage"></textarea>
       <div class="acts" style="margin-top:8px"><button class="danger" data-decide="${esc(nid)}" data-ok="0">Reject</button><button class="primary" data-decide="${esc(nid)}" data-ok="1">Approve</button></div></div>`;
   }
-  if (r.final) html += `<div class="card result-card"><h4>✓ Result</h4><div class="peek doc">${md(r.final)}</div>
+  const said = BOTTOM_RE.test(r.final || "") ? bottomOf(r.final)[0] : "";
+  if (r.final) html += `<div class="card result-card"><h4>✓ Result</h4>${said ? `<p class="said">${md(said).replace(/^<p>|<\/p>$/g, "")}</p>` : `<div class="peek doc">${md(r.final)}</div>`}
       <div class="acts"><button id="copyFinal">Copy</button><button class="primary" id="openFinal">Open result</button></div></div>` + troubleHtml(r, "card trouble");
   else if (!live && r.status !== "done") html += `<div class="card"><h4 style="margin:0 0 6px;font-size:13px">No result</h4>
       <p class="hint" style="margin:0">${esc((r.status === "stopped" && (r.log || []).map((l) => l.text).reverse().find((t) => /^Stopped/.test(t)))
@@ -2056,10 +2156,58 @@ function downloadResult(r) {
   a.href = url; a.download = (r.flow_name || "result").replace(/[^\w -]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() + ".md";
   a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-// The final result as a short read: bottom line up top, numbered points as cards, the rest underneath.
-function resultView(text, files = "") {
-  let t = String(text || "").trim(), bottom = "";
-  t = t.replace(/^[ 	]*(?:\*\*)?Bottom line:?(?:\*\*)?:?[ 	]*(.+)$/im, (_, line) => { bottom = line.replace(/\*\*/g, "").trim(); return ""; }).trim();
+// The first thing a report says: its "Bottom line:" sentence, or else its first sentence. Returns [line, the rest].
+const BOTTOM_RE = /^[ \t]*(?:[#>*-]+[ \t]*)?(?:\*\*)?Bottom line:?(?:\*\*)?:?[ \t]*(.+)$/im;
+function bottomOf(text) {
+  let t = String(text || "").trim(), line = "";
+  t = t.replace(BOTTOM_RE, (_, l) => { line = l.replace(/\*\*/g, "").trim(); return ""; }).trim();
+  if (!line) {   // no bottom line: the first sentence of the first real paragraph stands in for it
+    const first = t.split("\n").map((l) => l.replace(/^[#>*\-\s\d.)]+/, "").replace(/\*\*/g, "").trim()).find((l) => l.length > 12) || "";
+    line = (/^(.{20,220}?[.!?])(\s|$)/.exec(first) || [0, first.slice(0, 200)])[1];
+  }
+  return [line, t];
+}
+const wordCount = (s) => (String(s).match(/\S+/g) || []).length;
+// Every agent that worked, in the order they ran, as a card: its logo with what it said under it. A click shows
+// that agent's whole report below the cards.
+let sayReports = [];
+function agentSays(r) {
+  const rows = []; sayReports = [];
+  for (const n of flowOrder(r.flow)) {
+    if (n.type !== "cluster") continue;
+    const team = ((r.nodes[n.id] || {}).agents || []).slice().sort((x, y) => String(x.name).localeCompare(String(y.name), undefined, { numeric: true }));
+    for (const a of team) {
+      if (a.status === "running") continue;
+      const ok = a.status === "done" && a.report;
+      const line = ok ? bottomOf(a.report)[0] : String(a.error || (a.status === "stopped" ? "Stopped before it reported." : "It ended without a report.")).split("\n")[0].slice(0, 200);
+      const who = a.name || n.name;
+      sayReports.push({ who, report: ok ? a.report : "", meta: `${modelLabel(a.model)} · ${a.turns || 0} turns${a.tokens ? ` · ${tokenWord(a.tokens)} tokens` : ""}` });
+      rows.push(`<button type="button" class="rp-say${ok ? "" : " bad"}" data-say="${rows.length}"${ok ? ` title="Read ${esc(who)}'s whole report"` : " disabled"} style="--c:${esc(a.color || n.color || "#ecebe6")}">`
+        + `<canvas width="96" height="72" data-shape="${esc(a.shape || n.shape || "crab")}" data-color="${esc(a.color || n.color || "#ecebe6")}"></canvas>`
+        + `<b>${esc(who)}</b><span>${ok ? md(line).replace(/^<p>|<\/p>$/g, "") : esc(line)}</span></button>`);
+    }
+  }
+  return rows;
+}
+function wireSays(root) {
+  const full = root.querySelector("#sayFull");
+  root.querySelectorAll("[data-say]").forEach((b) => b.onclick = () => {
+    const s = sayReports[+b.dataset.say], was = b.classList.contains("on");
+    root.querySelectorAll("[data-say]").forEach((x) => x.classList.remove("on"));
+    if (was || !s || !s.report) { full.hidden = true; return; }
+    b.classList.add("on");
+    full.innerHTML = `<h4>${esc(s.who)}<span class="meta">${esc(s.meta)}</span></h4><div class="doc">${md(s.report)}</div>`;
+    full.hidden = false; full.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+}
+// The final result as a short read: the bottom line, the files, then one line from each agent. Anything longer is
+// folded away under "Full write-up", so the page never opens on an essay.
+function resultView(text, files = "", r = null) {
+  let [bottom, t] = BOTTOM_RE.test(String(text || "")) ? bottomOf(text) : ["", String(text || "").trim()];
+  const says = r ? agentSays(r) : [];
+  // the result is one agent's report word for word: its card already says it, and a click shows all of it
+  if (says.length > 1 && sayReports.some((s) => s.report && s.report.trim() === String(text || "").trim())) t = "";
+  const heard = says.length > 1 ? `<div class="rp-says"><small>From each agent</small><div class="says">${says.join("")}</div><div class="rp-sayfull" id="sayFull" hidden></div></div>` : "";
   const lines = t.split("\n"), items = [], head = [], tail = [];
   let cur = null, seenList = false;
   for (const ln of lines) {
@@ -2070,11 +2218,18 @@ function resultView(text, files = "") {
     else { cur = null; (seenList ? tail : head).push(ln); }
   }
   const lead = bottom ? `<div class="rp-bottom"><p>${md(bottom).replace(/^<p>|<\/p>$/g, "")}</p></div>` : "";
-  if (items.length < 2) return lead + files + (t ? `<div class="rp-plain doc">${md(t)}</div>` : (lead ? "" : `<div class="rp-plain doc"><p>No result yet.</p></div>`));
+  const fold = (body, label) => `<details class="rp-details rp-full"><summary>${label} · ${wordCount(t)} words</summary>${body}</details>`;
+  // several agents' reports glued together (no merge step): each agent's line above already covers it
+  const glued = heard && /^#{2,3} /m.test(t);
+  if (items.length < 2 || glued) {
+    const plain = t ? `<div class="rp-plain doc">${md(t)}</div>` : "";
+    if (!t) return lead + files + heard + (lead || heard ? "" : `<div class="rp-plain doc"><p>No result yet.</p></div>`);
+    return lead + files + heard + (heard && (glued || wordCount(t) > 70) ? fold(plain, "Full write-up") : plain);
+  }
   const intro = head.join("\n").trim(), more = tail.join("\n").trim();
-  return lead + files + (intro ? `<div class="rp-more"><div class="doc">${md(intro)}</div></div>` : "")
-    + `<div class="finds">${items.map((it, i) => `<div class="rfind"><i>${i + 1}</i><div class="doc">${md(it.join(" "))}</div></div>`).join("")}</div>`
-    + (more ? `<div class="rp-more"><div class="doc">${md(more)}</div></div>` : "");
+  const finds = `<div class="finds">${items.map((it, i) => `<div class="rfind"><i>${i + 1}</i><div class="doc">${md(it.join(" "))}</div></div>`).join("")}</div>`;
+  const rest = (s) => !s ? "" : heard && wordCount(s) > 50 ? `<details class="rp-details rp-full"><summary>More · ${wordCount(s)} words</summary><div class="rp-more"><div class="doc">${md(s)}</div></div></details>` : `<div class="rp-more"><div class="doc">${md(s)}</div></div>`;
+  return lead + files + rest(intro) + finds + rest(more) + heard;
 }
 // The files a run made, as buttons that open them (documents open, anything runnable is shown in its folder).
 const OPENS = /\.(html?|md|txt|png|jpe?g|gif|webp|svg|pdf|csv|json)$/i;
@@ -2105,7 +2260,7 @@ function openSheet(r) {
     more.push(`<section class="rp-sec"><h3>Items from ${esc(lastItems.name)}<span class="grow"></span><button id="sheetItems">Copy as table</button></h3>
       <div class="items-grid">${its.map((it) => itemCard(it, "sheet" + r.id, { animate: false })).join("")}</div></section>`);
   }
-  if (stages.length) {
+  if (stages.length && nReports < 2) {
     what.push(`${nReports} agent report${nReports === 1 ? "" : "s"}`);
     more.push(`<section class="rp-sec"><h3>Agent reports<span class="grow"></span><button id="sheetExpand">Expand all</button></h3>`
       + stages.map((g) => `<div class="rp-stage"><h4>${esc(g.node.name)}</h4>` + g.agents.map((a) =>
@@ -2134,12 +2289,13 @@ function openSheet(r) {
     </div>
     <div class="rp-body"><div class="rp-main"><div class="rp-col">
       ${troubleHtml(r, "rp-warn")}
-      ${resultView(r.final, filesView(r))}
+      ${resultView(r.final, filesView(r), r)}
       <details class="rp-details"><summary>Details: ${what.join(", ")}</summary>${more.join("")}</details>
     </div></div></div>`;
 
   const main = $("sheet").querySelector(".rp-main");
   $("sheet").classList.add("show"); main.scrollTop = 0;
+  drawLooks($("sheet")); wireSays($("sheet"));
   $("sheetCopy").onclick = () => copyText(r.final || "");
   if ($("sheetItems")) $("sheetItems").onclick = () => copyText(itemsMarkdown(r.nodes[lastItems.id].items));
   $("sheetDl").onclick = () => downloadResult(r);
@@ -2147,7 +2303,7 @@ function openSheet(r) {
   if ($("sheetFolder")) $("sheetFolder").onclick = () => openRunFile(r, "");
   $("sheetClose").onclick = closeSheet;
   if ($("sheetExpand")) $("sheetExpand").onclick = (e) => {
-    const all = [...$("sheet").querySelectorAll(".rp-agent")], open = !all.every((d) => d.open);
+    const all = [...$("sheet").querySelectorAll(".rp-agent, .rp-say")].filter((d) => d.querySelector(".doc")), open = !all.every((d) => d.open);
     all.forEach((d) => d.open = open); e.target.textContent = open ? "Collapse all" : "Expand all";
   };
 }

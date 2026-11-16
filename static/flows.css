@@ -44,12 +44,20 @@ svg.play { width: 11px; height: 11px; fill: currentColor; stroke: none; }
 .grow { flex: 1; }
 
 /* three columns, like a design tool: what you can add | the flow | the settings of what's selected */
-main { --lw: 252px; --rw: 344px; display: grid; grid-template-columns: var(--lw) minmax(0, 1fr) var(--rw); min-height: 0;
+main { --lw: min(var(--ulw, 252px), 34vw); --rw: min(var(--urw, 344px), 46vw); display: grid; grid-template-columns: var(--lw) minmax(0, 1fr) var(--rw); min-height: 0;
        transition: grid-template-columns .22s ease; }
 main.hideL, main.running { --lw: 0px; }   /* building blocks aren't needed while a run goes */
 main.hideR { --rw: 0px; }
 main:is(.hideL, .running) #palette, main.hideR #rside { visibility: hidden; }
-@media (max-width: 1180px) { main { --lw: 226px; --rw: 304px; } }
+@media (max-width: 1180px) { main { --lw: min(var(--ulw, 226px), 30vw); --rw: min(var(--urw, 304px), 40vw); } }
+/* drag a panel's inner edge to resize it */
+main.sizing { transition: none; cursor: col-resize; user-select: none; }
+.palette, .rside { position: relative; }
+.psize { position: absolute; top: 0; bottom: 0; width: 9px; z-index: 6; cursor: col-resize; touch-action: none; }
+.psize[data-side="l"] { right: 0; } .psize[data-side="r"] { left: 0; }
+.psize::after { content: ""; position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); opacity: 0; transition: opacity .12s; }
+.psize[data-side="l"]::after { right: 0; } .psize[data-side="r"]::after { left: 0; }
+.psize:hover::after, .psize.on::after { opacity: .7; }
 /* both panels start with a header of the same height, so their edges line up across the canvas */
 .phead, .rtop { flex: none; height: 58px; display: flex; align-items: center; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); }
 .ftitle { flex: 1; min-width: 0; display: grid; gap: 1px; }
@@ -769,7 +777,7 @@ dialog.rundlg .rbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .rfoot .acts { margin: 0; }
 .rfoot .hint { flex: 1; min-width: 200px; font-size: 12px; line-height: 1.45; }
 .rfoot .hint b { color: var(--ink); font-weight: 600; }
-.rfoot .hint .bigrun { color: var(--approval); }
+.rfoot .hint .bigrun, #heavyWarn { color: var(--approval); }
 dialog.usagedlg { width: min(460px, 94vw); padding: 22px 22px 18px; }
 .usagedlg h2 { margin: 0 0 10px; font-size: 17px; }
 .usagedlg p { margin: 0 0 10px; color: var(--muted); font-size: 13px; line-height: 1.55; }
@@ -910,6 +918,31 @@ html body .rp-main .doc code, html body .rp-main .doc pre, html body .rp-main .d
 .rp-bottom p { margin: 0; font-size: 17px; line-height: 1.5; font-weight: 600; }
 html body .rp-bottom p { font-family: var(--sans); }
 .rp-files { margin-bottom: 18px; }
+/* one line from each agent; a click opens that agent's whole report */
+.rp-says { margin-bottom: 18px; }
+.rp-says > small { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 600; margin: 0 4px 8px; }
+.rp-says > small button { margin-left: auto; font-size: 12px; padding: 3px 10px; }
+.says { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.rp-say { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 14px 14px; text-align: center; height: auto; white-space: normal;
+          background: var(--pad); border: 1px solid var(--line); border-radius: 14px; color: var(--ink); cursor: pointer; font: inherit; }
+.rp-say:hover:not(:disabled) { border-color: color-mix(in srgb, var(--c) 55%, var(--line)); }
+.rp-say.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 8%, var(--pad)); }
+.rp-say canvas { width: 72px; height: 54px; image-rendering: pixelated; }
+.rp-say b { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.rp-say span { font-size: 14px; line-height: 1.45; }
+.rp-say.bad { cursor: default; opacity: 1; } .rp-say.bad span { color: var(--failed); }
+.rp-sayfull { margin-top: 10px; background: var(--pad); border: 1px solid var(--line); border-radius: 14px; padding: 14px 22px 16px; scroll-margin: 16px; }
+.rp-sayfull h4 { margin: 0 0 4px; font-size: 14px; display: flex; align-items: baseline; gap: 10px; }
+.rp-sayfull h4 .meta { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 12px; }
+.rp-sayfull .doc { font-size: 14.5px; }
+/* the questions a run asks before it starts */
+.askbox { border: 1px solid color-mix(in srgb, var(--approval) 55%, var(--line)); background: color-mix(in srgb, var(--approval) 8%, var(--pad)); border-radius: 12px; padding: 12px 14px 14px; display: grid; gap: 6px; }
+.askbox b { font-size: 13.5px; } .askbox p { margin: 0 0 4px; color: var(--muted); font-size: 12.5px; }
+.askbox label { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.askbox input { width: 100%; }
+.rp-full > .rp-plain { margin-top: 4px; }
+.result-card .said { margin: 0; font-size: 13.5px; line-height: 1.5; font-weight: 600; }
+
 .rp-files > small { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 600; margin: 0 4px 8px; }
 .rp-files > small button { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; padding: 3px 10px; }
 .rp-files .list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -946,7 +979,7 @@ html body .rp-bottom p { font-family: var(--sans); }
 .doc a { color: var(--accent); }
 .doc hr { border: 0; border-top: 1px solid var(--line); margin: 1.2em 0; }
 .doc > :first-child { margin-top: .6em; }
-@media (max-width: 1040px) { main { --lw: 224px; --rw: 288px; } .bteam .bdots { display: none; } .bstep { padding-inline: 0; } .bstep b { font-size: 10.5px; letter-spacing: -.02em; } }
+@media (max-width: 1040px) { main { --lw: min(var(--ulw, 224px), 26vw); --rw: min(var(--urw, 288px), 34vw); } .bteam .bdots { display: none; } .bstep { padding-inline: 0; } .bstep b { font-size: 10.5px; letter-spacing: -.02em; } }
 
 /* ---- the look: the canvas is a patch of night sky (like lithnode.com), and every team wears its bot's color ---- */
 #canvas { background-color: var(--bg);

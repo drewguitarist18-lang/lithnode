@@ -50,7 +50,7 @@ DEFAULT_MODELS = {"think": "claude-opus-5-5", "build": "claude-sonnet-5-5", "run
 
 # How heavy each model is relative to Haiku, for the pre-run estimate only. Real costs come
 # from Claude Code's own `total_cost_usd` once agents finish.
-MODEL_WEIGHT = {"claude-haiku-4-5": 1, "claude-sonnet-5-5": 3, "claude-opus-5-5": 5, "claude-fable-5-1": 8}
+MODEL_WEIGHT = {"claude-haiku-4-5": 1, "claude-sonnet-5-5": 3, "claude-opus-5-5": 5, "claude-fable-5-1": 8, "claude-fable-5-2": 8}
 
 
 class Store:
@@ -382,7 +382,19 @@ def check_runnable(flow: dict[str, Any]) -> list[str]:
             problems.append("Not connected to Start: " + ", ".join(steps[:5]) + ".")
         if workers and len(steps) < len(loose):   # with no team yet, adding one is the fix, not this
             problems.append(f"Nothing leads to {next(n['name'] for n in loose if n['type'] == 'done')} yet: wire your last step into it.")
+        lost = dead_ends(flow)
+        if lost and dones == 1 and not problems:
+            done = next(n["name"] for n in flow["nodes"] if n["type"] == "done")
+            problems.append(f"{' and '.join(lost[:3])} {'is' if len(lost) == 1 else 'are'}n't wired into anything, so that work never reaches "
+                            f"{done} and the result would come back without it. Wire {'it' if len(lost) == 1 else 'them'} into {done} or the next step.")
     return problems
+
+
+def dead_ends(flow: dict[str, Any]) -> list[str]:
+    """Names of steps Start reaches that have no wire going out: their work would never get to Done."""
+    out_of = {e["from"] for e in flow["edges"]}
+    into = {e["to"] for e in flow["edges"]}
+    return [n["name"] for n in flow["nodes"] if n["type"] not in ("done", "master") and n["id"] in into and n["id"] not in out_of]
 
 
 def estimate(flow: dict[str, Any]) -> dict[str, Any]:
@@ -751,6 +763,79 @@ def parse_design(text: str) -> Any:
         raise ValueError("The designer's flow wasn't valid. Try again, or describe it a bit differently.") from None
 
 
+# ---- the check before a run: does the team have what it needs to start, or should it ask first?
+PRECHECK_SYSTEM = """You check a job before a team of AI agents starts on it, on the user's own computer, in an app called Lithnode.
+Decide whether the team can begin, or whether the user has to answer something first.
+
+Ask only when the job can't be done well without the answer:
+- it is about data, files, a project, a document or an account that is not in the folder and not given in the job
+  (for example "sort the 3000 columns" with no file anywhere), or
+- it names no real goal, so two sensible people would build different things.
+Never ask about taste or details the team can decide itself, and never ask for something already in the job or the
+folder. A job that makes something new from scratch needs no folder. A team that can use the web can look things up.
+When in doubt, let the run start.
+
+Ask at most 3 questions, and prefer 1. Each is one short plain sentence the user can answer in a few words.
+Reply with ONLY one JSON object, no prose and no code fence:
+{"ok": true}
+or
+{"ok": false, "questions": [{"q": "Where are the columns you want sorted?", "kind": "folder"}]}
+kind is "folder" when the answer is a folder on this computer the team should work in, "file" when it is one file,
+and "text" for anything else."""
+
+
+def folder_glance(folder: str | Path, cap: int = 60) -> str:
+    """What's at the top of a folder, as one line for the pre-run check ('' when there is no folder)."""
+    try:
+        entries = sorted(Path(folder).iterdir(), key=lambda p: (p.is_file(), p.name.lower())) if folder else []
+    except OSError:
+        return ""
+    names = [p.name + ("/" if p.is_dir() else "") for p in entries if not p.name.startswith(".") and p.name not in SKIP_DIRS]
+    more = f", and {len(names) - cap} more" if len(names) > cap else ""
+    return ", ".join(names[:cap]) + more
+
+
+def precheck_prompt(flow: dict[str, Any], task: str, folder: str) -> str:
+    can = {"none": "no tools", "read": "reads files", "web": "uses the web", "research": "reads files and uses the web",
+           "edit": "edits files", "full": "edits files and runs commands", "all": "edits files, runs commands, uses the web"}
+    teams = "; ".join(f'{n["name"]} ({can.get(n.get("tools", "read"), "reads files")})'
+                      for n in flow["nodes"] if n["type"] == "cluster") or "none"
+    if folder:
+        glance = folder_glance(folder)
+        where = f"The team will work in this folder: {folder}\nIt contains: {glance or 'nothing yet (it is empty)'}"
+    else:
+        where = "No folder was picked, so the team would work in a new, empty scratch folder."
+    return f"# The job\n{task}\n\n# Where\n{where}\n\n# The team\n{teams}"
+
+
+def parse_precheck(text: str) -> list[dict[str, str]]:
+    """The questions in the checker's answer; [] means start the run (also when the answer is unreadable)."""
+    start, end = text.find("{"), text.rfind("}")
+    try:
+        raw = json.loads(text[start:end + 1]) if 0 <= start < end else {}
+    except ValueError:
+        return []
+    if not isinstance(raw, dict) or raw.get("ok") is not False or not isinstance(raw.get("questions"), list):
+        return []
+    out = []
+    for q in raw["questions"][:3]:
+        text_q = " ".join(str((q.get("q") if isinstance(q, dict) else q) or "").split())[:200]
+        kind = q.get("kind") if isinstance(q, dict) and q.get("kind") in ("folder", "file", "text") else "text"
+        if text_q:
+            out.append({"q": text_q, "kind": kind})
+    return out
+
+
+def with_answers(task: str, answers: Any) -> str:
+    """The job with what the user answered before the run added, so every agent reads it."""
+    pairs = [(" ".join(str(a.get("q") or "").split())[:200], str(a.get("a") or "").strip()[:1000])
+             for a in (answers if isinstance(answers, list) else [])[:3] if isinstance(a, dict)]
+    pairs = [(q, a) for q, a in pairs if q and a]
+    if not pairs:
+        return task
+    return task + "\n\nAsked before the run started, and the user's answers:\n" + "\n".join(f"- {q}\n  {a}" for q, a in pairs)
+
+
 def build_design(raw: Any, bots: list[dict[str, Any]], engine: str = "claude") -> dict[str, Any]:
     """Turn a designer draft into a clean, laid-out flow. Raises ValueError with a readable reason."""
     if not isinstance(raw, dict) or not isinstance(raw.get("nodes"), list):
@@ -795,6 +880,11 @@ def build_design(raw: Any, bots: list[dict[str, Any]], engine: str = "claude") -
         sinks = [n["id"] for n in nodes if n["type"] != "done" and not any(e["from"] == n["id"] for e in edges)]
         nodes.append({"id": "done", "type": "done", "name": "Complete"})
         edges += [{"from": s_, "to": "done"} for s_ in sinks if s_ in ids]
+    else:   # a Done the designer forgot to wire up: every loose end goes into it, and Start doesn't skip the teams
+        done = next(n["id"] for n in nodes if n["type"] == "done")
+        edges += [{"from": n["id"], "to": done} for n in nodes if n["type"] not in ("done", "master") and not any(e["from"] == n["id"] for e in edges)]
+        if any(e["to"] == done and e["from"] != "master" for e in edges):
+            edges = [e for e in edges if not (e["from"] == "master" and e["to"] == done)]
     flow = clean_flow({"name": raw.get("name") or "Designed flow", "nodes": nodes, "edges": edges})
     _layout(flow)
     return flow
@@ -1158,7 +1248,9 @@ class Run:
             'it in a browser."), or else the answer. Then: what you '
             "did, what you found, and what the next stage must know. Only that report is passed on, and it's what the "
             "user reads: put your actual results in it (the ideas, the answer, the findings, the list), not a "
-            "sentence saying you made them. Say plainly what you didn't do, and never describe planned work as done.",
+            "sentence saying you made them. Say plainly what you didn't do, and never describe planned work as done. "
+            "Write it the way a sharp colleague reports back: results first, short plain sentences, no preamble, "
+            "no restating the task, no closing recap, no filler. Shorter is better when nothing is lost.",
             f"Today's date: {date.today().isoformat()}.",
         ]
         return "\n".join(lines)
@@ -1408,7 +1500,22 @@ def _ping(url: str, flow_name: str, message: str) -> None:
         pass
 
 
-SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".lithnode-shots", ".next", "dist", "build", ".cache"}
+SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".next", "target", ".lithnode-shots", ".idea", ".vscode", ".cache"}
+
+
+def count_files(folder: str | Path, cap: int = 2000, seconds: float = 1.0) -> int:
+    """About how many of the project's own files are in folder (dependencies and build output skipped), for the
+    Run dialog's too-heavy warning. Stops at cap or after `seconds`: past that the project is big enough anyway."""
+    n, deadline = 0, time.time() + seconds
+    try:
+        for _root, dirs, files in os.walk(folder):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
+            n += sum(1 for f in files if not f.startswith("."))
+            if n >= cap or time.time() > deadline:
+                return cap
+    except OSError:
+        pass
+    return n
 
 
 def changed_files(folder: str | Path, since: float, limit: int = 40) -> list[str]:
