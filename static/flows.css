@@ -1164,3 +1164,39 @@ main { grid-template-rows: minmax(0, 1fr) auto; }
 .trouble li span, .rp-warn li span { color: var(--ink); font-weight: 600; }
 .trouble li, .rp-warn li { overflow-wrap: anywhere; }
 .rp-top .meta .bad { color: var(--failed); font-weight: 600; }
+/* the run menu's folded options: the job, the folder and Start stay up front */
+.more .field { margin: 0 0 14px; }
+.more #schedBox label span { color: var(--muted); font-weight: 400; }
+.more #saveJob { font-size: 12.5px; }
+.ideas:empty, .jobs:empty, .recent:empty { display: none; }
+.rbody .risk { margin-top: 0; }
+.schedrow select, .schedrow input { width: auto; flex: none; }
+/* side panels: the same quiet section headings on both sides */
+.psec h3 { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.psec h3 .count { letter-spacing: 0; }
+.psec h3 .newbot { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--ink); }
+.grp { font-size: 11px; color: color-mix(in srgb, var(--muted) 80%, transparent); margin: 14px 8px 4px; }
+.can:not(.edit):not(.full):not(.web) { opacity: .65; }
+.palette .tip[hidden] { display: none; }
+main { --lw: min(var(--ulw, 268px), 34vw); }
+@media (max-width: 1180px) { main { --lw: min(var(--ulw, 236px), 30vw); } }
+/* the step-by-step list folds under its heading */
+.hwfold > summary { list-style: none; cursor: pointer; }
+.hwfold > summary::-webkit-details-marker { display: none; }
+.hwfold > summary h4::after { content: "▸"; margin-left: 6px; font-size: 10px; color: var(--muted); }
+.hwfold[open] > summary h4::after { content: "▾"; }
+.hwfold:not([open]) { gap: 0; }
+.hwfold > summary { display: block; }
+.hwfold > summary > h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.hwfold > summary > h4 .aside { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.hwfold > summary:hover > h4 { color: var(--ink); }
+/* Get started's last step points here instead of a second Run button */
+#runBtn.nudge { animation: nudge 2.4s ease-in-out infinite; }
+@keyframes nudge { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 35%, transparent); } }
+@media (prefers-reduced-motion: reduce) { #runBtn.nudge { animation: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); } }
+/* a building block the flow can only have one of is gone once it's placed, not left as a faded tile */
+.blocks { grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); }
+.blk.used { display: none; }
+/* bot descriptions in full, up to two lines */
+.bot small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
+.bot { align-items: start; } .bot .ava { margin-top: 2px; }

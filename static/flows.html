@@ -99,33 +99,29 @@
     <div class="team" id="runTeam"></div>
   </header>
   <div class="rbody">
-    <div class="field"><label for="taskIn">What should the team do this run?</label>
-      <textarea id="taskIn" rows="4" placeholder="Write the job in your own words, e.g. Find bugs in the checkout code and list them with file and line"></textarea>
+    <div class="field"><label for="taskIn">What should the team do?</label>
+      <textarea id="taskIn" rows="3" placeholder="In your own words, e.g. Find bugs in the checkout code"></textarea>
       <div class="ideas" id="taskIdeas"></div>
       <div class="jobs" id="jobChips"></div>
       <div class="sub" id="taskSub"></div></div>
-    <div class="field"><label for="folderIn">Project folder</label><div class="folder"><input id="folderIn" list="recentFolders" placeholder="Pick your project folder (blank = a scratch folder)">
+    <div class="field"><label for="folderIn">Folder</label><div class="folder"><input id="folderIn" list="recentFolders" placeholder="Your project folder (blank = a scratch folder)">
       <button type="button" data-browse="folderIn">Browse…</button></div>
-      <div class="recent" id="recentChips"></div>
-      <div class="sub">Agents work here. Reviewers only read it; builders can change it.</div></div>
-    <div class="field"><label for="limitIn">Token limit</label>
-      <div class="limit"><select id="limitIn">
-        <option value="250000">250k tokens</option><option value="500000">500k tokens</option>
-        <option value="1000000">1M tokens</option><option value="2000000">2M tokens</option>
-        <option value="5000000">5M tokens</option><option value="0">No limit</option></select>
-        <span class="sub" id="limitSub"></span></div></div>
-    <div class="field" id="rolesField"><label>Models</label>
-      <div class="roles">
-        <label><span>Composer</span><select id="roleThink" data-role="think"></select></label>
-        <label><span>Orchestrator</span><select id="roleBuild" data-role="build"></select></label>
-        <label><span>Performer</span><select id="roleRun" data-role="run"></select></label></div>
-      <div class="sub" id="rolesSub"></div></div>
-    <details class="sched" id="schedBox"><summary>Schedule <span id="schedState"></span></summary>
-      <div class="schedrow"><select id="schedEvery" aria-label="How often"><option value="hour">Every hour</option><option value="day">Every day</option><option value="weekday">Every weekday</option></select>
-        <span>at</span><input type="time" id="schedAt" value="09:00" aria-label="Time"><span class="grow"></span>
-        <button type="button" id="schedOff" hidden>Turn off</button><button type="button" id="schedSave">Turn on</button></div>
-      <div class="sub" id="schedJob"></div>
-      <div class="sub">Uses the job and folder above. It runs only while Lithnode is open, and starts without the questions or the checkbox below. For every hour, only the minutes of the time count.</div></details>
+      <div class="recent" id="recentChips"></div></div>
+    <details class="sched more" id="moreBox"><summary>More options <span id="moreState"></span></summary>
+      <div class="field" id="rolesField"><label>Models</label>
+        <div class="roles">
+          <label><span>Composer</span><select id="roleThink" data-role="think"></select></label>
+          <label><span>Orchestrator</span><select id="roleBuild" data-role="build"></select></label>
+          <label><span>Performer</span><select id="roleRun" data-role="run"></select></label></div>
+        <div class="sub" id="rolesSub"></div></div>
+      <div class="field" id="schedBox"><label>Schedule <span id="schedState"></span></label>
+        <div class="schedrow"><select id="schedEvery" aria-label="How often"><option value="hour">Every hour</option><option value="day">Every day</option><option value="weekday">Every weekday</option></select>
+          <span>at</span><input type="time" id="schedAt" value="09:00" aria-label="Time"><span class="grow"></span>
+          <button type="button" id="schedOff" hidden>Turn off</button><button type="button" id="schedSave">Turn on</button></div>
+        <div class="sub" id="schedJob"></div>
+        <div class="sub">Runs the job and folder above by itself, while Lithnode is open.</div></div>
+      <div class="field"><button type="button" id="saveJob" title="Keep this job and folder on the flow, so next time it's one click">Save this job for later</button></div>
+    </details>
     <div id="previewBox" class="previewbox" hidden></div>
     <div id="askBox" class="askbox" hidden></div>
     <label id="riskBox" class="risk" hidden><input type="checkbox" id="riskOk"> <span id="riskText"></span></label>
@@ -1437,11 +1433,12 @@ function getStarted() {   // "" once all three are done
   const clusters = flow.nodes.filter((n) => n.type === "cluster");
   const done = [clusters.length > 0 && problems.length === 0, clusters.length > 0 && !unsetCluster(), ranFlows.has(flow.id)];
   const now = done.findIndex((d) => !d);
+  $("runBtn").classList.toggle("nudge", now === 2);   // the last step points at the one Run button, top right
   if (now < 0) return "";
   const steps = [
     { shape: "owl", color: "#7aa2f7", title: "Make a team", text: "Describe it in one line, or drag bots in.", act: "describe", label: "Describe a team" },
     { shape: "golem", color: "#e0823d", title: "Set them up", text: "Pick a job, agents and access for each team.", act: "setup", label: unsetCluster() ? "Pick a team" : "Open a team" },
-    { shape: "rocket", color: "#bb9af7", title: "Run it", text: "Say what you want done, then watch.", act: "run", label: `<svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>Run` },
+    { shape: "rocket", color: "#bb9af7", title: "Run it", text: "Press Run at the top right, say what you want done, then watch." },
   ];
   const count = done.filter(Boolean).length;
   return `<div class="gs-top"><h4>Get started</h4><span>${count} of 3</span></div>
@@ -1450,7 +1447,7 @@ function getStarted() {   // "" once all three are done
       const cls = done[i] ? "did" : i === now ? "now" : "next";
       return `<div class="gs-step ${cls}" style="--c:${st.color}">
         <span class="ic"><canvas width="96" height="72" data-shape="${st.shape}" data-color="${st.color}"></canvas>${done[i] ? '<span class="tick" aria-label="done">✓</span>' : ""}</span>
-        <div><b>${st.title}</b>${i === now ? `<p>${st.text}</p><button type="button" class="primary" data-gs="${st.act}">${st.label}</button>` : ""}</div></div>`;
+        <div><b>${st.title}</b>${i === now ? `<p>${st.text}</p>${st.act ? `<button type="button" class="primary" data-gs="${st.act}">${st.label}</button>` : ""}` : ""}</div></div>`;
     }).join("")}</div>`;
 }
 // a team's connectors: only the ones switched on here load, and only when an agent searches for a tool
@@ -1538,6 +1535,7 @@ function botOptions(n) {
   return `<option value=""${list.some((b) => b.id === n.bot) ? "" : " selected"}>Custom (no bot)</option>`
     + groups.map(([name, items]) => `<optgroup label="${esc(name)}">${items.map(one).join("")}</optgroup>`).join("");
 }
+const howOpen = () => { try { return localStorage.getItem("lithnode.howOpen") === "1"; } catch { return false; } };
 function renderInspector() {
   if (!flow) return;   // checks that finish before the first flow loads have nothing to draw yet
   if (run) return renderRunPanel();
@@ -1548,15 +1546,17 @@ function renderInspector() {
   if (!n) {
     const mine = allRuns.filter((r) => r.flow_id === flow.id).sort((a, b) => b.started - a.started).slice(0, 3);
     const gs = getStarted();
+    // what you reach for first (your runs, the folder) on top; the step-by-step list folds away, since the canvas shows it too
     box.innerHTML = (gs ? `<div class="isec">${gs}</div>` : "") + `
-      <div class="isec"><h4>How it works <span class="aside">${plural(est ? est.sessions : 0, "agent")} · ${plural(stepCount(flow), "step")}</span></h4>
-        ${howItWorks(flow, null)}
-        <p class="hw-note">Each stage waits for everything wired into it. Only each agent's short report moves on, which keeps usage down.</p></div>
-      <div class="isec" title="Where agents work. You can change it each time you run."><h4>Project folder</h4>${folderField("fFolder", flow.folder)}</div>
       <div class="isec"><h4>Recent runs${mine.length ? `<a href="#" class="aside" id="allRuns">All runs</a>` : ""}</h4>
         ${mine.length ? `<div class="rruns">${mine.map((r) => `<button type="button" class="rrun" data-run="${esc(r.id)}"><i class="${esc(r.status)}"></i>
           <span class="ot"><b>${esc(jobOf(r.task) || "No task")}</b><small>${esc(STATUS_WORD[r.status] || cap(r.status))} · ${esc(when(r.started))}${r.ended ? " · " + dur(r.ended - r.started) : ""}</small></span></button>`).join("")}</div>`
-          : `<p class="hint" style="margin:0">No runs yet. Press Run and say what you want done.</p>`}</div>`;
+          : `<p class="hint" style="margin:0">No runs yet. Press Run and say what you want done.</p>`}</div>
+      <div class="isec" title="Where agents work. You can change it each time you run."><h4>Project folder</h4>${folderField("fFolder", flow.folder)}</div>
+      <details class="isec hwfold" id="hwFold"${howOpen() ? " open" : ""}><summary><h4>How it works <span class="aside">${plural(est ? est.sessions : 0, "agent")} · ${plural(stepCount(flow), "step")}</span></h4></summary>
+        ${howItWorks(flow, null)}</details>`;
+    $("hwFold").addEventListener("toggle", (e) => { try { localStorage.setItem("lithnode.howOpen", e.target.open ? "1" : ""); } catch {} });
+    document.querySelector(".palette .tip").hidden = flow.nodes.length > 3;   // the how-to only while a flow is still new
     wireFolder("fFolder", (v) => { flow.folder = v; changed(false); });
     drawLooks(box);
     box.querySelectorAll("[data-gs]").forEach((b) => b.addEventListener("click", () => GS_ACTIONS[b.dataset.gs]()));
@@ -1847,8 +1847,8 @@ $("runBtn").onclick = () => {
   $("riskBox").hidden = !careful; $("riskOk").checked = false;
   $("riskText").textContent = [
     !writers.length ? "" : runners.length
-      ? `${runners.map((w) => w.name).join(", ")} can run commands on this computer, and ${writers.map((w) => w.name).join(", ")} can change files in the folder. Only run this on a folder you trust, ideally with its work committed to git.`
-      : `${writers.map((w) => w.name).join(", ")} can change files in the folder. Use a folder whose work is committed to git, so you can undo anything.`,
+      ? `OK: ${writers.map((w) => w.name).join(", ")} can change files in this folder and run commands on this computer.`
+      : `OK: ${writers.map((w) => w.name).join(", ")} can change files in this folder.`,
     actors.length ? `${actors.map((n) => n.name).join(", ")} can read and change things in ${apps.join(", ")} for real.` : "",
     cliTeams.length ? cliTeams.map((n) => `${n.name} can run ${n.clis.join(", ")} on this computer.`).join(" ") : "",
     codexOpen.length ? `${codexOpen.map((n) => n.name).join(", ")} can read, change, or delete files and run commands anywhere on this PC. The selected folder won't limit Codex on this Windows setup.` : "",
@@ -1865,20 +1865,13 @@ $("runBtn").onclick = () => {
   };
   $("riskOk").onchange = ready; ready();
   loadEngines(false).then(() => { if ($("runDlg").open) { warn(); ready(); } });   // they may have just signed in
-  const lim = String(flow.limit ?? 1000000);
-  if (![...$("limitIn").options].some((o) => o.value === lim)) $("limitIn").add(new Option(lim === "0" ? "No limit" : `${tokenWord(+lim)} tokens`, lim));
-  $("limitIn").value = lim;
-  const limitNote = () => {
-    const n = +$("limitIn").value;
-    $("limitSub").textContent = n ? "The run stops if its agents use more. Re-reading earlier work counts a tenth, like it costs." : "Agents run until they finish. Big flows can use a lot of your plan.";
-  };
-  $("limitIn").onchange = limitNote; limitNote();
   const roleSelects = [...document.querySelectorAll("#runDlg [data-role]")];
   roleSelects.forEach((el) => { el.innerHTML = opt(meta.models.map((m) => [m.id, m.label]), roleModel(el.dataset.role)); el.value = roleModel(el.dataset.role); });
   const roleCount = (r) => flow.nodes.filter((n) => n.role === r && !(n.type === "cluster" && engineOf(n) !== "claude") && !(n.type === "master" && n.mode === "pass") && !(n.type === "checkpoint" && n.mode !== "summarize")).length;
   const counts = ["think", "build", "run"].map((r) => [ROLE_NAME[r], roleCount(r)]).filter(([, c]) => c);
   $("rolesField").hidden = !counts.length;   // nothing to pick for yet
-  $("rolesSub").textContent = `The model each role uses, for every team in this flow (${counts.map(([r, c]) => `${c} ${r}${c === 1 ? "" : "s"}`).join(", ")}).`;
+  $("rolesSub").textContent = "Composer plans, Orchestrator builds, Performer does the quick steps.";
+  $("moreBox").open = false; renderMore();
   $("runDlg").showModal(); $("taskIn").focus();
 };
 // whose plan this run uses, so nobody is surprised by their usage
@@ -1887,31 +1880,32 @@ const BIG_RUN = 8;
 function usageLine(e) {
   if (!e || !e.sessions) return "";
   const per = e.per_engine || { claude: e.sessions };
-  const parts = Object.keys(PLAN_NAME).filter((k) => per[k]).map((k) => `${per[k]} on your ${PLAN_NAME[k]} plan`)
+  let parts = Object.keys(PLAN_NAME).filter((k) => per[k]).map((k) => `${per[k]} on your ${PLAN_NAME[k]} plan`)
     .concat(per.ollama ? [`${per.ollama} free on this PC (Ollama)`] : [])
     .concat(per.api ? [`${per.api} on your API keys, billed per token`] : []);
+  if (parts.length === 1) parts = [parts[0].replace(/^\d+ /, "")];   // all on one plan: "6 agents on your Claude plan"
   const big = e.sessions >= BIG_RUN || flow.nodes.some((n) => n.type === "cluster" && n.split && n.count > 2);
-  return `<b>${e.sessions} agent session${e.sessions === 1 ? "" : "s"}</b>: ${esc(parts.join(", "))}.` +
-    (big ? ` <span class="bigrun">This is a big run and can use a lot of your plan.</span>` : "");
+  return `<b>${e.sessions} agent${e.sessions === 1 ? "" : "s"}</b> ${esc(parts.join(", "))}.` +
+    (big ? ` <span class="bigrun">A big run: it can use a lot of your plan.</span>` : "");
 }
 // what this flow's finished runs used, so you know what Start will cost before you press it
 function pastLine() {
   const h = pastRuns;
-  if (!h || !h.runs) return ` <span class="past">No finished run of this flow yet, so no estimate.</span>`;
-  const range = h.low !== h.high ? ` (${tokenWord(h.low)} to ${tokenWord(h.high)})` : "";
-  return ` <span class="past">Expect about <b>${tokenWord(h.tokens)} tokens</b>${range} and <b>${dur(h.seconds)}</b>, going by ${h.runs === 1 ? "its last run" : `its last ${h.runs} runs`}.</span>`;
+  if (!h || !h.runs) return "";
+  return ` <span class="past" title="Going by ${h.runs === 1 ? "its last run" : `its last ${h.runs} runs`}${h.low !== h.high ? `: ${tokenWord(h.low)} to ${tokenWord(h.high)} tokens` : ""}">Usually about <b>${tokenWord(h.tokens)} tokens</b> and <b>${dur(h.seconds)}</b>.</span>`;
 }
 // jobs saved on this flow: one click fills the task and the folder
 function renderJobs() {
   const jobs = flow.jobs || [];
-  $("jobChips").innerHTML = jobs.map((j, i) => `<span class="job"><button type="button" data-job="${i}" title="${esc(j.task)}${j.folder ? "\n" + esc(j.folder) : ""}">${esc(j.name)}</button><button type="button" class="jx" data-jobx="${i}" title="Remove this saved job" aria-label="Remove ${esc(j.name)}">✕</button></span>`).join("")
-    + `<button type="button" id="saveJob" title="Keep this task and folder on the flow, so next time it's one click">+ Save this job</button>`;
+  $("jobChips").innerHTML = jobs.map((j, i) => `<span class="job"><button type="button" data-job="${i}" title="${esc(j.task)}${j.folder ? "\n" + esc(j.folder) : ""}">${esc(j.name)}</button><button type="button" class="jx" data-jobx="${i}" title="Remove this saved job" aria-label="Remove ${esc(j.name)}">✕</button></span>`).join("");
 }
 $("jobChips").addEventListener("click", async (e) => {
   const use = e.target.closest("[data-job]"), del = e.target.closest("[data-jobx]");
   if (use) { const j = flow.jobs[+use.dataset.job]; $("taskIn").value = draftTask = j.task; if (j.folder) { $("folderIn").value = j.folder; showTail($("folderIn")); } resetCheck(); ready(true); checkHeavy(); }
   if (del) { flow.jobs.splice(+del.dataset.jobx, 1); changed(false); renderJobs(); }
-  if (e.target.closest("#saveJob")) {
+});
+$("saveJob").onclick = () => {
+  {
     const task = $("taskIn").value.trim();
     if (!realTask(task)) { ready(true); return toast("Type the job first, then save it."); }
     flow.jobs = flow.jobs || [];
@@ -1919,9 +1913,13 @@ $("jobChips").addEventListener("click", async (e) => {
     let name = task.split(/\s+/).slice(0, 5).join(" ").slice(0, 40), i = 2;
     const base = name; while (flow.jobs.some((j) => j.name.toLowerCase() === name.toLowerCase())) name = `${base.slice(0, 36)} ${i++}`;
     flow.jobs.push({ name, task: task.slice(0, 4000), folder: $("folderIn").value.trim().replace(/^"|"$/g, "") });
-    changed(false); renderJobs(); toast(`Saved as "${name}".`);
+    changed(false); renderJobs(); toast(`Saved as "${name}". It's under the job box next time.`);
   }
-});
+};
+function renderMore() {
+  const s = flow.schedule || {};
+  $("moreState").textContent = s.on ? "· " + $("schedState").textContent.replace(/^· /, "scheduled ") : "";
+}
 // a schedule: this flow runs by itself, with one job, while Lithnode is open
 const EVERY_WORD = { hour: "every hour", day: "every day", weekday: "every weekday" };
 function renderSchedule() {
@@ -1930,6 +1928,7 @@ function renderSchedule() {
   $("schedEvery").value = s.every || "day"; $("schedAt").value = s.at || "09:00";
   $("schedJob").textContent = on ? `Runs: ${s.task.length > 90 ? s.task.slice(0, 90) + "…" : s.task}${s.folder ? ` · in ${s.folder.split(/[\\/]/).filter(Boolean).pop()}` : ""}` : "";
   $("schedOff").hidden = !on; $("schedSave").textContent = on ? "Update schedule" : "Turn on";
+  if ($("runDlg").open) renderMore();
 }
 $("schedSave").onclick = () => {
   const task = $("taskIn").value.trim();
@@ -2140,8 +2139,7 @@ $("goBtn").onclick = async () => {
     flow.models = picked;
     flow.nodes.forEach((n) => { if (n.role) n.model = roleModel(n.role); });
     if (!(await save())) { $("runWarn").textContent = "Your latest changes aren't saved yet, so the run didn't start. Try again."; return; }
-    const d = await api(`/api/flows/${flow.id}/run`, { method: "POST", body: { task: $("taskIn").value, folder: $("folderIn").value, limit: +$("limitIn").value, models: picked, answers } });
-    flow.limit = +$("limitIn").value;
+    const d = await api(`/api/flows/${flow.id}/run`, { method: "POST", body: { task: $("taskIn").value, folder: $("folderIn").value, models: picked, answers } });
     flow.folder = $("folderIn").value.trim().replace(/^"|"$/g, "");
     flow.task = $("taskIn").value.trim().slice(0, 4000);
     $("runDlg").close(); $("taskIn").value = draftTask = "";

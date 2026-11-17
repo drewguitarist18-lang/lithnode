@@ -135,7 +135,6 @@ class Store:
             try:
                 r = json.loads(path.read_text(encoding="utf-8"))
                 row = {k: r.get(k) for k in ("id", "flow_id", "flow_name", "task", "status", "started", "ended", "cost", "tokens")}
-                row["limit"] = (r.get("flow") or {}).get("limit", 0)   # what Settings' usage bars measure against
                 row["only"] = (r.get("flow") or {}).get("only") or ""   # a one-team follow-up, not the whole flow
                 # the run's latest list of items, counted: what the history shows ("3 passed · 3 cut")
                 lists = sorted((st for st in (r.get("nodes") or {}).values() if st.get("items")), key=lambda st: st.get("ended") or 0)
@@ -490,21 +489,9 @@ def clean_flow(raw: Any) -> dict[str, Any]:
             "task": _text(raw, "task", 4000),   # what the Run menu opens with: your description, or the last task run
             "dir": raw.get("dir") if raw.get("dir") in ("tb", "lr") else "lr",
             "auto": raw.get("auto") is not False,   # auto-arrange: re-lay out the nodes on every change
-            "limit": clean_limit(raw.get("limit", DEFAULT_LIMIT)), "models": models, "roles": use_roles,
+            "models": models, "roles": use_roles,
             "engine_models": engine_models, "widgets": clean_widgets(raw.get("widgets"), ids),
             "jobs": clean_jobs(raw.get("jobs")), "schedule": clean_schedule(raw.get("schedule"))}
-
-
-DEFAULT_LIMIT = 1_000_000   # tokens a run may use before it's stopped
-
-
-def clean_limit(value: Any) -> int:
-    """A run's token limit: 0 for none, otherwise between 50k and 100M."""
-    try:
-        n = int(value)
-    except (TypeError, ValueError):
-        return DEFAULT_LIMIT
-    return 0 if n <= 0 else max(50_000, min(100_000_000, n))
 
 
 def _has_cycle(ids: list[str], edges: list[dict[str, str]]) -> bool:
@@ -1274,8 +1261,7 @@ class Run:
         self.files = []               # files this run made or changed, found when it ends
         self.snap = False             # a before-picture of the folder was taken (teams that can change files)
         self.undone = False           # you put the folder back after this run
-        self.limit = clean_limit(flow.get("limit", DEFAULT_LIMIT))   # tokens; 0 means no limit
-        self.over_limit = False
+        self.over_limit = False       # halted: out of usage, so nothing more may start
         self.brief = ""
         self.log = []
         self.lock = threading.RLock()
@@ -1362,11 +1348,6 @@ class Run:
             for ev in self.approvals.values():
                 ev.set()
         self.say("Stopped by you.")
-
-    def stop_at_limit(self) -> None:
-        """The run's agents together passed its token limit: stop everything, and say why."""
-        self._halt(f"Stopped: this run reached its token limit of {agents.short_tokens(self.limit)}. "
-                   "You can raise it in the Run menu.")
 
     def stop_out_of_usage(self) -> None:
         """Claude says the plan has no usage left: every later agent would fail too, so stop now."""
@@ -1650,12 +1631,10 @@ class Run:
         def update() -> None:
             with self.lock:
                 rec.update(step=agent.step, steps=list(agent.steps), tokens=agent.tokens, seen=time.time())
-            if self.limit and self.tokens > self.limit:
-                self.stop_at_limit()
             self.changed()
 
         agent = agents.Agent(model=model, effort=effort, tools=tools, system=system, prompt=prompt,
-                             cwd=self.folder, on_update=update, max_turns=max_turns, token_cap=self.limit,
+                             cwd=self.folder, on_update=update, max_turns=max_turns,
                              connectors=connectors, known=known, clis=clis, engine=engine, engine_model=engine_model)
         with self.lock:
             rec["session_id"] = agent.session_id

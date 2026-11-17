@@ -238,8 +238,7 @@ try:
                 os.environ.pop("CLAWD_BOT_CLAUDE_CMD", None)
             else:
                 os.environ["CLAWD_BOT_CLAUDE_CMD"] = old_cmd
-    check("token limits are cleaned: 0 means none, others clamped", flows.clean_limit(0) == 0 and flows.clean_limit(5) == 50_000
-          and flows.clean_limit("junk") == flows.DEFAULT_LIMIT and flows.clean_flow({"nodes": [], "edges": []})["limit"] == flows.DEFAULT_LIMIT)
+    check("flows carry no token limit; an old saved one is dropped", "limit" not in flows.clean_flow({"nodes": [], "edges": [], "limit": 1_000_000}))
     rf = flows.clean_flow({"models": {"think": "claude-fable-5-1", "run": "bad model!"}, "nodes": [
         {"id": "master", "type": "master", "role": "think"},
         {"id": "x", "type": "cluster", "role": "run", "model": "claude-opus-5-5"},

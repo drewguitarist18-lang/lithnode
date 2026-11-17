@@ -465,7 +465,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- settings ----------------------------------------------------------------
     def GET_api_settings(self) -> None:
-        self.send_json({"settings": settings.load(HQ_STORE.root), "limits": settings.LIMITS,
+        self.send_json({"settings": settings.load(HQ_STORE.root),
                         "version": updates.VERSION, "folder": str(HQ_STORE.root.resolve())})
 
     def POST_api_settings(self) -> None:
@@ -600,7 +600,7 @@ class Handler(BaseHTTPRequestHandler):
                               {"id": "done", "type": "done", "x": 600, "y": 220, "name": "Complete"}]}
         prefs = settings.load(HQ_STORE.root)          # a new flow starts with the Settings window's defaults
         blank = not body.get("template")
-        flow = {**flows.clean_flow({**flow, "limit": prefs["limit"], "roles": prefs["roles"], "auto": prefs["auto"],
+        flow = {**flows.clean_flow({**flow, "roles": prefs["roles"], "auto": prefs["auto"],
                                     **({"dir": prefs["dir"]} if blank else {})}), "id": flow["id"]}
         if blank and prefs["dir"] == "tb":
             flows._layout(flow, "tb")   # Start above Done instead of beside it
@@ -751,13 +751,12 @@ class Handler(BaseHTTPRequestHandler):
             folder = str(body.get("folder") or (before or {}).get("folder") or flow.get("folder") or "").strip().strip('"')
             if folder and not Path(folder).is_dir():
                 return self.send_json({"error": f"That folder doesn't exist: {folder}"}, 400)
-            limit = flows.clean_limit(body["limit"]) if "limit" in body else flows.clean_limit(flow.get("limit", flows.DEFAULT_LIMIT))
             models = flows.clean_models(body["models"]) if "models" in body else flow["models"]
             new_models = models != flow["models"]
             if new_models:   # which model fills each role: re-resolve every stage that has one
                 flow = {**flows.clean_flow({**flow, "models": models}), "id": flow_id}
-            if new_models or folder != flow.get("folder", "") or task[:4000] != flow.get("task", "") or limit != flow.get("limit"):
-                flow["folder"], flow["task"], flow["limit"] = folder, task[:4000], limit   # the next run starts from this one
+            if new_models or folder != flow.get("folder", "") or task[:4000] != flow.get("task", ""):
+                flow["folder"], flow["task"] = folder, task[:4000]   # the next run starts from this one
                 HQ_STORE.save_flow(flow)
             job = flows.follow_up(task, before) if before else task   # a follow-up carries the run it follows
             if body.get("only"):   # a small follow-up: just one team does it, not the whole flow again

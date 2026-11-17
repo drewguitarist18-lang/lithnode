@@ -39,7 +39,7 @@
     display: grid; grid-template-rows: minmax(0, 1fr); overflow: hidden;
   }
   button { font: inherit; color: inherit; cursor: pointer; }
-  main { display: grid; grid-template-columns: 264px minmax(0, 1fr) 300px; min-height: 0; }
+  main { display: grid; grid-template-columns: 268px minmax(0, 1fr) 344px; min-height: 0; }   /* the same widths as Flows' side panels */
   /* nobody at work: the side panels have nothing to say, so the empty office gets the whole window */
   main.empty { grid-template-columns: 0 minmax(0, 1fr) 0; }
   main.empty :is(aside, #detail) { visibility: hidden; padding: 0; border: 0; }
@@ -111,6 +111,12 @@
     #detail { border-left: 0; border-top: 1px solid var(--line); max-height: 30vh; }
     body { overflow: auto; }
   }
+  /* section headings: small and quiet, the same as Flows */
+  aside h2, #detail h2, #detail h3 { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  #detail h2 { margin: 0 0 6px; }
+  #detail h3 { margin: 20px 0 8px; }
+  #detail .hint { font-size: 12.5px; line-height: 1.5; }
+  .glabel { font-size: 11px !important; color: color-mix(in srgb, var(--muted) 80%, transparent) !important; }
 </style>
 <link rel="stylesheet" href="/static/theme.css">
 </head>

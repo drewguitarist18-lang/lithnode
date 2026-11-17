@@ -46,9 +46,6 @@ check("a Read step names the file, not the path", agents.describe("Read", {"file
 check("a web search shows its query", agents.describe("WebSearch", {"query": "rust async"}) == "Searching the web: rust async")
 
 # ---- flows: what gets saved and what can run --------------------------------------------------------------------
-check("token limit: junk falls back to 1M", flows.clean_limit("abc") == 1_000_000)
-check("token limit: clamped to 50k..100M", flows.clean_limit(5) == 50_000 and flows.clean_limit(10**12) == 100_000_000)
-check("token limit: a sane one is kept", flows.clean_limit(500_000) == 500_000)
 check("focuses: a list from a drafted flow becomes one line per agent", flows._focuses(["Logic", "Security  holes"]) == "Logic\nSecurity holes")
 check("focuses: a list an older version saved as text is mended", flows._focuses("['Hooks, surprises', 'Trims']") == "Hooks, surprises\nTrims")
 check("focuses: plain lines and odd text are left alone", flows._focuses("a\nb") == "a\nb" and flows._focuses("[not a list") == "[not a list"
@@ -290,8 +287,7 @@ check("cursor sign-in: no link yet while only the Git notice is out", engines._j
 check("settings: nothing saved means the defaults", settings.clean(None) == settings.DEFAULTS)
 check("settings: junk is dropped, a sane value is kept", settings.clean({"limit": "x", "roles": "yes", "check_updates": False, "evil": 1})
       == {**settings.DEFAULTS, "check_updates": False})
-check("settings: the token limit is clamped like a flow's", settings.clean({"limit": 5})["limit"] == 50_000)
-check("settings: every offered limit survives cleaning", all(settings.clean({"limit": n})["limit"] == n for n in settings.LIMITS))
+check("settings: an old saved token limit is dropped", "limit" not in settings.clean({"limit": 1_000_000}))
 
 # ---- too-heavy warning: how many project files a folder has --------------------------------------------------------
 import tempfile  # noqa: E402

@@ -791,13 +791,13 @@ function renderEngines() { if ($("setEng")) $("setEng").innerHTML = engineRows()
 function usageRows() {
   if (!recentRuns) return `<div class="row"><div><small>Loading your runs…</small></div></div>`;
   const rows = recentRuns.filter((r) => r.tokens).slice(0, 6);
-  if (!rows.length) return `<div class="row"><div><small>No runs yet. Your last few show here, with how much of their token limit they used.</small></div></div>`;
+  if (!rows.length) return `<div class="row"><div><small>No runs yet. Your last few show here, with how many tokens each used.</small></div></div>`;
+  const top = Math.max(...rows.map((r) => r.tokens));
   return `<div class="use">` + rows.map((r) => {
-    const pct = r.limit ? Math.min(100, Math.round((r.tokens / r.limit) * 100)) : 0;
-    const col = pct >= 90 ? "#ff6b8b" : pct >= 60 ? "#ffb547" : "#36d39a";
+    const pct = Math.round((r.tokens / top) * 100), col = "#36d39a";   // bars compare your recent runs with each other
     const when = r.started ? new Date(r.started * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
     return `<div class="urow" style="--uc:${col}" title="${esc(String(r.task || "").split("\n\n# This follows an earlier run of this team")[0])}"><span class="un"><b>${esc(r.flow_name || "Flow")}</b><small>${esc(when)}</small></span>
-      <span class="ubar"><i style="width:${Math.max(2, pct)}%"></i></span><span class="uv">${shortTokens(r.tokens)}${r.limit ? `<small> / ${shortTokens(r.limit)}</small>` : ""}</span></div>`;
+      <span class="ubar"><i style="width:${Math.max(2, pct)}%"></i></span><span class="uv">${shortTokens(r.tokens)}</span></div>`;
   }).join("") + `</div>`;
 }
 const SHORTCUTS = [
@@ -814,7 +814,6 @@ function renderSettings() {
   const b = $("setBody");
   if (!prefs) { b.innerHTML = `<p style="color:var(--muted)">Couldn't reach Lithnode's server. Is it still running?</p>`; return; }
   const p = prefs.settings, sw = (key, on, label) => `<button type="button" class="sw" role="switch" aria-checked="${on}" aria-label="${label}" data-key="${key}"></button>`;
-  const limits = [...new Set([...prefs.limits, p.limit])].sort((x, y) => x - y);
   const btnIco = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ui.icon(k).svg}</svg>`;
   const h = (k, t) => { const c = ui.icon(k); return `<h3 style="--ic:${c.color}"><i class="ci"><svg viewBox="0 0 24 24" aria-hidden="true">${c.svg}</svg></i>${t}</h3>`; };
   const seg = (label, attr, cur, opts) => `<div class="seg" role="radiogroup" aria-label="${label}">${opts.map(([v, n, col, svg]) =>
@@ -842,9 +841,6 @@ function renderSettings() {
       <select data-key="model" aria-label="Model for new teams"><option value="">From the team's role</option>${pickModels.map((m) =>
         `<option value="${esc(m.id)}"${m.id === p.model ? " selected" : ""}>${esc(m.label)}</option>`).join("")}${p.model && !pickModels.some((m) => m.id === p.model) ? `<option value="${esc(p.model)}" selected>${esc(p.model)}</option>` : ""}</select></div>
     <div class="row"><div><b>Roles</b><small>Each team gets a role (think, build, run…) and the model set for that role.</small></div>${sw("roles", p.roles, "Roles for new flows")}</div>
-    <div class="row"><div><b>Token limit</b><small>A run stops once it has used this many. Each flow can change its own.</small></div>
-      <select data-key="limit" aria-label="Token limit for new flows">${limits.map((n) =>
-        `<option value="${n}"${n === p.limit ? " selected" : ""}>${shortTokens(n)} tokens</option>`).join("")}</select></div>
     <div class="row"><div><b>Check the job before a run</b><small>A quick look at the job and folder first. If the team can't start without something, it asks you instead of guessing.</small></div>${sw("precheck", p.precheck, "Check the job before a run")}</div>
     <div class="row"><div><b>Offer a preview before a run</b><small>Adds a Preview button to the Run menu: one quick agent says what each team would do with your job.</small></div>${sw("dry_run", p.dry_run, "Offer a preview before a run")}</div>
     ${h("tidyLr", "Canvas")}

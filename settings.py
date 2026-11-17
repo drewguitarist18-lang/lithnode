@@ -12,8 +12,7 @@ from typing import Any
 import engines
 import flows
 
-LIMITS = [250_000, 500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000]   # the choices the Settings window offers
-DEFAULTS: dict[str, Any] = {"limit": flows.DEFAULT_LIMIT, "roles": True, "check_updates": True, "count_install": True,
+DEFAULTS: dict[str, Any] = {"roles": True, "check_updates": True, "count_install": True,
                             "engine": "claude",   # what a new team runs on
                             "model": "",          # a Claude model for new teams; "" lets the team's role pick
                             "auto": True,         # new flows auto-arrange
@@ -28,8 +27,6 @@ def clean(raw: Any) -> dict[str, Any]:
     """Known keys only, each a sane value; anything missing or junk falls back to its default."""
     raw = raw if isinstance(raw, dict) else {}
     out = dict(DEFAULTS)
-    if "limit" in raw:
-        out["limit"] = flows.clean_limit(raw["limit"])
     for key in ("roles", "check_updates", "count_install", "auto", "precheck", "dry_run", "notify_sound", "notify_desktop"):
         if isinstance(raw.get(key), bool):
             out[key] = raw[key]
