@@ -136,6 +136,7 @@ class Store:
                 r = json.loads(path.read_text(encoding="utf-8"))
                 row = {k: r.get(k) for k in ("id", "flow_id", "flow_name", "task", "status", "started", "ended", "cost", "tokens")}
                 row["limit"] = (r.get("flow") or {}).get("limit", 0)   # what Settings' usage bars measure against
+                row["only"] = (r.get("flow") or {}).get("only") or ""   # a one-team follow-up, not the whole flow
                 # the run's latest list of items, counted: what the history shows ("3 passed · 3 cut")
                 lists = sorted((st for st in (r.get("nodes") or {}).values() if st.get("items")), key=lambda st: st.get("ended") or 0)
                 if lists:
@@ -330,7 +331,8 @@ def schedule_due(schedule: dict[str, Any], now: datetime, last: str = "", grace:
 
 def run_history(runs: Sequence[dict[str, Any]], flow_id: str) -> dict[str, Any]:
     """What this flow's finished runs used, so the Run menu can say what to expect ({} when it has never finished one)."""
-    done = [r for r in runs if r.get("flow_id") == flow_id and r.get("status") == "done" and r.get("tokens") and r.get("ended")][:12]
+    done = [r for r in runs if r.get("flow_id") == flow_id and r.get("status") == "done" and r.get("tokens")
+            and r.get("ended") and not r.get("only")][:12]
     if not done:
         return {}
     tokens = [r["tokens"] for r in done]
@@ -338,10 +340,18 @@ def run_history(runs: Sequence[dict[str, Any]], flow_id: str) -> dict[str, Any]:
             "seconds": int(statistics.median(r["ended"] - r["started"] for r in done))}
 
 
+FOLLOW_MARK = "\n\n# This follows an earlier run of this team"
+
+
+def job_of(task: str) -> str:
+    """What you typed for a run, without the earlier run a follow-up carries along for its agents."""
+    return str(task or "").split(FOLLOW_MARK, 1)[0]
+
+
 def follow_up(task: str, old: dict[str, Any]) -> str:
     """A follow-up job with what it follows: the earlier job and its result, so the team builds on it."""
     final = (old.get("final") or "").strip()
-    return (f"{task}\n\n# This follows an earlier run of this team\n## The earlier job\n{(old.get('task') or '').strip()[:3000]}"
+    return (f"{task}{FOLLOW_MARK}\n## The earlier job\n{job_of(old.get('task') or '').strip()[:3000]}"
             + (f"\n\n## What that run produced\n{final[:6000]}" if final else "")
             + "\nBuild on that work (it is still in the folder); don't start over.")
 
@@ -485,7 +495,7 @@ def clean_flow(raw: Any) -> dict[str, Any]:
             "jobs": clean_jobs(raw.get("jobs")), "schedule": clean_schedule(raw.get("schedule"))}
 
 
-DEFAULT_LIMIT = 1_000_000   # tokens a run may use before it's stopped; no agent may use more than half of it
+DEFAULT_LIMIT = 1_000_000   # tokens a run may use before it's stopped
 
 
 def clean_limit(value: Any) -> int:
@@ -1180,6 +1190,44 @@ def verdict_of(reports: Sequence[str]) -> str:
     return "fail" if "FAIL" in said else "pass" if said else ""
 
 
+def only_team(flow: dict[str, Any], node_id: str) -> dict[str, Any]:
+    """The flow cut down to one team: Start, that team, Done. For a small follow-up that doesn't need everyone again.
+    Raises ValueError with a plain reason when that team isn't in the flow."""
+    by_type = {n["type"]: n for n in reversed(flow.get("nodes") or [])}
+    team = next((n for n in flow.get("nodes") or [] if n["id"] == node_id and n["type"] == "cluster"), None)
+    start, done = by_type.get("master"), by_type.get("done")
+    if not (team and start and done):
+        raise ValueError("That team isn't in this flow any more. Run the whole team instead.")
+    cut = clean_flow({**flow, "nodes": [start, {**team, "retry": 0}, done],
+                      "edges": [{"from": start["id"], "to": team["id"]}, {"from": team["id"], "to": done["id"]}]})
+    _layout(cut)
+    return {**cut, "id": flow.get("id"), "only": node_id}   # marked: a one-team run says nothing about what the whole flow costs
+
+
+STALL_SECONDS = 300   # an agent that shows nothing new for this long may be stuck
+
+
+def attention(active: Sequence[Any], now: float | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """What live runs want from the user right now: steps waiting for an OK or an answer, and agents that have gone quiet.
+    Each has a key that stays the same while it lasts, so it is only pointed out once."""
+    now = now or time.time()
+    needs, quiet = [], []
+    for r in active:
+        name = r.flow.get("name") or "Your flow"
+        nodes = {n["id"]: n for n in r.flow["nodes"]}
+        for nid, st in r.nodes.items():
+            if st["status"] == "approval":
+                q = st.get("question") or {}
+                needs.append({"key": f"{r.id}:{nid}:{int(st.get('started') or 0)}:{len(st['agents'])}:{'q' if q else 'a'}", "run": r.id, "flow": name,
+                              "kind": "question" if q else "approval", "who": q.get("agent") or (nodes.get(nid) or {}).get("name") or "",
+                              "text": " ".join(str(q.get("text") or (nodes.get(nid) or {}).get("message") or "").split())[:300]})
+            for i, a in enumerate(st["agents"]):
+                idle = now - (a.get("seen") or a.get("started") or now)
+                if a["status"] == "running" and idle >= STALL_SECONDS:
+                    quiet.append({"key": f"{r.id}:{nid}:{i}:quiet", "run": r.id, "flow": name, "who": a["name"], "minutes": int(idle // 60)})
+    return needs, quiet
+
+
 def rerun_seed(old: dict[str, Any], node_id: str) -> dict[str, Any]:
     """What a re-run from one step keeps of an earlier run: every finished step that isn't that step or after it.
     Raises ValueError with a plain reason when there is nothing to start from."""
@@ -1416,7 +1464,13 @@ class Run:
                     t.start()
                 states = [st["status"] for st in self.nodes.values()]
                 if all(s in TERMINAL for s in states) and not any(t.is_alive() for t in self.threads):
-                    self.status = "failed" if "failed" in states else "done"
+                    failed = [nid for nid, st in self.nodes.items() if st["status"] == "failed"]
+                    if failed and all(self.nodes[nid]["error"].startswith("Rejected") for nid in failed):
+                        # you said no at your own approval step: nothing broke, so it's stopped, not failed
+                        self.status = "stopped"
+                        self.log.append({"t": time.time(), "text": f"Stopped: you rejected it at {self.by_id[failed[0]]['name']}."})
+                    else:
+                        self.status = "failed" if failed else "done"
                     break
                 self.status = "waiting" if "approval" in states and "running" not in states else "running"
             self._wake.wait(1.0)
@@ -1590,17 +1644,18 @@ class Run:
         """Run one agent to completion, tracked in the node's state. Returns its record."""
         rec = {"name": label, "status": "running", "step": "", "steps": [], "report": "", "items": [], "error": "", "question": "",
                "cost": 0.0, "turns": 0, "model": model if engine == "claude" else engines.LABELS[engine], "engine": engine, "session_id": "", "started": time.time(), "ended": None,
+               "seen": time.time(),   # when it last showed anything new, so a run that has gone quiet can be pointed out
                "shape": shape or node.get("shape") or "crab", "color": color or node.get("color") or "#ecebe6"}
 
         def update() -> None:
             with self.lock:
-                rec.update(step=agent.step, steps=list(agent.steps), tokens=agent.tokens)
+                rec.update(step=agent.step, steps=list(agent.steps), tokens=agent.tokens, seen=time.time())
             if self.limit and self.tokens > self.limit:
                 self.stop_at_limit()
             self.changed()
 
         agent = agents.Agent(model=model, effort=effort, tools=tools, system=system, prompt=prompt,
-                             cwd=self.folder, on_update=update, max_turns=max_turns, token_cap=self.limit // 2,
+                             cwd=self.folder, on_update=update, max_turns=max_turns, token_cap=self.limit,
                              connectors=connectors, known=known, clis=clis, engine=engine, engine_model=engine_model)
         with self.lock:
             rec["session_id"] = agent.session_id

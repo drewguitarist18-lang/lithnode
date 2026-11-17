@@ -20,7 +20,7 @@ DEFAULTS: dict[str, Any] = {"limit": flows.DEFAULT_LIMIT, "roles": True, "check_
                             "dir": "lr",          # new blank flows go left to right, or top to bottom ("tb")
                             "precheck": True,     # a quick check of the job before each run, which may ask a question
                             "dry_run": False,     # the Run menu offers a preview of what each team would do
-                            "notify_sound": True, "notify_desktop": False}   # when a run finishes or needs you
+                            "notify_sound": True, "notify_desktop": True}   # when a run finishes or needs you
 _lock = threading.Lock()
 
 

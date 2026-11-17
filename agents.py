@@ -30,6 +30,14 @@ OUT_OF_USAGE_RE = re.compile(r"usage limit|limit reached|hit your (usage )?limit
                              r"credit balance is too low|insufficient credit|exceeded your .*quota", re.I)
 RETRY_PAUSE = float(os.environ.get("LITHNODE_RETRY_PAUSE") or 5)
 USAGE_KEYS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
+# Every turn re-reads the conversation so far from the cache, at about a tenth of the price of fresh input. Counted in
+# full, a long working session looked ten times dearer than it was and ran into its limit doing ordinary work.
+CACHE_READ_WEIGHT = 0.1
+
+
+def used_tokens(use: dict[str, Any]) -> int:
+    """One message's or one session's tokens as they count toward a limit: cache re-reads at a tenth."""
+    return int(sum(int(use.get(k) or 0) * (CACHE_READ_WEIGHT if k == "cache_read_input_tokens" else 1) for k in USAGE_KEYS))
 
 
 def short_tokens(n: int) -> str:
@@ -177,7 +185,7 @@ class Agent:
         self.text = ""
         self.error = None
         self.cost = 0.0
-        self.tokens = 0   # everything the session read and wrote, as Claude Code counts it
+        self.tokens = 0   # everything the session read and wrote (cache re-reads at a tenth: see used_tokens)
         self.turns = 0
         self.proc = None
         self.stopped = False
@@ -211,7 +219,7 @@ class Agent:
         use = msg.get("usage") if isinstance(msg.get("usage"), dict) else None
         if not use or not msg.get("id"):
             return False
-        used[msg["id"]] = sum(int(use.get(k) or 0) for k in USAGE_KEYS)
+        used[msg["id"]] = used_tokens(use)
         self.tokens = sum(used.values())
         return bool(self.token_cap) and self.tokens > self.token_cap
 
@@ -316,7 +324,7 @@ class Agent:
             self.cost = float(final.get("total_cost_usd") or 0)
             self.turns = int(final.get("num_turns") or 0)
             use = final.get("usage") if isinstance(final.get("usage"), dict) else {}
-            self.tokens = sum(int(use.get(k) or 0) for k in USAGE_KEYS) or self.tokens
+            self.tokens = used_tokens(use) or self.tokens
             result = final.get("result") if isinstance(final.get("result"), str) else ""
             if final.get("is_error") or str(final.get("subtype", "")).startswith("error"):
                 self.error = self.error or result or str(final.get("subtype")) or "Claude Code reported an error."

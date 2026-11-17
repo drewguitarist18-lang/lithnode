@@ -47,7 +47,7 @@ Source: "..\dist\Lithnode\*"; DestDir: "{app}\server"; Flags: recursesubdirs cre
 #include "oneclick.iss"
 
 [Icons]
-Name: "{autoprograms}\Lithnode"; Filename: "{app}\Lithnode.exe"
+Name: "{autoprograms}\Lithnode"; Filename: "{app}\Lithnode.exe"; AppUserModelID: "com.lithnode.Lithnode"
 
 [Run]
 Filename: "{app}\server\lithnode-cli.exe"; Parameters: "install-pet"; Check: WantPet; Flags: runhidden; StatusMsg: "Adding Claude Pet to Claude Code..."

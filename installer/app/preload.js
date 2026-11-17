@@ -6,4 +6,6 @@ contextBridge.exposeInMainWorld("lithnodeApp", {
   setBar: (color, symbol) => ipcRenderer.send("bar", { color, symbol }),
   pickFolder: () => ipcRenderer.invoke("pick-folder"),
   pickFile: () => ipcRenderer.invoke("pick-file"),
+  alert: (a) => ipcRenderer.send("alert", a),
+  onAlertClick: (cb) => ipcRenderer.on("alert-click", (e, run) => cb(run)),
 });

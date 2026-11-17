@@ -796,7 +796,7 @@ function usageRows() {
     const pct = r.limit ? Math.min(100, Math.round((r.tokens / r.limit) * 100)) : 0;
     const col = pct >= 90 ? "#ff6b8b" : pct >= 60 ? "#ffb547" : "#36d39a";
     const when = r.started ? new Date(r.started * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
-    return `<div class="urow" style="--uc:${col}" title="${esc(r.task || "")}"><span class="un"><b>${esc(r.flow_name || "Flow")}</b><small>${esc(when)}</small></span>
+    return `<div class="urow" style="--uc:${col}" title="${esc(String(r.task || "").split("\n\n# This follows an earlier run of this team")[0])}"><span class="un"><b>${esc(r.flow_name || "Flow")}</b><small>${esc(when)}</small></span>
       <span class="ubar"><i style="width:${Math.max(2, pct)}%"></i></span><span class="uv">${shortTokens(r.tokens)}${r.limit ? `<small> / ${shortTokens(r.limit)}</small>` : ""}</span></div>`;
   }).join("") + `</div>`;
 }
@@ -855,7 +855,7 @@ function renderSettings() {
       ${seg("View", "data-view", view, [["nodes", "Nodes", "#36d39a", SEG_SVG.nodes], ["steps", "Steps", "#ffb547", SEG_SVG.steps]])}</div>
     ${h("bell", "Notifications")}
     <div class="row"><div><b>Sound</b><small>A short chime when a run finishes or needs your OK.</small></div>${sw("notify_sound", p.notify_sound, "Sound alerts")}</div>
-    <div class="row"><div><b>Desktop alert</b><small>A system notification, so you hear about it while you're in another app.</small></div>${sw("notify_desktop", p.notify_desktop, "Desktop alerts")}</div>
+    <div class="row"><div><b>Desktop alert</b><small>A Windows or Mac notification when a run needs your OK, asks you something, finishes, or goes quiet. Click it to jump to the run.</small></div>${sw("notify_desktop", p.notify_desktop, "Desktop alerts")}</div>
     <div class="row"><div><b>Try it</b><small>Plays whatever you've turned on.</small></div><button type="button" class="btn" data-act="test-alert" style="--ic:#ffb547">${btnIco("bell")}Test</button></div>
     ${h("chart", "Token usage")}
     <div id="setUse">${usageRows()}</div>
@@ -879,7 +879,18 @@ function renderSettings() {
   const al = $("aboutLogo").getContext("2d"); al.clearRect(0, 0, 96, 72); drawLogo(al, 12, 9, 4.5);
 }
 // ---- run alerts: a chime and / or a desktop notification when a run ends or stops to ask you
-let alertPrefs = null, lastRuns = null, lastApprovals = null;
+let alertPrefs = null, lastRuns = null, alertsPrimed = false;
+const alerted = new Set();   // what has been pointed out already, so each thing alerts once
+const openAlert = (runId, tries = 0) => {
+  try {
+    if (!tries) { window.focus(); goTab("flows"); }   // goTab, not show: the Office link must still work after
+    if (!runId) return;
+    if (fapi()?.openRun) return fapi().openRun(runId);
+    if (tries < 40) setTimeout(() => openAlert(runId, tries + 1), 250);   // Flows may still be loading (the app opened on Office)
+  } catch (e) { /* the page moved on */ }
+};
+window.openRun = openAlert;   // the Office's "Open this run" goes through it too
+try { window.lithnodeApp?.onAlertClick?.(openAlert); } catch (e) { /* not the desktop app */ }
 const loadAlertPrefs = async () => { try { alertPrefs = (await (await fetch("/api/settings", { cache: "no-store" })).json()).settings; } catch (e) {} };
 loadAlertPrefs();
 function chime(kind) {
@@ -903,23 +914,43 @@ function synth(kind) {
     });
   } catch (e) {}
 }
-async function runAlert(kind, title, body, test) {
+async function runAlert(kind, title, body, test, runId) {
   const p = alertPrefs || {};
   if (p.notify_sound || test === "sound") chime(kind);
-  if (p.notify_desktop && "Notification" in window) {
-    if (Notification.permission === "default") { try { await Notification.requestPermission(); } catch (e) {} }
-    if (Notification.permission === "granted") { try { new Notification(title, { body, icon: "/static/logo-512.png", silent: true }); } catch (e) {} }
+  if (!p.notify_desktop) return;
+  if (window.lithnodeApp?.alert) return window.lithnodeApp.alert({ title, body, run: runId || "" });   // the desktop app: the system's own, and it flashes the taskbar
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default") { try { await Notification.requestPermission(); } catch (e) {} }
+  if (Notification.permission === "granted") {
+    try { const n = new Notification(title, { body, icon: "/static/logo-512.png", silent: true }); n.onclick = () => { openAlert(runId); n.close(); }; } catch (e) {}
   }
 }
+// Told once each: a step that waits for your OK, an agent's question, an agent that has gone quiet, and a run that ended.
 async function watchRuns(d) {
-  const runs = d.runs || 0, asks = d.approvals || 0;
-  if (lastApprovals !== null && asks > lastApprovals) runAlert("ask", "A run needs you", "A flow is waiting for your OK to keep going.");
+  const runs = d.runs || 0;
+  const fresh = (list) => (list || []).filter((x) => !alerted.has(x.key));
+  const needs = fresh(d.needs), quiet = fresh(d.quiet);
+  for (const x of [...(d.needs || []), ...(d.quiet || [])]) alerted.add(x.key);
+  if (alertsPrimed) {   // what was already waiting when the app opened isn't news
+    for (const n of needs) {
+      if (n.kind === "question") runAlert("ask", `${n.who || "An agent"} has a question`, `${n.flow}: ${n.text || "It's waiting for your answer."}`, "", n.run);
+      else runAlert("ask", `${n.flow} needs your OK`, n.text || "It's waiting for you to approve the next step.", "", n.run);
+    }
+    for (const q of quiet) runAlert("bad", `${q.flow} may be stuck`, `${q.who} has shown nothing new for ${q.minutes} minutes. Have a look, or stop the run.`, "", q.run);
+  }
   if (lastRuns !== null && runs < lastRuns) {
     let r = null; try { r = ((await (await fetch("/api/runs", { cache: "no-store" })).json()).runs || [])[0]; } catch (e) {}
-    const ok = !r || r.status === "done";
-    runAlert(ok ? "ok" : "bad", ok ? "Run finished" : `Run ${r.status}`, r ? `${r.flow_name || "Your flow"} ${ok ? "is done. The report is ready." : "didn't finish."}` : "A flow finished.");
+    // Status checks can land out of order, so a late one may still say "no runs" just after one started: only a run
+    // that has really ended counts, and each is told once.
+    const ended = r && !["running", "waiting"].includes(r.status) && !alerted.has("end:" + r.id);
+    if (ended) {
+      alerted.add("end:" + r.id);
+      const ok = r.status === "done", name = r.flow_name || "Your flow";
+      runAlert(ok ? "ok" : "bad", ok ? `${name} finished` : `${name} ${r.status === "failed" ? "failed" : "stopped"}`,
+               ok ? "The result is ready." : "It didn't finish. Open it to see where it stopped.", "", r.id);
+    }
   }
-  lastRuns = runs; lastApprovals = asks;
+  lastRuns = runs; alertsPrimed = true;
 }
 async function saveSetting(key, value) {
   try {

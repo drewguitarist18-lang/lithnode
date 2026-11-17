@@ -89,7 +89,7 @@ def _backfill_tasks() -> None:
     latest = {}
     for r in HQ_STORE.list_runs(limit=5000):   # newest first
         if r.get("flow_id") and r.get("task"):
-            latest.setdefault(r["flow_id"], r["task"])
+            latest.setdefault(r["flow_id"], flows.job_of(r["task"]))
     for f in HQ_STORE.list_flows():
         flow = HQ_STORE.get_flow(f["id"])
         if flow and "task" not in flow and flow["id"] in latest:
@@ -571,7 +571,8 @@ class Handler(BaseHTTPRequestHandler):
         waiting = sum(1 for r in active for st in r.nodes.values() if st["status"] == "approval")
         working = sum(1 for r in active for st in r.nodes.values() for a in st["agents"] if a["status"] == "running")
         force = "fresh=1" in self.path
-        self.send_json({"runs": len(active), "approvals": waiting, "agents": working,
+        needs, quiet = flows.attention(active)
+        self.send_json({"runs": len(active), "approvals": waiting, "agents": working, "needs": needs, "quiet": quiet,
                         "claude_code": claude_code.auth_status(force=force), "signin": claude_code.login_state(),
                         "engines": engines.all_status(force=force)})
 
@@ -759,6 +760,11 @@ class Handler(BaseHTTPRequestHandler):
                 flow["folder"], flow["task"], flow["limit"] = folder, task[:4000], limit   # the next run starts from this one
                 HQ_STORE.save_flow(flow)
             job = flows.follow_up(task, before) if before else task   # a follow-up carries the run it follows
+            if body.get("only"):   # a small follow-up: just one team does it, not the whole flow again
+                try:
+                    flow = flows.only_team(flow, str(body["only"]))
+                except ValueError as exc:
+                    return self.send_json({"error": str(exc)}, 400)
             run = RUNNER.start(flow, flows.with_answers(job, body.get("answers"))[:20000], folder)
             return self.send_json({"run": run.id})
         self.send_json({"error": "not found"}, 404)
@@ -867,7 +873,8 @@ class Handler(BaseHTTPRequestHandler):
             if old.get("status") in ("running", "waiting"):
                 return self.send_json({"error": "This run is still going. Stop it or let it finish first."}, 409)
             try:
-                flow = {**flows.clean_flow(old.get("flow")), "id": old.get("flow_id") or (old.get("flow") or {}).get("id")}
+                flow = {**flows.clean_flow(old.get("flow")), "id": old.get("flow_id") or (old.get("flow") or {}).get("id"),
+                        "only": (old.get("flow") or {}).get("only") or ""}   # a re-run of a one-team run stays one team
                 seed = flows.rerun_seed({**old, "flow": flow}, str(self.read_json().get("node") or ""))
             except (ValueError, TypeError) as exc:
                 return self.send_json({"error": str(exc)}, 400)
@@ -878,10 +885,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"run": RUNNER.start(flow, str(old.get("task") or ""), folder, seed).id})
         run = RUNNER.get(run_id)
         if not run:
-            return self.send_json({"error": "That run isn't active."}, 404)
+            return self.send_json({"error": "That run already finished."}, 404)
         if method == "POST" and action == "note":
-            ok = run.tell(str(self.read_json().get("text") or ""))
-            return self.send_json({"ok": True}) if ok else self.send_json({"error": "Type the note first."}, 400)
+            text = str(self.read_json().get("text") or "")
+            if run.tell(text):
+                return self.send_json({"ok": True})
+            return self.send_json({"error": "Type the note first." if not text.strip() else "The run already finished, so no agent is left to read it."}, 400)
         if method == "POST" and action == "stop":
             run.stop()
             return self.send_json({"ok": True})

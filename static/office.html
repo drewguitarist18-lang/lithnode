@@ -84,6 +84,8 @@
   #empty p { margin: 0 auto; max-width: 400px; font-size: 13.5px; line-height: 1.55; text-wrap: balance; }
   #empty .go { pointer-events: auto; margin-top: 16px; padding: 7px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--pad); font-weight: 550; }
   #empty .go:hover { background: var(--hover); }
+  #detail .go { margin-top: 16px; width: 100%; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--pad); color: inherit; font: inherit; font-weight: 550; cursor: pointer; }
+  #detail .go:hover { background: var(--hover); }
   #detail { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 16px; min-width: 0; }
   #detail h2 { margin: 0 0 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
   #detail h3 { margin: 18px 0 6px; font-size: 13px; font-weight: 600; }
@@ -464,19 +466,22 @@ function renderDetail() {
   const s = x.s, st = effState(s), f = fill(s);
   const subs = s.subagents.length
     ? "<ul>" + s.subagents.map((a) => `<li>${esc(a.type)}</li>`).join("") + "</ul>" : "<span class='hint'>none</span>";
-  box.innerHTML = `<h2>${s.engine && s.engine !== "claude" ? esc(ENGINE_NAME[s.engine] || s.engine) + " agent" : "Session"}</h2><div class="big">${esc(s.project)}</div>
+  const yours = s.id.startsWith("approval-");   // a step of a run that waits for your OK: no agent, no session
+  box.innerHTML = `<h2>${yours ? "Your step" : s.engine && s.engine !== "claude" ? esc(ENGINE_NAME[s.engine] || s.engine) + " agent" : "Session"}</h2><div class="big">${esc(s.project)}</div>
     <p class="state" style="color:${stColor(st)}">${esc(statusText(s, st))}</p>
     <dl>
-      <dt>Runs on</dt><dd>${esc(ENGINE_NAME[s.engine || "claude"] || s.engine)}</dd>
+      ${yours ? "" : `<dt>Runs on</dt><dd>${esc(ENGINE_NAME[s.engine || "claude"] || s.engine)}</dd>`}
       ${s.flow ? `<dt>Flow</dt><dd>${esc(s.flow.name)} · ${esc(s.flow.stage)}</dd>` : ""}
       <dt>Folder</dt><dd class="mono">${esc(s.cwd || "—")}</dd>
       ${s.window ? `<dt>Context</dt><dd>${s.tokens.toLocaleString()} / ${s.window.toLocaleString()} tokens (${Math.round(f * 100)}%)</dd>` : ""}
-      <dt>Tools used</dt><dd>${s.tools}</dd>
-      <dt>Tasks done</dt><dd>${s.done}</dd>
-      <dt>Open for</dt><dd>${dur(nowS() - s.started)}</dd>
-      <dt>Session</dt><dd class="mono">${esc(s.id.slice(0, 8))}</dd>
-      <dt>Subagents</dt><dd>${subs}</dd>
-    </dl>`;
+      ${yours ? "" : `<dt>Tools used</dt><dd>${s.tools}</dd>
+      <dt>Tasks done</dt><dd>${s.done}</dd>`}
+      <dt>${yours ? "Waiting for" : "Open for"}</dt><dd>${dur(nowS() - s.started)}</dd>
+      ${yours ? "" : `<dt>Session</dt><dd class="mono">${esc(s.id.slice(0, 8))}</dd>
+      <dt>Subagents</dt><dd>${subs}</dd>`}
+    </dl>${s.flow ? `<button class="go" id="openRun" type="button">${st === "waiting" ? "Open the run to answer" : "Open this run"}</button>` : ""}`;
+  const go = () => { try { top.openRun(s.flow.run); } catch (e) { top.location.hash = "flows"; } };
+  if ($("openRun")) { $("openRun").onpointerdown = go; $("openRun").onclick = go; }   // on press: this panel is redrawn every second
 }
 
 function renderChips() {

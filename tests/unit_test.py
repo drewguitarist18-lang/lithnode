@@ -155,18 +155,21 @@ import time  # noqa: E402
 _py = sys.executable
 engines._start_job("codex", "login", [_py, "-c", "import time; print('Open https://auth.example.com/x?y=1 to sign in'); "
                                                  "print('pulling 42%', end='\\r', flush=True); time.sleep(5)"])
-time.sleep(0.8)
-_js = engines.job_state("codex")
+for _ in range(40):   # the child prints within a moment; a busy machine can take a few seconds to start Python
+    _js = engines.job_state("codex")
+    if _js["url"] and _js["pct"] is not None:
+        break
+    time.sleep(0.1)
 check("jobs: a running sign-in shows its link and progress", _js["busy"] and _js["url"] == "https://auth.example.com/x?y=1" and _js["pct"] == 42, _js)
-check("jobs: the engines status carries the job", engines.all_status()["codex"].get("job", {}).get("busy") is True)
-for _ in range(50):
+check("jobs: the engines status carries the job", engines.all_status()["codex"].get("job", {}).get("kind") == "login")
+for _ in range(100):
     if not engines.job_state("codex")["busy"]:
         break
     time.sleep(0.1)
 check("jobs: a finished sign-in leaves no error", engines.job_state("codex") == {"kind": "login", "busy": False, "url": "", "pct": None, "error": ""},
       engines.job_state("codex"))
 engines._start_job("cursor", "install", [_py, "-c", "import sys; print('network is down'); sys.exit(3)"])
-for _ in range(50):
+for _ in range(100):
     if not engines.job_state("cursor")["busy"]:
         break
     time.sleep(0.1)
@@ -334,6 +337,41 @@ check("widgets: kept with the flow, sizes and colors made sane, unknown kinds dr
       and _w[0] == {"id": "note1", "type": "note", "x": 10, "y": 20, "w": 150, "h": 170, "text": "hi", "color": flows.WIDGET_COLORS[0]}, _w)
 check("widgets: live output keeps its team only while that team exists", (_w[1]["node"], _w[2]["node"]) == ("a", ""))
 check("widgets: a flow without any still loads", flows.clean_flow(_early)["widgets"] == [])
+import agents as _agents  # noqa: E402
+
+check("tokens: re-reading the conversation from the cache counts a tenth toward a limit",
+      _agents.used_tokens({"input_tokens": 1000, "output_tokens": 500, "cache_creation_input_tokens": 200, "cache_read_input_tokens": 400_000}) == 41_700
+      and _agents.used_tokens({}) == 0)
+# ---- a follow-up for one team, and what a live run wants from you ----------------------------------------------------
+import types  # noqa: E402
+
+_whole = flows.clean_flow({"name": "W", "nodes": [{"id": "s", "type": "master"}, {"id": "b", "type": "cluster", "name": "Builders", "retry": 2},
+                                                  {"id": "c", "type": "cluster", "name": "Checkers"}, {"id": "d", "type": "done"}],
+                           "edges": [{"from": "s", "to": "b"}, {"from": "b", "to": "c"}, {"from": "c", "to": "d"}]})
+_one = flows.only_team({**_whole, "id": "abc"}, "c")
+check("one team: the cut flow says it is one team", _one.get("only") == "c")
+check("follow-up: one team alone is Start, that team, Done, and can run",
+      [n["id"] for n in _one["nodes"]] == ["s", "c", "d"] and _one["edges"] == [{"from": "s", "to": "c"}, {"from": "c", "to": "d"}]
+      and _one["id"] == "abc" and not flows.check_runnable(_one), _one)
+try:
+    flows.only_team(_whole, "d")
+    _bad = False
+except ValueError:
+    _bad = True
+check("follow-up: a step that isn't a team is refused", _bad)
+_live = types.SimpleNamespace(id="r1", flow={"name": "Ship", "nodes": [{"id": "ok", "name": "Your call", "message": "Approve to ship."}, {"id": "b", "name": "Builders"}]},
+                              nodes={"ok": {"status": "approval", "started": 5, "agents": []},
+                                     "b": {"status": "running", "agents": [{"name": "Builder 1", "status": "running", "started": 100, "seen": 100},
+                                                                           {"name": "Builder 2", "status": "running", "started": 100, "seen": 690}]}})
+_needs, _quiet = flows.attention([_live], now=700)
+check("alerts: a waiting approval says which flow and what it asks",
+      [(n["kind"], n["flow"], n["text"], n["run"]) for n in _needs] == [("approval", "Ship", "Approve to ship.", "r1")], _needs)
+check("alerts: only the agent that has shown nothing for five minutes counts as quiet",
+      [(q["who"], q["minutes"]) for q in _quiet] == [("Builder 1", 10)], _quiet)
+_live.nodes["ok"]["question"] = {"agent": "Builder 1", "text": "Which file?"}
+_n2 = flows.attention([_live], now=700)[0]
+check("alerts: an agent's question is told apart from an approval, with its own key",
+      _n2[0]["kind"] == "question" and _n2[0]["who"] == "Builder 1" and _n2[0]["key"] != _needs[0]["key"], _n2)
 _w2 = {w["type"]: w for w in flows.clean_flow({**_early, "widgets": [
     {"type": "checklist", "items": [{"text": "  Tests   pass ", "done": True}, {"text": ""}, "junk", {"text": "x" * 300}], "pin": "a", "px": 30, "py": -40},
     {"type": "group", "text": "G" * 90, "pin": "a"}, {"type": "file", "file": "out.md", "pin": "gone"}, {"type": "approve"}]})["widgets"]}
@@ -377,11 +415,16 @@ check("schedule: fires in its slot once, not before, not hours late, not at the 
 check("schedule: hourly fires each hour at its minute", flows.schedule_due({**_s, "every": "hour", "at": "00:30"}, datetime(2026, 11, 14, 15, 31)) == "2026-11-14 15"
       and flows.schedule_due({**_s, "every": "hour", "at": "00:30"}, datetime(2026, 11, 14, 15, 29)) == "")
 _runs = [{"flow_id": "f", "status": "done", "tokens": t, "started": 0, "ended": s} for t, s in ((100, 10), (300, 30), (200, 20))] + [
-    {"flow_id": "f", "status": "failed", "tokens": 9, "started": 0, "ended": 1}, {"flow_id": "g", "status": "done", "tokens": 5, "started": 0, "ended": 1}]
+    {"flow_id": "f", "status": "failed", "tokens": 9, "started": 0, "ended": 1}, {"flow_id": "g", "status": "done", "tokens": 5, "started": 0, "ended": 1},
+    {"flow_id": "f", "status": "done", "tokens": 7, "started": 0, "ended": 1, "only": "c"}]   # a one-team follow-up doesn't count
 check("history: what this flow's finished runs used", flows.run_history(_runs, "f") == {"runs": 3, "tokens": 200, "low": 100, "high": 300, "seconds": 20}
       and flows.run_history(_runs, "none") == {})
 check("follow-up: carries the earlier job and result", "## The earlier job\nSort it" in flows.follow_up("Now chart it", {"task": "Sort it", "final": "Sorted."})
       and "## What that run produced\nSorted." in flows.follow_up("Now chart it", {"task": "Sort it", "final": "Sorted."}))
+_f1 = flows.follow_up("Now chart it", {"task": "Sort it", "final": "Sorted."})
+_f2 = flows.follow_up("Add a legend", {"task": _f1, "final": "Charted."})
+check("follow-up: shows only what you typed, and a second one doesn't nest the first", flows.job_of(_f1) == "Now chart it"
+      and flows.job_of("Plain job") == "Plain job" and _f2.count(flows.FOLLOW_MARK) == 1 and "## The earlier job\nNow chart it\n" in _f2)
 check("preview: read from the answer, junk refused", flows.parse_dryrun('ok {"steps": [{"team": "Sorter", "does": "Sorts it."}, {"team": ""}], "watch": "x"}', _bad)
       == {"steps": [{"team": "Sorter", "does": "Sorts it."}], "watch": "x"} and raises(lambda: flows.parse_dryrun("nope", _bad)))
 

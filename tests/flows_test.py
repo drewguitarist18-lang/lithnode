@@ -218,7 +218,7 @@ try:
         spender.write_text("import json, sys, time\n"
                            "for i in range(50):\n"
                            "    m = {'id': f'm{i}', 'model': 'claude', 'role': 'assistant', 'content': [{'type': 'tool_use', 'id': f't{i}', 'name': 'Read', 'input': {}}],\n"
-                           "         'usage': {'input_tokens': 10, 'cache_read_input_tokens': 99990, 'output_tokens': 0}}\n"
+                           "         'usage': {'input_tokens': 99990, 'cache_read_input_tokens': 100, 'output_tokens': 0}}\n"
                            "    print(json.dumps({'type': 'assistant', 'message': m}), flush=True)\n"
                            "    print(json.dumps({'type': 'assistant', 'message': m}), flush=True)   # repeated per block\n"
                            "    time.sleep(0.2)\n")
@@ -607,7 +607,8 @@ try:
     run = wait_run(r["run"], until=("waiting", "failed"))
     call(f"/api/runs/{run['id']}/decide", {"node": "ok", "approved": False, "note": "not now"}, "POST")
     run = wait_run(run["id"])
-    check("rejecting stops the chain", run["status"] == "failed" and run["nodes"]["ok"]["error"] == "Rejected: not now"
+    check("rejecting stops the chain", run["status"] == "stopped" and run["nodes"]["ok"]["error"] == "Rejected: not now"
+          and any(e["text"].startswith("Stopped: you rejected it at") for e in run["log"])
           and run["nodes"]["prod"]["status"] == "skipped" and run["nodes"]["done"]["status"] == "skipped", run["nodes"]["prod"])
 
     # ---- failures ----------------------------------------------------------------------------
@@ -852,7 +853,7 @@ try:
     wait_run(rid, until=("waiting", "failed", "done"))
     call(f"/api/runs/{rid}/decide", {"node": "ok", "approved": False, "redo": True}, "POST")
     r = wait_run(rid)
-    check("work can be sent back twice, then a third reject ends the run", r["status"] == "failed" and "already been sent back" in r["nodes"]["ok"]["error"], r["nodes"]["ok"])
+    check("work can be sent back twice, then a third reject ends the run", r["status"] == "stopped" and "already been sent back" in r["nodes"]["ok"]["error"], r["nodes"]["ok"])
 
     loop = chain([{"id": "b", "type": "cluster", "name": "Maker", "model": "claude-haiku-4-5"},
                   {"id": "chk", "type": "cluster", "name": "Checker gate", "model": "claude-haiku-4-5", "retry": 2}],

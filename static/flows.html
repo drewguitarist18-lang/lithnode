@@ -321,8 +321,9 @@ async function boot() {
   allRuns = runs; runs.forEach((r) => ranFlows.add(r.flow_id));
   if (!sel) renderInspector();   // Get started can now tick off "Run it"
   const live = runs.find((r) => r.flow_id === flow.id && (r.status === "running" || r.status === "waiting"));
-  if (live) openRun(live.id);
+  if (live) await openRun(live.id);
 }
+let booted = null;   // boot() under way; asking for a run waits for it
 
 async function openFlow(id) {
   const d = await api("/api/flows/" + id);
@@ -1052,7 +1053,7 @@ function teamText(n) {   // [title html, footer html] for a team card, at rest o
   let dots = Array.from({ length: shown }, (_, i) => agent(i, "", label(i))).join("");
   let foot = `<span class="how" title="${esc(how)}">${count < 2 ? "1 agent" : count + " agents"}</span>${toolIcons(n)}${model}`;
   if (st) {
-    const ag = st.agents || [], running = ag.find((a) => a.status === "running");
+    const ag = latestAgents(st.agents), running = ag.find((a) => a.status === "running");
     dots = Array.from({ length: shown }, (_, i) => {
       const a = ag[i]; return agent(i, !a ? "wait" : { running: "run", done: "done", failed: "fail" }[a.status] || "wait", a ? a.name + ": " + a.status : label(i) + " · waiting");
     }).join("");
@@ -1554,7 +1555,7 @@ function renderInspector() {
       <div class="isec" title="Where agents work. You can change it each time you run."><h4>Project folder</h4>${folderField("fFolder", flow.folder)}</div>
       <div class="isec"><h4>Recent runs${mine.length ? `<a href="#" class="aside" id="allRuns">All runs</a>` : ""}</h4>
         ${mine.length ? `<div class="rruns">${mine.map((r) => `<button type="button" class="rrun" data-run="${esc(r.id)}"><i class="${esc(r.status)}"></i>
-          <span class="ot"><b>${esc(r.task || "No task")}</b><small>${esc(STATUS_WORD[r.status] || cap(r.status))} · ${esc(when(r.started))}${r.ended ? " · " + dur(r.ended - r.started) : ""}</small></span></button>`).join("")}</div>`
+          <span class="ot"><b>${esc(jobOf(r.task) || "No task")}</b><small>${esc(STATUS_WORD[r.status] || cap(r.status))} · ${esc(when(r.started))}${r.ended ? " · " + dur(r.ended - r.started) : ""}</small></span></button>`).join("")}</div>`
           : `<p class="hint" style="margin:0">No runs yet. Press Run and say what you want done.</p>`}</div>`;
     wireFolder("fFolder", (v) => { flow.folder = v; changed(false); });
     drawLooks(box);
@@ -1859,7 +1860,7 @@ $("runBtn").onclick = () => {
     const task = realTask($("taskIn").value);
     // a missing engine blocks the run; a sign-in check can be wrong (offline, slow), so that one only warns
     $("goBtn").disabled = !task || problems.length > 0 || notReady().some((id) => !engineInfo(id).installed) || (careful && !$("riskOk").checked);
-    $("taskSub").textContent = task ? "" : "Type the job first. The run can't start until it knows what to do.";
+    $("taskSub").textContent = task || !nagged ? "" : "Type the job first. The run can't start until it knows what to do.";
     $("taskSub").classList.toggle("need", !task && nagged);
   };
   $("riskOk").onchange = ready; ready();
@@ -1869,7 +1870,7 @@ $("runBtn").onclick = () => {
   $("limitIn").value = lim;
   const limitNote = () => {
     const n = +$("limitIn").value;
-    $("limitSub").textContent = n ? `The run stops if its agents use more, and no one agent may use over ${tokenWord(n / 2)}.` : "Agents run until they finish. Big flows can use a lot of your plan.";
+    $("limitSub").textContent = n ? "The run stops if its agents use more. Re-reading earlier work counts a tenth, like it costs." : "Agents run until they finish. Big flows can use a lot of your plan.";
   };
   $("limitIn").onchange = limitNote; limitNote();
   const roleSelects = [...document.querySelectorAll("#runDlg [data-role]")];
@@ -1985,6 +1986,10 @@ function flowOrder(f) {
 }
 // ---- How it works: every stage in running order, each team with its agents and what each one is told to work on.
 // With a run it shows what each agent is doing right now instead.
+// a team sent back runs its agents again under the same names; the run keeps both rounds, the view shows the latest
+// what you typed for a run: a follow-up also carries the earlier run for its agents (flows.FOLLOW_MARK)
+const jobOf = (t) => String(t || "").split("\n\n# This follows an earlier run of this team")[0];
+const latestAgents = (ags) => [...new Map((ags || []).map((a) => [a.name, a])).values()];
 function agentFocus(n, i) {   // as flows.py's _cluster tells agent i
   const c = n.count || 1, fs = (n.focuses || "").split("\n").map((s) => s.trim()).filter(Boolean);
   if (n.split && c > 1) return `Part ${i} of ${c}` + (fs.length ? ` · ${fs[(i - 1) % fs.length]}` : "");
@@ -2015,7 +2020,7 @@ function howItWorks(f, r) {
   if (end) stages.push([end]);
   const row = (n) => {
     const lk = lookOf(n), team = n.type === "cluster", st = r ? r.nodes[n.id] || { status: "waiting", agents: [] } : null, status = st ? st.status : "";
-    const ags = st ? st.agents || [] : [], live = ags.find((a) => a.status === "running");
+    const ags = st ? latestAgents(st.agents) : [], live = ags.find((a) => a.status === "running");
     const secs = st && st.started ? (st.ended || now) - st.started : 0, took = secs >= 1 || (st && !st.ended && st.started) ? dur(secs) : "";
     const meta = r ? (status === "waiting" ? "" : status === "approval" ? "Needs you" : took)
       : team ? `${teamModel(n)} · ${(CAN[n.tools] || CAN.read)[0]}` : (n.type === "master" && n.mode !== "pass") || (n.type === "checkpoint" && n.mode === "summarize") ? modelLabel(n.model) : "";
@@ -2320,8 +2325,8 @@ function dur(sec) { sec = Math.max(0, Math.round(sec)); return sec < 60 ? `${sec
 function stepCount(f) { return f.nodes.filter((n) => n.type !== "done").length; }
 function runMeta(r) {
   const ids = new Set(r.flow.nodes.filter((n) => n.type !== "done").map((n) => n.id));
-  const states = Object.entries(r.nodes).filter(([id]) => ids.has(id)).map(([, s]) => s), fin = states.filter((x) => ["done", "failed", "stopped", "skipped"].includes(x.status)).length;
-  const agents = states.reduce((n, x) => n + x.agents.length, 0);
+  const states = Object.entries(r.nodes).filter(([id]) => ids.has(id)).map(([, s]) => s), fin = states.filter((x) => ["done", "failed", "skipped"].includes(x.status)).length;   // a stopped step never ran: "3 of 8 steps", not a full bar
+  const agents = states.reduce((n, x) => n + latestAgents(x.agents).length, 0);   // a team sent back is still the same agents
   return { states, fin, agents, took: (r.ended || Date.now() / 1000) - r.started };
 }
 // Agents that failed in a run that still finished: the run went on without their reports, so say so next to the result.
@@ -2391,7 +2396,7 @@ function renderRunPanel() {
   } else html += `<div class="hw-h">How it works${live ? `<span class="hw-live"><i></i>Live</span>` : ""}</div>${howItWorks(r.flow, r)}`;
 
   if (live) html += `<form id="tellForm" class="tell"><input id="tellIn" maxlength="1000" autocomplete="off" placeholder="Tell the team something…" aria-label="A note to the team" title="Agents already working can't hear it. Every agent that starts after this reads it."><button>Send</button></form>`;
-  html += `<details class="quiet"${live ? " open" : ""}><summary>Task</summary><div class="task-text">${esc(r.task)}</div></details>
+  html += `<details class="quiet"${live ? " open" : ""}><summary>Task</summary><div class="task-text">${esc(jobOf(r.task))}</div></details>
     <details class="quiet"><summary>Activity · ${r.log.length}</summary><ul class="timeline">${r.log.slice().reverse().map((l) =>
       `<li class="${logClass(l.text)}"><time>${new Date(l.t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><b></b><span>${esc(l.text)}</span></li>`).join("")}</ul></details>`;
 
@@ -2432,7 +2437,7 @@ function reportStages(r) {      // [{ node, agents }] for every team that left r
     .map((n) => ({ node: n, agents: r.nodes[n.id].agents.filter((a) => a.report) })).filter((g) => g.agents.length);
 }
 function resultMarkdown(r) {
-  const out = [`# ${r.flow_name}`, "", `> ${String(r.task || "").replace(/\n/g, "\n> ")}`, "", r.final || "No result."];
+  const out = [`# ${r.flow_name}`, "", `> ${jobOf(r.task).replace(/\n/g, "\n> ")}`, "", r.final || "No result."];
   const lastItems = itemNodes(r).pop();
   if (lastItems) out.push("", `## Items from ${lastItems.name}`, "", itemsMarkdown(r.nodes[lastItems.id].items));
   if (r.brief) out.push("", "---", "", "## The plan", "", r.brief);
@@ -2566,7 +2571,7 @@ function openSheet(r) {
   }
   if (r.brief) { what.push("the plan"); more.push(`<section class="rp-sec"><h3>The plan everyone got</h3><div class="doc">${md(r.brief)}</div></section>`); }
   what.push("your task");
-  more.push(`<section class="rp-sec"><h3>Your task</h3><div class="ask">${esc(r.task)}</div></section>
+  more.push(`<section class="rp-sec"><h3>Your task</h3><div class="ask">${esc(jobOf(r.task))}</div></section>
     <p class="hint"><button id="sheetDl">Download everything as .md</button></p>`);
   const folder = r.folder ? r.folder.split(/[\\/]/).filter(Boolean).pop() || "" : "";
 
@@ -2580,7 +2585,7 @@ function openSheet(r) {
       ${troubleHtml(r, "rp-warn")}
       ${resultView(r.final, filesView(r), r)}
       ${r.snap ? `<div id="sheetChanges" class="rp-changes"></div>` : ""}
-      ${ok && r.flow_id && flows.some((f) => f.id === r.flow_id) ? `<form id="followForm" class="follow"><input id="followIn" maxlength="4000" autocomplete="off" placeholder="Follow up: now also…" aria-label="A follow-up job for the same team"><button class="primary">Run</button></form>` : ""}
+      ${ok && r.flow_id && flows.some((f) => f.id === r.flow_id) ? `<form id="followForm" class="follow"><input id="followIn" maxlength="4000" autocomplete="off" placeholder="Follow up: now also…" aria-label="A follow-up job for the same team"><select id="followWho" aria-label="Who does the follow-up" title="A small follow-up rarely needs everyone. Pick one team to do it alone, or run the whole flow again."><option value="">Whole team</option>${r.flow.nodes.filter((n) => n.type === "cluster").map((n) => `<option value="${esc(n.id)}">Just ${esc(n.name)}</option>`).join("")}</select><button class="primary">Run</button></form>` : ""}
       <details class="rp-details"><summary>Details: ${what.join(", ")}</summary>${more.join("")}</details>
     </div></div></div>`;
 
@@ -2588,12 +2593,17 @@ function openSheet(r) {
   $("sheet").classList.add("show"); main.scrollTop = 0;
   drawLooks($("sheet")); wireSays($("sheet"));
   if (r.snap) loadChanges(r);
+  if ($("followWho")) {   // who did the last follow-up, when that team is in this flow too
+    let last = ""; try { last = localStorage.getItem("hq-follow-who") || ""; } catch (e) { /* private window */ }
+    if ([...$("followWho").options].some((o) => o.value === last)) $("followWho").value = last;
+    $("followWho").onchange = () => { try { localStorage.setItem("hq-follow-who", $("followWho").value); } catch (e) { /* private window */ } };
+  }
   if ($("followForm")) $("followForm").onsubmit = async (e) => {
     e.preventDefault();
     const task = $("followIn").value.trim();
     if (!realTask(task)) return toast("Say what to do next, in a few words.");
     try {
-      const d = await api(`/api/flows/${r.flow_id}/run`, { method: "POST", body: { task, folder: r.folder, after: r.id } });
+      const d = await api(`/api/flows/${r.flow_id}/run`, { method: "POST", body: { task, folder: r.folder, after: r.id, only: $("followWho").value } });
       closeSheet(); openRun(d.run);
     } catch (err) { toast(err.message); }
   };
@@ -2636,7 +2646,7 @@ function maybeShowResult(r) {
 $("runsBtn").onclick = async () => {
   const runs = allRuns = (await api("/api/runs")).runs;
   $("runList").innerHTML = runs.length ? runs.map((r) => `<div class="runrow" data-run="${esc(r.id)}"><b>${esc(r.flow_name)}</b>
-    <span class="pill ${esc(r.status === "waiting" ? "approval" : r.status)}">${esc(r.status === "waiting" ? "Needs you" : cap(r.status))}</span>${r.items ? `<span class="pill items">${r.items.pass || r.items.cut ? `<span style="color:var(--done)">${r.items.pass} ✓</span>${r.items.cut ? ` · <span style="color:var(--failed)">${r.items.cut} ✕</span>` : ""}` : `${r.items.total} items`}</span>` : ""}<small>${esc((r.task || "").slice(0, 120))} · <span title="${esc(new Date(r.started * 1000).toLocaleString())}">${when(r.started)}</span>${r.ended ? " · " + dur(r.ended - r.started) : ""}</small></div>`).join("")
+    <span class="pill ${esc(r.status === "waiting" ? "approval" : r.status)}">${esc(r.status === "waiting" ? "Needs you" : cap(r.status))}</span>${r.items ? `<span class="pill items">${r.items.pass || r.items.cut ? `<span style="color:var(--done)">${r.items.pass} ✓</span>${r.items.cut ? ` · <span style="color:var(--failed)">${r.items.cut} ✕</span>` : ""}` : `${r.items.total} items`}</span>` : ""}<small>${esc(jobOf(r.task).slice(0, 120))} · <span title="${esc(new Date(r.started * 1000).toLocaleString())}">${when(r.started)}</span>${r.ended ? " · " + dur(r.ended - r.started) : ""}</small></div>`).join("")
     : '<p class="hint">No runs yet. Press Run to start one.</p>';
   $("runsDlg").showModal();
 };
@@ -2853,7 +2863,7 @@ window.flowsApi = {
   undo: () => undo(), redo: () => redo(), canUndo: () => canUndo(), canRedo: () => canRedo(),
   zoomIn: () => zoomBy(1.2), zoomOut: () => zoomBy(1 / 1.2), zoomReset: () => zoomBy(0), fit: () => { autoFit = true; fit(); },
   panes, toggleLeft: () => setPanes(!panes()[0], panes()[1]), toggleRight: () => setPanes(panes()[0], !panes()[1]),
-  tour: () => welcomeTour(),
+  tour: () => welcomeTour(), openRun: async (id) => { await booted; openRun(id); },   // after boot, so its own "open the live run" can't win
   reloadPrefs: () => loadPrefs(), reloadEngines: () => loadEngines(true), setView: (v) => setView(v), view: () => viewMode, models: () => meta.models || [],
 };
 // Team files: a flow saved as a .lithnode.json to share, and one someone shared opened as a new flow.
@@ -3059,7 +3069,7 @@ let lastFrame = 0;
   lastFrame = ms; drawIcons(ms / 1000);
 })(0);
 
-boot().catch((e) => toast("Couldn't load flows: " + e.message));
+booted = boot().catch((e) => toast("Couldn't load flows: " + e.message));
 </script>
 </body>
 </html>

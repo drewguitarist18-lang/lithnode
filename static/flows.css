@@ -1002,6 +1002,7 @@ main { grid-template-rows: minmax(0, 1fr) auto; }
 .sched .sub { padding-bottom: 10px; }
 .previewbox { border: 1px solid var(--line); background: var(--pad); border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.5; }
 .previewbox ol { margin: 6px 0 0; padding-left: 20px; } .previewbox p { margin: 8px 0 0; } .previewbox .bad { color: var(--failed); margin: 0; }
+.follow select { flex: none; width: auto; max-width: 40%; height: 40px; border-radius: 12px; font-size: 13.5px; }
 .follow { display: flex; gap: 8px; margin: 0 0 18px; } .follow input { flex: 1; min-width: 0; height: 40px; font-size: 14.5px; padding: 0 14px; border-radius: 12px; }
 .rp-changes { margin-bottom: 18px; } .rp-changes:empty { display: none; }
 .rp-changes > small { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 600; margin: 0 4px 8px; }

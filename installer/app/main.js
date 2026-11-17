@@ -2,7 +2,9 @@
 // hidden in the background, then shows the app in a window with Lithnode's own dark title bar.
 // Windows and Linux: the engine sits in server/ next to this program. Mac: in the app's Resources folder.
 // Closing the window stops the engine and any runs, like Quit does.
-const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Notification, shell } = require("electron");
+// Windows only shows an app's notifications under a name it knows: the same id the Start menu shortcut carries
+if (process.platform === "win32" && !process.windowsStore) app.setAppUserModelId("com.lithnode.Lithnode");
 const { spawn } = require("child_process");
 const http = require("http");
 const path = require("path");
@@ -78,6 +80,24 @@ ipcMain.on("bar", (_e, colors) => {
   if (!win || !colors) return;
   if (MAC) return;
   try { win.setTitleBarOverlay({ color: String(colors.color), symbolColor: String(colors.symbol) }); } catch (e) { /* older Windows */ }
+});
+// a run needs you, finished or went quiet: the system's own notification, and the taskbar flashes until you look
+const alerts = new Set();   // kept until closed, so a click still reaches us
+ipcMain.on("alert", (e, a) => {
+  if (!win || !a) return;
+  if (!win.isFocused()) { win.flashFrame(true); win.once("focus", () => win.flashFrame(false)); }
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title: String(a.title || "Lithnode").slice(0, 120), body: String(a.body || "").slice(0, 400), silent: true,
+                               icon: path.join(__dirname, "lithnode.png") });
+  alerts.add(n);
+  n.on("click", () => {
+    if (win.isMinimized()) win.restore();
+    win.show(); win.focus();
+    win.webContents.send("alert-click", String(a.run || ""));
+    alerts.delete(n);
+  });
+  n.on("close", () => alerts.delete(n));
+  n.show();
 });
 // the system's own folder picker, on every platform (and inside the Linux sandbox, through its portal)
 ipcMain.handle("pick-folder", async () => {
